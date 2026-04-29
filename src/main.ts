@@ -16,6 +16,7 @@ if (!appElement) {
 }
 
 const app = appElement;
+const currentWindow = getCurrentWindow();
 
 function titleFor(documentView: LoadedDocument): string {
   if (documentView.error) {
@@ -92,7 +93,7 @@ async function openDroppedFile(path: string): Promise<void> {
 }
 
 async function registerDragAndDrop(): Promise<void> {
-  await getCurrentWindow().onDragDropEvent((event) => {
+  await currentWindow.onDragDropEvent((event) => {
     if (event.payload.type !== "drop") {
       return;
     }
@@ -103,6 +104,10 @@ async function registerDragAndDrop(): Promise<void> {
       void openDroppedFile(path);
     }
   });
+}
+
+async function revealWindow(): Promise<void> {
+  await currentWindow.show();
 }
 
 async function start(): Promise<void> {
@@ -117,6 +122,8 @@ async function start(): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     document.title = "Error - Markdown Reader";
     renderState("error", "Could not start Markdown Reader.", message);
+  } finally {
+    await revealWindow();
   }
 }
 
