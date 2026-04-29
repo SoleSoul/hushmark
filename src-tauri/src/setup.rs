@@ -1,7 +1,6 @@
 use std::{
     env, fs,
     path::{Path, PathBuf},
-    process::Command,
 };
 
 use serde::Serialize;
@@ -16,6 +15,14 @@ use crate::identity::{
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SetupMessage {
+    pub kind: &'static str,
+    pub text: String,
+    pub details: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SetupStatus {
     pub app_name: &'static str,
     pub version: &'static str,
@@ -27,16 +34,56 @@ pub struct SetupStatus {
     pub installed: bool,
     pub installed_matches_current: bool,
     pub app_path_registered: bool,
+    pub application_registered: bool,
     pub file_handlers_registered: bool,
+    pub open_with_md_registered: bool,
+    pub open_with_markdown_registered: bool,
     pub context_menu_registered: bool,
+    pub context_menu_md_registered: bool,
+    pub context_menu_markdown_registered: bool,
     pub default_apps_uri: &'static str,
-    pub message: Option<String>,
+    pub message: Option<SetupMessage>,
 }
 
-pub fn setup_status(message: Option<String>) -> Result<SetupStatus, String> {
+impl SetupMessage {
+    fn success(text: impl Into<String>) -> Self {
+        Self {
+            kind: "success",
+            text: text.into(),
+            details: None,
+        }
+    }
+
+    fn warning(text: impl Into<String>, details: Option<String>) -> Self {
+        Self {
+            kind: "warning",
+            text: text.into(),
+            details,
+        }
+    }
+
+    fn error(text: impl Into<String>, details: impl Into<String>) -> Self {
+        Self {
+            kind: "error",
+            text: text.into(),
+            details: Some(details.into()),
+        }
+    }
+}
+
+pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String> {
     let current_exe = current_exe_path()?;
     let install_path = installed_exe_path()?;
     let installed = install_path.exists();
+    let installed_matches_current = installed && files_match(&current_exe, &install_path);
+    let app_path_registered = is_app_path_registered(&install_path);
+    let application_registered = is_application_registered(&install_path);
+    let open_with_md_registered = is_open_with_extension_registered(MARKDOWN_EXTENSIONS[0]);
+    let open_with_markdown_registered = is_open_with_extension_registered(MARKDOWN_EXTENSIONS[1]);
+    let context_menu_md_registered =
+        is_context_menu_extension_registered(MARKDOWN_EXTENSIONS[0], &install_path);
+    let context_menu_markdown_registered =
+        is_context_menu_extension_registered(MARKDOWN_EXTENSIONS[1], &install_path);
 
     Ok(SetupStatus {
         app_name: DISPLAY_NAME,
@@ -47,125 +94,192 @@ pub fn setup_status(message: Option<String>) -> Result<SetupStatus, String> {
         install_path: path_to_string(&install_path),
         current_exe_path: path_to_string(&current_exe),
         installed,
-        installed_matches_current: installed && files_match(&current_exe, &install_path),
-        app_path_registered: is_app_path_registered(&install_path),
-        file_handlers_registered: are_file_handlers_registered(&install_path),
-        context_menu_registered: is_context_menu_registered(&install_path),
+        installed_matches_current,
+        app_path_registered,
+        application_registered,
+        file_handlers_registered: installed_matches_current
+            && app_path_registered
+            && application_registered
+            && open_with_md_registered
+            && open_with_markdown_registered,
+        open_with_md_registered,
+        open_with_markdown_registered,
+        context_menu_registered: installed_matches_current
+            && context_menu_md_registered
+            && context_menu_markdown_registered,
+        context_menu_md_registered,
+        context_menu_markdown_registered,
         default_apps_uri: DEFAULT_APPS_URI,
         message,
     })
 }
 
-pub fn install_or_update() -> Result<SetupStatus, String> {
-    let current_exe = current_exe_path()?;
-    let install_path = installed_exe_path()?;
-    let install_dir = install_path.parent().ok_or_else(|| {
-        format!(
-            "Could not determine install directory for {}",
-            install_path.display()
-        )
-    })?;
+pub fn install_hushmark() -> Result<SetupStatus, String> {
+    match install_current_exe() {
+        Ok(()) => setup_status(Some(SetupMessage::success(format!(
+            "{DISPLAY_NAME} was installed."
+        )))),
+        Err(error) => setup_status(Some(SetupMessage::error(
+            format!("{DISPLAY_NAME} could not be installed."),
+            error,
+        ))),
+    }
+}
 
-    fs::create_dir_all(install_dir).map_err(|error| {
-        format!(
-            "Could not create install directory {}: {error}",
-            install_dir.display()
-        )
-    })?;
+pub fn toggle_install() -> Result<SetupStatus, String> {
+    let status = setup_status(None)?;
 
-    if !same_path(&current_exe, &install_path) {
-        let temp_path = install_path.with_extension("exe.tmp");
-        let _ = fs::remove_file(&temp_path);
-        fs::copy(&current_exe, &temp_path).map_err(|error| {
-            format!(
-                "Could not copy {} to {}: {error}",
-                current_exe.display(),
-                temp_path.display()
-            )
-        })?;
+    if status.installed_matches_current {
+        let mut errors = Vec::new();
+        if let Err(error) = unregister_open_with_integration() {
+            errors.push(error);
+        }
+        if let Err(error) = unregister_context_menu_integration() {
+            errors.push(error);
+        }
 
-        if install_path.exists() {
-            replace_file(&temp_path, &install_path)?;
-        } else {
-            fs::rename(&temp_path, &install_path).map_err(|error| {
-                let _ = fs::remove_file(&temp_path);
-                format!(
-                    "Could not move {} to {}: {error}",
-                    temp_path.display(),
-                    install_path.display()
-                )
-            })?;
+        let mut message = remove_installed_exe()?;
+        notify_shell_associations_changed();
+
+        if !errors.is_empty() {
+            return setup_status(Some(SetupMessage::error(
+                "Some Hushmark integration could not be removed.",
+                errors.join("\n"),
+            )));
+        }
+
+        if message.kind == "success" {
+            message.text.push_str(
+                " Open With support and right-click entries were removed because they need the installed copy.",
+            );
+        }
+
+        setup_status(Some(message))
+    } else {
+        install_hushmark()
+    }
+}
+
+pub fn toggle_open_with_support() -> Result<SetupStatus, String> {
+    let status = setup_status(None)?;
+
+    if status.file_handlers_registered {
+        match unregister_open_with_integration() {
+            Ok(()) => {
+                notify_shell_associations_changed();
+                setup_status(Some(SetupMessage::success(
+                    "Open With support was removed.",
+                )))
+            }
+            Err(error) => setup_status(Some(SetupMessage::error(
+                "Open With support could not be removed.",
+                error,
+            ))),
+        }
+    } else {
+        let installed_first = !status.installed_matches_current;
+        match install_current_exe().and_then(|_| {
+            let install_path = installed_exe_path()?;
+            register_open_with_integration(&install_path)
+        }) {
+            Ok(()) => {
+                notify_shell_associations_changed();
+                let text = if installed_first {
+                    format!("{DISPLAY_NAME} was installed and Open With support was added.")
+                } else {
+                    "Open With support was added.".to_string()
+                };
+                setup_status(Some(SetupMessage::success(text)))
+            }
+            Err(error) => setup_status(Some(SetupMessage::error(
+                "Open With support could not be added.",
+                error,
+            ))),
         }
     }
+}
 
-    register_windows_integration(&install_path)?;
+pub fn toggle_context_menu() -> Result<SetupStatus, String> {
+    let status = setup_status(None)?;
+
+    if status.context_menu_registered {
+        match unregister_context_menu_integration() {
+            Ok(()) => {
+                notify_shell_associations_changed();
+                setup_status(Some(SetupMessage::success(
+                    "Right-click menu entry was removed.",
+                )))
+            }
+            Err(error) => setup_status(Some(SetupMessage::error(
+                "Right-click menu entry could not be removed.",
+                error,
+            ))),
+        }
+    } else {
+        let installed_first = !status.installed_matches_current;
+        match install_current_exe().and_then(|_| {
+            let install_path = installed_exe_path()?;
+            register_context_menu_integration(&install_path)
+        }) {
+            Ok(()) => {
+                notify_shell_associations_changed();
+                let text = if installed_first {
+                    format!(
+                        "{DISPLAY_NAME} was installed and the right-click menu entry was added."
+                    )
+                } else {
+                    "Right-click menu entry was added.".to_string()
+                };
+                setup_status(Some(SetupMessage::success(text)))
+            }
+            Err(error) => setup_status(Some(SetupMessage::error(
+                "Right-click menu entry could not be added.",
+                error,
+            ))),
+        }
+    }
+}
+
+pub fn remove_all_integration() -> Result<SetupStatus, String> {
+    let mut errors = Vec::new();
+
+    if let Err(error) = unregister_open_with_integration() {
+        errors.push(error);
+    }
+
+    if let Err(error) = unregister_context_menu_integration() {
+        errors.push(error);
+    }
+
+    let install_message = remove_installed_exe()?;
     notify_shell_associations_changed();
 
-    setup_status(Some(format!(
-        "{DISPLAY_NAME} is installed and registered as an Open with option for Markdown files."
+    if !errors.is_empty() {
+        return setup_status(Some(SetupMessage::error(
+            "Some Hushmark integration could not be removed.",
+            errors.join("\n"),
+        )));
+    }
+
+    if install_message.kind == "warning" {
+        return setup_status(Some(install_message));
+    }
+
+    setup_status(Some(SetupMessage::success(
+        "All Hushmark integration was removed.",
     )))
 }
 
-pub fn remove_integration() -> Result<SetupStatus, String> {
-    unregister_windows_integration()?;
-
-    let current_exe = current_exe_path()?;
-    let install_path = installed_exe_path()?;
-    let mut message = format!("{DISPLAY_NAME} registry integration was removed.");
-
-    if install_path.exists() {
-        if same_path(&current_exe, &install_path) {
-            message.push_str(&format!(
-                " The installed executable is currently running and remains at {}. Close {DISPLAY_NAME}, then delete that file manually if you want to remove the installed copy.",
-                install_path.display()
-            ));
-        } else {
-            match fs::remove_file(&install_path) {
-                Ok(()) => {
-                    remove_empty_install_dir(&install_path, &mut message);
-                    message.push_str(" The installed executable was removed.");
-                }
-                Err(error) => {
-                    message.push_str(&format!(
-                        " The installed executable remains at {} because it could not be deleted: {error}. Close any running {DISPLAY_NAME} windows, then delete it manually if you want to remove the installed copy.",
-                        install_path.display()
-                    ));
-                }
-            }
-        }
+pub fn open_default_apps_settings() -> Result<SetupStatus, String> {
+    match open_default_apps_settings_impl() {
+        Ok(()) => setup_status(Some(SetupMessage::success(
+            "Windows Default Apps settings opened. Choose Hushmark manually if you want it as the default for Markdown files.",
+        ))),
+        Err(error) => setup_status(Some(SetupMessage::warning(
+            "Windows did not open Default Apps automatically. You can still choose Hushmark manually in Windows Settings > Apps > Default apps.",
+            Some(error),
+        ))),
     }
-
-    notify_shell_associations_changed();
-    setup_status(Some(message))
-}
-
-fn remove_empty_install_dir(install_path: &Path, message: &mut String) {
-    if let Some(install_dir) = install_path.parent() {
-        match fs::remove_dir(install_dir) {
-            Ok(()) => message.push_str(" The empty install directory was removed."),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) if error.kind() == std::io::ErrorKind::DirectoryNotEmpty => {
-                message.push_str(&format!(
-                    " The install directory {} contains other files and was left in place.",
-                    install_dir.display()
-                ));
-            }
-            Err(error) => {
-                message.push_str(&format!(
-                    " The install directory {} could not be removed: {error}",
-                    install_dir.display()
-                ));
-            }
-        }
-    }
-}
-
-pub fn open_default_apps_settings() -> Result<(), String> {
-    Command::new("explorer.exe")
-        .arg(DEFAULT_APPS_URI)
-        .spawn()
-        .map(|_| ())
-        .map_err(|error| format!("Could not open Windows Default Apps settings: {error}"))
 }
 
 pub fn is_install_mode_arg(arg: &std::ffi::OsStr) -> bool {
@@ -236,8 +350,110 @@ fn files_match(left: &Path, right: &Path) -> bool {
             .map_or(false, |(left, right)| left == right)
 }
 
+fn install_current_exe() -> Result<(), String> {
+    let current_exe = current_exe_path()?;
+    let install_path = installed_exe_path()?;
+    let install_dir = install_path.parent().ok_or_else(|| {
+        format!(
+            "Could not determine install directory for {}",
+            install_path.display()
+        )
+    })?;
+
+    fs::create_dir_all(install_dir).map_err(|error| {
+        format!(
+            "Could not create install directory {}: {error}",
+            install_dir.display()
+        )
+    })?;
+
+    if same_path(&current_exe, &install_path) {
+        return Ok(());
+    }
+
+    let temp_path = install_path.with_extension("exe.tmp");
+    let _ = fs::remove_file(&temp_path);
+    fs::copy(&current_exe, &temp_path).map_err(|error| {
+        format!(
+            "Could not copy {} to {}: {error}",
+            current_exe.display(),
+            temp_path.display()
+        )
+    })?;
+
+    if install_path.exists() {
+        replace_file(&temp_path, &install_path)
+    } else {
+        fs::rename(&temp_path, &install_path).map_err(|error| {
+            let _ = fs::remove_file(&temp_path);
+            format!(
+                "Could not move {} to {}: {error}",
+                temp_path.display(),
+                install_path.display()
+            )
+        })
+    }
+}
+
+fn remove_installed_exe() -> Result<SetupMessage, String> {
+    let current_exe = current_exe_path()?;
+    let install_path = installed_exe_path()?;
+
+    if !install_path.exists() {
+        return Ok(SetupMessage::success(format!(
+            "{DISPLAY_NAME} is not installed."
+        )));
+    }
+
+    if same_path(&current_exe, &install_path) {
+        return Ok(SetupMessage::warning(
+            "The installed executable could not be removed because it is currently running.",
+            Some(format!(
+                "The running executable is {}. Close {DISPLAY_NAME}, then delete {} manually if you want to remove the installed copy.",
+                current_exe.display(),
+                install_path.display()
+            )),
+        ));
+    }
+
+    match fs::remove_file(&install_path) {
+        Ok(()) => {
+            let mut text = format!("{DISPLAY_NAME} was uninstalled.");
+            if let Some(note) = remove_empty_install_dir(&install_path) {
+                text.push(' ');
+                text.push_str(&note);
+            }
+            Ok(SetupMessage::success(text))
+        }
+        Err(error) => Ok(SetupMessage::warning(
+            "The installed executable could not be removed because it is currently running.",
+            Some(format!(
+                "Could not delete {}: {error}",
+                install_path.display()
+            )),
+        )),
+    }
+}
+
+fn remove_empty_install_dir(install_path: &Path) -> Option<String> {
+    let install_dir = install_path.parent()?;
+
+    match fs::remove_dir(install_dir) {
+        Ok(()) => Some("The empty install directory was removed.".to_string()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) if error.kind() == std::io::ErrorKind::DirectoryNotEmpty => Some(format!(
+            "The install directory {} contains other files and was left in place.",
+            install_dir.display()
+        )),
+        Err(error) => Some(format!(
+            "The install directory {} could not be removed: {error}",
+            install_dir.display()
+        )),
+    }
+}
+
 #[cfg(windows)]
-fn register_windows_integration(install_path: &Path) -> Result<(), String> {
+fn register_open_with_integration(install_path: &Path) -> Result<(), String> {
     use winreg::{
         enums::{HKEY_CURRENT_USER, REG_NONE},
         RegKey, RegValue,
@@ -335,40 +551,21 @@ fn register_windows_integration(install_path: &Path) -> Result<(), String> {
         .map_err(registry_error)?;
     }
 
-    for extension in MARKDOWN_EXTENSIONS {
-        let key_path = context_menu_key(extension);
-        let (key, _) = hkcu.create_subkey(&key_path).map_err(registry_error)?;
-        key.set_value("", &CONTEXT_MENU_LABEL)
-            .map_err(registry_error)?;
-        key.set_value("Icon", &icon).map_err(registry_error)?;
-        let (command_key, _) = hkcu
-            .create_subkey(format!(r"{key_path}\command"))
-            .map_err(registry_error)?;
-        command_key
-            .set_value("", &command)
-            .map_err(registry_error)?;
-    }
-
     Ok(())
 }
 
 #[cfg(not(windows))]
-fn register_windows_integration(_install_path: &Path) -> Result<(), String> {
+fn register_open_with_integration(_install_path: &Path) -> Result<(), String> {
     Err("Windows integration is only available on Windows.".to_string())
 }
 
 #[cfg(windows)]
-fn unregister_windows_integration() -> Result<(), String> {
+fn unregister_open_with_integration() -> Result<(), String> {
     use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
     for key_path in [app_paths_key(), prog_id_key(), application_key()] {
-        delete_subkey_all_if_exists(&hkcu, &key_path)?;
-    }
-
-    for extension in MARKDOWN_EXTENSIONS {
-        let key_path = context_menu_key(extension);
         delete_subkey_all_if_exists(&hkcu, &key_path)?;
     }
 
@@ -389,7 +586,56 @@ fn unregister_windows_integration() -> Result<(), String> {
 }
 
 #[cfg(not(windows))]
-fn unregister_windows_integration() -> Result<(), String> {
+fn unregister_open_with_integration() -> Result<(), String> {
+    Err("Windows integration is only available on Windows.".to_string())
+}
+
+#[cfg(windows)]
+fn register_context_menu_integration(install_path: &Path) -> Result<(), String> {
+    use winreg::{enums::HKEY_CURRENT_USER, RegKey};
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let command = open_command(install_path);
+    let icon = format!("\"{}\",0", install_path.display());
+
+    for extension in MARKDOWN_EXTENSIONS {
+        let key_path = context_menu_key(extension);
+        let (key, _) = hkcu.create_subkey(&key_path).map_err(registry_error)?;
+        key.set_value("", &CONTEXT_MENU_LABEL)
+            .map_err(registry_error)?;
+        key.set_value("Icon", &icon).map_err(registry_error)?;
+        let (command_key, _) = hkcu
+            .create_subkey(format!(r"{key_path}\command"))
+            .map_err(registry_error)?;
+        command_key
+            .set_value("", &command)
+            .map_err(registry_error)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn register_context_menu_integration(_install_path: &Path) -> Result<(), String> {
+    Err("Windows integration is only available on Windows.".to_string())
+}
+
+#[cfg(windows)]
+fn unregister_context_menu_integration() -> Result<(), String> {
+    use winreg::{enums::HKEY_CURRENT_USER, RegKey};
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+
+    for extension in MARKDOWN_EXTENSIONS {
+        let key_path = context_menu_key(extension);
+        delete_subkey_all_if_exists(&hkcu, &key_path)?;
+    }
+
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn unregister_context_menu_integration() -> Result<(), String> {
     Err("Windows integration is only available on Windows.".to_string())
 }
 
@@ -419,12 +665,14 @@ fn is_app_path_registered(_install_path: &Path) -> bool {
 }
 
 #[cfg(windows)]
-fn are_file_handlers_registered(install_path: &Path) -> bool {
+fn is_application_registered(install_path: &Path) -> bool {
     use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let prog_id_key = prog_id_key();
     let expected_command = open_command(install_path);
+    let prog_id_key = prog_id_key();
+    let application_key = application_key();
+    let file_associations_key = application_capabilities_file_associations_key();
 
     let prog_id_registered = hkcu
         .open_subkey(format!(r"{prog_id_key}\shell\open\command"))
@@ -432,52 +680,72 @@ fn are_file_handlers_registered(install_path: &Path) -> bool {
         .map(|value| value.eq_ignore_ascii_case(&expected_command))
         .unwrap_or(false);
 
-    prog_id_registered
-        && is_registered_application(&hkcu)
-        && MARKDOWN_EXTENSIONS.iter().all(|extension| {
-            let key_path = open_with_progids_key(extension);
-            has_open_with_progid(&hkcu, &key_path)
+    let application_command_registered = hkcu
+        .open_subkey(format!(r"{application_key}\shell\open\command"))
+        .and_then(|key| key.get_value::<String, _>(""))
+        .map(|value| value.eq_ignore_ascii_case(&expected_command))
+        .unwrap_or(false);
+
+    let registered_application = hkcu
+        .open_subkey(REGISTERED_APPLICATIONS_KEY)
+        .and_then(|key| key.get_value::<String, _>(REGISTERED_APPLICATIONS_VALUE))
+        .map(|value| value == application_capabilities_key())
+        .unwrap_or(false);
+
+    let file_associations_registered = hkcu
+        .open_subkey(file_associations_key)
+        .map(|key| {
+            MARKDOWN_EXTENSIONS.iter().all(|extension| {
+                key.get_value::<String, _>(extension)
+                    .map(|value| value == PROG_ID)
+                    .unwrap_or(false)
+            })
         })
+        .unwrap_or(false);
+
+    prog_id_registered
+        && application_command_registered
+        && registered_application
+        && file_associations_registered
 }
 
 #[cfg(not(windows))]
-fn are_file_handlers_registered(_install_path: &Path) -> bool {
+fn is_application_registered(_install_path: &Path) -> bool {
     false
 }
 
 #[cfg(windows)]
-fn has_open_with_progid(hkcu: &winreg::RegKey, key_path: &str) -> bool {
+fn is_open_with_extension_registered(extension: &str) -> bool {
+    use winreg::{enums::HKEY_CURRENT_USER, RegKey};
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let key_path = open_with_progids_key(extension);
     hkcu.open_subkey(key_path)
         .and_then(|key| key.get_raw_value(PROG_ID))
         .is_ok()
 }
 
-#[cfg(windows)]
-fn is_registered_application(hkcu: &winreg::RegKey) -> bool {
-    hkcu.open_subkey(REGISTERED_APPLICATIONS_KEY)
-        .and_then(|key| key.get_value::<String, _>(REGISTERED_APPLICATIONS_VALUE))
-        .map(|value| value == application_capabilities_key())
-        .unwrap_or(false)
+#[cfg(not(windows))]
+fn is_open_with_extension_registered(_extension: &str) -> bool {
+    false
 }
 
 #[cfg(windows)]
-fn is_context_menu_registered(install_path: &Path) -> bool {
+fn is_context_menu_extension_registered(extension: &str, install_path: &Path) -> bool {
     use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let expected_command = open_command(install_path);
+    let key_path = context_menu_key(extension);
 
-    MARKDOWN_EXTENSIONS.iter().all(|extension| {
-        let key_path = context_menu_key(extension);
-        hkcu.open_subkey(format!(r"{key_path}\command"))
-            .and_then(|key| key.get_value::<String, _>(""))
-            .map(|value| value.eq_ignore_ascii_case(&expected_command))
-            .unwrap_or(false)
-    })
+    hkcu.open_subkey(format!(r"{key_path}\command"))
+        .and_then(|key| key.get_value::<String, _>(""))
+        .map(|value| value.eq_ignore_ascii_case(&expected_command))
+        .unwrap_or(false)
 }
 
 #[cfg(not(windows))]
-fn is_context_menu_registered(_install_path: &Path) -> bool {
+fn is_context_menu_extension_registered(_extension: &str, _install_path: &Path) -> bool {
     false
 }
 
@@ -497,6 +765,38 @@ fn notify_shell_associations_changed() {
 
 #[cfg(not(windows))]
 fn notify_shell_associations_changed() {}
+
+#[cfg(windows)]
+fn open_default_apps_settings_impl() -> Result<(), String> {
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+
+    let operation = wide_null("open");
+    let uri = wide_null(DEFAULT_APPS_URI);
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            operation.as_ptr(),
+            uri.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            1,
+        )
+    } as isize;
+
+    if result > 32 {
+        Ok(())
+    } else {
+        Err(format!(
+            "ShellExecuteW returned {result} for {DEFAULT_APPS_URI}. Last OS error: {}",
+            std::io::Error::last_os_error()
+        ))
+    }
+}
+
+#[cfg(not(windows))]
+fn open_default_apps_settings_impl() -> Result<(), String> {
+    Err("Windows Default Apps settings are only available on Windows.".to_string())
+}
 
 #[cfg(windows)]
 fn registry_error(error: std::io::Error) -> String {
@@ -554,6 +854,16 @@ fn path_to_wide(path: &Path) -> Vec<u16> {
     use std::os::windows::ffi::OsStrExt;
 
     path.as_os_str().encode_wide().chain(Some(0)).collect()
+}
+
+#[cfg(windows)]
+fn wide_null(value: &str) -> Vec<u16> {
+    use std::os::windows::ffi::OsStrExt;
+
+    std::ffi::OsStr::new(value)
+        .encode_wide()
+        .chain(Some(0))
+        .collect()
 }
 
 #[cfg(test)]

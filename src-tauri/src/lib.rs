@@ -10,9 +10,10 @@ use document::{
 use identity::setup_window_title;
 use serde::Serialize;
 use setup::{
-    first_document_arg, install_or_update as install_or_update_app,
-    open_default_apps_settings as open_windows_default_apps_settings,
-    remove_integration as remove_app_integration, setup_status, SetupStatus,
+    first_document_arg, open_default_apps_settings as open_windows_default_apps_settings,
+    remove_all_integration as remove_all_app_integration, setup_status,
+    toggle_context_menu as toggle_app_context_menu, toggle_install as toggle_app_install,
+    toggle_open_with_support as toggle_app_open_with_support, SetupStatus,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,17 +64,27 @@ fn get_setup_status() -> Result<SetupStatus, String> {
 }
 
 #[tauri::command]
-fn install_or_update() -> Result<SetupStatus, String> {
-    install_or_update_app()
+fn toggle_install() -> Result<SetupStatus, String> {
+    toggle_app_install()
 }
 
 #[tauri::command]
-fn remove_integration() -> Result<SetupStatus, String> {
-    remove_app_integration()
+fn toggle_open_with_support() -> Result<SetupStatus, String> {
+    toggle_app_open_with_support()
 }
 
 #[tauri::command]
-fn open_default_apps_settings() -> Result<(), String> {
+fn toggle_context_menu() -> Result<SetupStatus, String> {
+    toggle_app_context_menu()
+}
+
+#[tauri::command]
+fn remove_all_integration() -> Result<SetupStatus, String> {
+    remove_all_app_integration()
+}
+
+#[tauri::command]
+fn open_default_apps_settings() -> Result<SetupStatus, String> {
     open_windows_default_apps_settings()
 }
 
@@ -90,8 +101,10 @@ pub fn run() {
             load_initial_view,
             load_dropped_document,
             get_setup_status,
-            install_or_update,
-            remove_integration,
+            toggle_install,
+            toggle_open_with_support,
+            toggle_context_menu,
+            remove_all_integration,
             open_default_apps_settings
         ])
         .run(tauri::generate_context!())

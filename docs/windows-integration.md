@@ -26,11 +26,13 @@ Setup mode copies the running executable to:
 %LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe
 ```
 
-The install/update path uses a temporary copy and replaces the existing executable with the Windows file-replacement API when updating.
+The install/update path uses a temporary copy and replaces the existing executable with the Windows file-replacement API when updating. The setup UI treats installation as its own immediate row: checked means the installed copy exists and matches the current executable.
 
 ## Registry keys
 
-Hushmark writes only per-user registry entries under `HKCU`:
+Hushmark writes only per-user registry entries under `HKCU`.
+
+Open With support creates:
 
 ```text
 HKCU\Software\Microsoft\Windows\CurrentVersion\App Paths\Hushmark.exe
@@ -44,6 +46,11 @@ HKCU\Software\Classes\Applications\Hushmark.exe\Capabilities\FileAssociations
 HKCU\Software\RegisteredApplications
 HKCU\Software\Classes\.md\OpenWithProgids
 HKCU\Software\Classes\.markdown\OpenWithProgids
+```
+
+The right-click menu row creates:
+
+```text
 HKCU\Software\Classes\SystemFileAssociations\.md\shell\OpenWithHushmark
 HKCU\Software\Classes\SystemFileAssociations\.md\shell\OpenWithHushmark\command
 HKCU\Software\Classes\SystemFileAssociations\.markdown\shell\OpenWithHushmark
@@ -54,11 +61,25 @@ The `.md` and `.markdown` `OpenWithProgids` keys and `Software\RegisteredApplica
 
 After install/remove, Hushmark calls `SHChangeNotify(SHCNE_ASSOCCHANGED, ...)` so Explorer can refresh association state.
 
+## Setup control panel behavior
+
+Setup mode is an immediate integration control panel. There is no Apply button.
+
+Rows:
+
+1. **Install Hushmark** copies or removes `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe`. Turning it off also removes Hushmark Open With and right-click entries so Windows is not left pointing at a missing executable.
+2. **Show Hushmark in Open With** installs/updates Hushmark first if needed, then adds or removes only Hushmark Open With registration.
+3. **Add right-click menu entry** installs/updates Hushmark first if needed, then adds or removes only Hushmark context-menu entries.
+
+Each row refreshes from actual file/registry state after the operation. The **Remove all Hushmark integration** action removes Hushmark Open With registration, right-click entries, App Paths/application registration, and the installed executable when safe. It removes `%LOCALAPPDATA%\Programs\Hushmark` only if the directory is empty.
+
 ## Default-app behavior
 
 Hushmark does not automatically set itself as the default Markdown app.
 
-Windows 10/11 default-app selection is intentionally user-controlled and stored in protected `UserChoice` entries. Hushmark registers itself as a candidate handler and opens Windows Default Apps settings so the user can explicitly choose it.
+Windows 10/11 default-app selection is intentionally user-controlled and stored in protected `UserChoice` entries. Hushmark registers itself as a candidate handler and tries to open Windows Default Apps settings with the Windows shell so the user can explicitly choose it.
+
+If Windows refuses to open Settings automatically, setup shows calm fallback instructions and keeps the technical OS error in the collapsed Details section.
 
 ## Manual test steps
 
@@ -93,13 +114,15 @@ Open setup:
 
 In setup:
 
-1. Click **Install / Update Hushmark**.
-2. Confirm `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe` exists.
-3. Right-click a `.md` file and check that **Open with Hushmark** appears.
-4. Open Windows Default Apps from setup and choose Hushmark manually for `.md` / `.markdown` if desired.
-5. Double-click a Markdown file after choosing Hushmark as default.
-6. Click **Remove integration / uninstall**.
-7. Confirm Hushmark registry entries are removed.
+1. Click **Install Hushmark** and confirm `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe` exists.
+2. Click **Install Hushmark** again and confirm the installed executable is removed when safe.
+3. From a fresh state, click **Show Hushmark in Open With** and confirm setup auto-installs Hushmark before adding Open With registration.
+4. Click **Show Hushmark in Open With** again and confirm only Open With registration is removed.
+5. From a fresh state, click **Add right-click menu entry** and confirm setup auto-installs Hushmark before adding context-menu entries.
+6. Right-click a `.md` / `.markdown` file and check that **Open with Hushmark** appears.
+7. Open Windows Default Apps from setup and choose Hushmark manually for `.md` / `.markdown` if desired.
+8. Double-click a Markdown file after choosing Hushmark as default.
+9. Click **Remove all Hushmark integration** and confirm Hushmark registry entries and the installed executable are removed when safe.
 
 If setup is running from the installed executable, or another Hushmark window is holding the installed executable open, Hushmark removes registry integration but leaves the executable in place. Close Hushmark, then manually delete `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe` if needed.
 
