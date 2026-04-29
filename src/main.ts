@@ -9,6 +9,26 @@ type LoadedDocument = {
   error: string | null;
 };
 
+type SetupStatus = {
+  appName: string;
+  version: string;
+  installPath: string;
+  currentExePath: string;
+  installed: boolean;
+  installedMatchesCurrent: boolean;
+  appPathRegistered: boolean;
+  fileHandlersRegistered: boolean;
+  contextMenuRegistered: boolean;
+  defaultAppsUri: string;
+  message: string | null;
+};
+
+type StartupView = {
+  mode: "reader" | "setup";
+  document: LoadedDocument | null;
+  setup: SetupStatus | null;
+};
+
 const appElement = document.querySelector<HTMLElement>("#app");
 
 if (!appElement) {
@@ -21,13 +41,11 @@ const currentWindow = getCurrentWindow();
 function titleFor(documentView: LoadedDocument): string {
   if (documentView.error) {
     return documentView.fileName
-      ? `Error: ${documentView.fileName} - Markdown Reader`
-      : "Error - Markdown Reader";
+      ? `Error: ${documentView.fileName} - Marlo`
+      : "Error - Marlo";
   }
 
-  return documentView.fileName
-    ? `${documentView.fileName} - Markdown Reader`
-    : "Markdown Reader";
+  return documentView.fileName ? `${documentView.fileName} - Marlo` : "Marlo";
 }
 
 function renderState(
@@ -77,6 +95,129 @@ function renderDocument(documentView: LoadedDocument): void {
   app.replaceChildren(article);
 }
 
+function createTextElement<K extends keyof HTMLElementTagNameMap>(
+  tagName: K,
+  text: string,
+  className?: string,
+): HTMLElementTagNameMap[K] {
+  const element = document.createElement(tagName);
+  element.textContent = text;
+
+  if (className) {
+    element.className = className;
+  }
+
+  return element;
+}
+
+function statusText(value: boolean): string {
+  return value ? "Yes" : "No";
+}
+
+function createStatusRow(label: string, value: string): HTMLDivElement {
+  const row = document.createElement("div");
+  row.className = "setup__row";
+  row.append(createTextElement("dt", label), createTextElement("dd", value));
+  return row;
+}
+
+function renderSetup(status: SetupStatus): void {
+  document.title = `${status.appName} Setup`;
+
+  const section = document.createElement("section");
+  section.className = "setup";
+
+  const panel = document.createElement("div");
+  panel.className = "setup__panel";
+
+  const heading = createTextElement("h1", status.appName);
+  const intro = createTextElement(
+    "p",
+    "Install Marlo for the current user and register it as an Open with option for Markdown files.",
+    "setup__intro",
+  );
+
+  const details = document.createElement("dl");
+  details.className = "setup__details";
+  details.append(
+    createStatusRow("Version", status.version),
+    createStatusRow("Install path", status.installPath),
+    createStatusRow("Current executable", status.currentExePath),
+    createStatusRow("Installed", statusText(status.installed)),
+    createStatusRow("Installed copy is current", statusText(status.installedMatchesCurrent)),
+    createStatusRow("App path registered", statusText(status.appPathRegistered)),
+    createStatusRow("Markdown handlers registered", statusText(status.fileHandlersRegistered)),
+    createStatusRow("Right-click entry registered", statusText(status.contextMenuRegistered)),
+  );
+
+  const defaultAppsNote = createTextElement(
+    "p",
+    "Marlo will not take over .md or .markdown defaults automatically. After installing, choose Marlo in Windows Default Apps if you want it as the default handler.",
+    "setup__note",
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "setup__actions";
+
+  const installButton = createTextElement("button", "Install / Update Marlo");
+  installButton.type = "button";
+  installButton.addEventListener("click", () => {
+    void runSetupAction(installButton, "install_or_update", status);
+  });
+
+  const removeButton = createTextElement("button", "Remove integration / uninstall");
+  removeButton.type = "button";
+  removeButton.addEventListener("click", () => {
+    void runSetupAction(removeButton, "remove_integration", status);
+  });
+
+  const defaultAppsButton = createTextElement("button", "Open Windows Default Apps");
+  defaultAppsButton.type = "button";
+  defaultAppsButton.addEventListener("click", () => {
+    void openDefaultApps(status);
+  });
+
+  actions.append(installButton, removeButton, defaultAppsButton);
+
+  panel.append(heading, intro, details, defaultAppsNote, actions);
+
+  if (status.message) {
+    panel.append(createTextElement("p", status.message, "setup__message"));
+  }
+
+  section.append(panel);
+  app.replaceChildren(section);
+}
+
+async function runSetupAction(
+  button: HTMLButtonElement,
+  command: "install_or_update" | "remove_integration",
+  previousStatus: SetupStatus,
+): Promise<void> {
+  button.disabled = true;
+
+  try {
+    const status = await invoke<SetupStatus>(command);
+    renderSetup(status);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    renderSetup({ ...previousStatus, message });
+  }
+}
+
+async function openDefaultApps(status: SetupStatus): Promise<void> {
+  try {
+    await invoke("open_default_apps_settings");
+    renderSetup({
+      ...status,
+      message: "Windows Default Apps settings opened. Search for .md or .markdown and choose Marlo if you want it as the default.",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    renderSetup({ ...status, message });
+  }
+}
+
 async function openDroppedFile(path: string): Promise<void> {
   renderState("loading", "Opening Markdown file...");
 
@@ -87,7 +228,7 @@ async function openDroppedFile(path: string): Promise<void> {
     renderDocument(documentView);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    document.title = "Error - Markdown Reader";
+    document.title = "Error - Marlo";
     renderState("error", "Could not open the Markdown file.", message);
   }
 }
@@ -116,12 +257,25 @@ async function start(): Promise<void> {
   });
 
   try {
-    const documentView = await invoke<LoadedDocument>("load_initial_document");
-    renderDocument(documentView);
+    const startupView = await invoke<StartupView>("load_initial_view");
+
+    if (startupView.mode === "setup") {
+      if (!startupView.setup) {
+        throw new Error("Setup status was not returned.");
+      }
+
+      renderSetup(startupView.setup);
+    } else {
+      if (!startupView.document) {
+        throw new Error("Initial document state was not returned.");
+      }
+
+      renderDocument(startupView.document);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    document.title = "Error - Markdown Reader";
-    renderState("error", "Could not start Markdown Reader.", message);
+    document.title = "Error - Marlo";
+    renderState("error", "Could not start Marlo.", message);
   } finally {
     await revealWindow();
   }

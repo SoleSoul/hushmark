@@ -1,12 +1,12 @@
 [package]
-name = "markdown-reader"
+name = "marlo"
 version = "0.1.0"
 description = "A small Markdown reader built with Tauri."
 authors = ["Markdown Reader Contributors"]
 edition = "2021"
 
 [lib]
-name = "markdown_reader_lib"
+name = "marlo_lib"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -17,3 +17,6 @@ pulldown-cmark = "0.13"
 serde = { version = "1", features = ["derive"] }
 tauri = { version = "2", features = [] }
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_UI_Shell"] }
+winreg = "0.55"

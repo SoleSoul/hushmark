@@ -8,6 +8,8 @@ use ammonia::Builder;
 use pulldown_cmark::{html, Options, Parser};
 use serde::Serialize;
 
+pub const APP_NAME: &str = "Marlo";
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LoadedDocument {
@@ -81,10 +83,10 @@ pub fn load_dropped_markdown_file(path: PathBuf) -> LoadedDocument {
 
 pub fn title_for(document: &LoadedDocument) -> String {
     match (&document.file_name, &document.error) {
-        (Some(file_name), Some(_)) => format!("Error: {file_name} - Markdown Reader"),
-        (Some(file_name), None) => format!("{file_name} - Markdown Reader"),
-        (None, Some(_)) => "Error - Markdown Reader".to_string(),
-        (None, None) => "Markdown Reader".to_string(),
+        (Some(file_name), Some(_)) => format!("Error: {file_name} - {APP_NAME}"),
+        (Some(file_name), None) => format!("{file_name} - {APP_NAME}"),
+        (None, Some(_)) => format!("Error - {APP_NAME}"),
+        (None, None) => APP_NAME.to_string(),
     }
 }
 
@@ -144,7 +146,7 @@ mod tests {
             error: None,
         };
 
-        assert_eq!(title_for(&document), "notes.md - Markdown Reader");
+        assert_eq!(title_for(&document), "notes.md - Marlo");
     }
 
     #[test]
