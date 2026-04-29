@@ -1,12 +1,12 @@
 [package]
-name = "marlo"
+name = "hushmark"
 version = "0.1.0"
 description = "A small Markdown reader built with Tauri."
-authors = ["Markdown Reader Contributors"]
+authors = ["Hushmark Contributors"]
 edition = "2021"
 
 [lib]
-name = "marlo_lib"
+name = "hushmark_lib"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

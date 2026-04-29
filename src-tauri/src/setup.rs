@@ -6,25 +6,22 @@ use std::{
 
 use serde::Serialize;
 
-use crate::document::APP_NAME;
-
-const INSTALLED_EXE_NAME: &str = "Marlo.exe";
-const PROG_ID: &str = "Marlo.md";
-const APP_PATHS_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\App Paths\Marlo.exe";
-const PROG_ID_KEY: &str = r"Software\Classes\Marlo.md";
-const APPLICATION_KEY: &str = r"Software\Classes\Applications\Marlo.exe";
-const MD_OPEN_WITH_KEY: &str = r"Software\Classes\.md\OpenWithProgids";
-const MARKDOWN_OPEN_WITH_KEY: &str = r"Software\Classes\.markdown\OpenWithProgids";
-const MD_CONTEXT_MENU_KEY: &str =
-    r"Software\Classes\SystemFileAssociations\.md\shell\OpenWithMarlo";
-const MARKDOWN_CONTEXT_MENU_KEY: &str =
-    r"Software\Classes\SystemFileAssociations\.markdown\shell\OpenWithMarlo";
+use crate::identity::{
+    app_paths_key, application_capabilities_file_associations_key, application_capabilities_key,
+    application_key, context_menu_key, open_with_progids_key, prog_id_key, APPLICATION_DESCRIPTION,
+    CONTEXT_MENU_LABEL, DEFAULT_APPS_URI, DISPLAY_NAME, DOCUMENT_FRIENDLY_NAME, INSTALLED_EXE_NAME,
+    INSTALL_DIR_NAME, MARKDOWN_EXTENSIONS, PROG_ID, REGISTERED_APPLICATIONS_KEY,
+    REGISTERED_APPLICATIONS_VALUE,
+};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetupStatus {
     pub app_name: &'static str,
     pub version: &'static str,
+    pub release_exe_name: &'static str,
+    pub installed_exe_name: &'static str,
+    pub prog_id: &'static str,
     pub install_path: String,
     pub current_exe_path: String,
     pub installed: bool,
@@ -42,8 +39,11 @@ pub fn setup_status(message: Option<String>) -> Result<SetupStatus, String> {
     let installed = install_path.exists();
 
     Ok(SetupStatus {
-        app_name: APP_NAME,
+        app_name: DISPLAY_NAME,
         version: env!("CARGO_PKG_VERSION"),
+        release_exe_name: crate::identity::RELEASE_EXE_NAME,
+        installed_exe_name: INSTALLED_EXE_NAME,
+        prog_id: PROG_ID,
         install_path: path_to_string(&install_path),
         current_exe_path: path_to_string(&current_exe),
         installed,
@@ -51,7 +51,7 @@ pub fn setup_status(message: Option<String>) -> Result<SetupStatus, String> {
         app_path_registered: is_app_path_registered(&install_path),
         file_handlers_registered: are_file_handlers_registered(&install_path),
         context_menu_registered: is_context_menu_registered(&install_path),
-        default_apps_uri: "ms-settings:defaultapps",
+        default_apps_uri: DEFAULT_APPS_URI,
         message,
     })
 }
@@ -101,9 +101,9 @@ pub fn install_or_update() -> Result<SetupStatus, String> {
     register_windows_integration(&install_path)?;
     notify_shell_associations_changed();
 
-    setup_status(Some(
-        "Marlo is installed and registered as an Open with option for Markdown files.".to_string(),
-    ))
+    setup_status(Some(format!(
+        "{DISPLAY_NAME} is installed and registered as an Open with option for Markdown files."
+    )))
 }
 
 pub fn remove_integration() -> Result<SetupStatus, String> {
@@ -111,27 +111,27 @@ pub fn remove_integration() -> Result<SetupStatus, String> {
 
     let current_exe = current_exe_path()?;
     let install_path = installed_exe_path()?;
-    let mut message = "Marlo registry integration was removed.".to_string();
+    let mut message = format!("{DISPLAY_NAME} registry integration was removed.");
 
     if install_path.exists() {
         if same_path(&current_exe, &install_path) {
             message.push_str(&format!(
-                " The installed executable is currently running and remains at {}.",
+                " The installed executable is currently running and remains at {}. Close {DISPLAY_NAME}, then delete that file manually if you want to remove the installed copy.",
                 install_path.display()
             ));
         } else {
-            fs::remove_file(&install_path).map_err(|error| {
-                format!(
-                    "Registry integration was removed, but {} could not be deleted: {error}",
-                    install_path.display()
-                )
-            })?;
-
-            if let Some(install_dir) = install_path.parent() {
-                let _ = fs::remove_dir(install_dir);
+            match fs::remove_file(&install_path) {
+                Ok(()) => {
+                    remove_empty_install_dir(&install_path, &mut message);
+                    message.push_str(" The installed executable was removed.");
+                }
+                Err(error) => {
+                    message.push_str(&format!(
+                        " The installed executable remains at {} because it could not be deleted: {error}. Close any running {DISPLAY_NAME} windows, then delete it manually if you want to remove the installed copy.",
+                        install_path.display()
+                    ));
+                }
             }
-
-            message.push_str(" The installed executable was removed.");
         }
     }
 
@@ -139,9 +139,30 @@ pub fn remove_integration() -> Result<SetupStatus, String> {
     setup_status(Some(message))
 }
 
+fn remove_empty_install_dir(install_path: &Path, message: &mut String) {
+    if let Some(install_dir) = install_path.parent() {
+        match fs::remove_dir(install_dir) {
+            Ok(()) => message.push_str(" The empty install directory was removed."),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) if error.kind() == std::io::ErrorKind::DirectoryNotEmpty => {
+                message.push_str(&format!(
+                    " The install directory {} contains other files and was left in place.",
+                    install_dir.display()
+                ));
+            }
+            Err(error) => {
+                message.push_str(&format!(
+                    " The install directory {} could not be removed: {error}",
+                    install_dir.display()
+                ));
+            }
+        }
+    }
+}
+
 pub fn open_default_apps_settings() -> Result<(), String> {
     Command::new("explorer.exe")
-        .arg("ms-settings:defaultapps")
+        .arg(DEFAULT_APPS_URI)
         .spawn()
         .map(|_| ())
         .map_err(|error| format!("Could not open Windows Default Apps settings: {error}"))
@@ -169,7 +190,7 @@ fn installed_exe_path() -> Result<PathBuf, String> {
 
     Ok(PathBuf::from(local_app_data)
         .join("Programs")
-        .join(APP_NAME)
+        .join(INSTALL_DIR_NAME)
         .join(INSTALLED_EXE_NAME))
 }
 
@@ -179,9 +200,21 @@ fn path_to_string(path: &Path) -> String {
 
 fn same_path(left: &Path, right: &Path) -> bool {
     match (left.canonicalize(), right.canonicalize()) {
-        (Ok(left), Ok(right)) => left == right,
-        _ => left == right,
+        (Ok(left), Ok(right)) => paths_equal(&left, &right),
+        _ => paths_equal(left, right),
     }
+}
+
+#[cfg(windows)]
+fn paths_equal(left: &Path, right: &Path) -> bool {
+    left.as_os_str()
+        .to_string_lossy()
+        .eq_ignore_ascii_case(&right.as_os_str().to_string_lossy())
+}
+
+#[cfg(not(windows))]
+fn paths_equal(left: &Path, right: &Path) -> bool {
+    left == right
 }
 
 fn files_match(left: &Path, right: &Path) -> bool {
@@ -219,7 +252,13 @@ fn register_windows_integration(install_path: &Path) -> Result<(), String> {
     let command = open_command(install_path);
     let icon = format!("\"{}\",0", install_path.display());
 
-    let (app_paths, _) = hkcu.create_subkey(APP_PATHS_KEY).map_err(registry_error)?;
+    let app_paths_key = app_paths_key();
+    let prog_id_key = prog_id_key();
+    let application_key = application_key();
+    let capabilities_key = application_capabilities_key();
+    let file_associations_key = application_capabilities_file_associations_key();
+
+    let (app_paths, _) = hkcu.create_subkey(&app_paths_key).map_err(registry_error)?;
     app_paths
         .set_value("", &install_path_string)
         .map_err(registry_error)?;
@@ -227,39 +266,65 @@ fn register_windows_integration(install_path: &Path) -> Result<(), String> {
         .set_value("Path", &install_dir_string)
         .map_err(registry_error)?;
 
-    let (prog_id, _) = hkcu.create_subkey(PROG_ID_KEY).map_err(registry_error)?;
+    let (prog_id, _) = hkcu.create_subkey(&prog_id_key).map_err(registry_error)?;
     prog_id
-        .set_value("", &"Marlo Markdown Document")
+        .set_value("", &DOCUMENT_FRIENDLY_NAME)
         .map_err(registry_error)?;
     let (default_icon, _) = hkcu
-        .create_subkey(format!(r"{PROG_ID_KEY}\DefaultIcon"))
+        .create_subkey(format!(r"{prog_id_key}\DefaultIcon"))
         .map_err(registry_error)?;
     default_icon.set_value("", &icon).map_err(registry_error)?;
     let (open_command_key, _) = hkcu
-        .create_subkey(format!(r"{PROG_ID_KEY}\shell\open\command"))
+        .create_subkey(format!(r"{prog_id_key}\shell\open\command"))
         .map_err(registry_error)?;
     open_command_key
         .set_value("", &command)
         .map_err(registry_error)?;
 
     let (application_command, _) = hkcu
-        .create_subkey(format!(r"{APPLICATION_KEY}\shell\open\command"))
+        .create_subkey(format!(r"{application_key}\shell\open\command"))
         .map_err(registry_error)?;
     application_command
         .set_value("", &command)
         .map_err(registry_error)?;
     let (supported_types, _) = hkcu
-        .create_subkey(format!(r"{APPLICATION_KEY}\SupportedTypes"))
+        .create_subkey(format!(r"{application_key}\SupportedTypes"))
         .map_err(registry_error)?;
-    supported_types
-        .set_value(".md", &"")
+    let (capabilities, _) = hkcu
+        .create_subkey(&capabilities_key)
         .map_err(registry_error)?;
-    supported_types
-        .set_value(".markdown", &"")
+    capabilities
+        .set_value("ApplicationName", &DISPLAY_NAME)
+        .map_err(registry_error)?;
+    capabilities
+        .set_value("ApplicationDescription", &APPLICATION_DESCRIPTION)
+        .map_err(registry_error)?;
+    capabilities
+        .set_value("ApplicationIcon", &icon)
+        .map_err(registry_error)?;
+    let (file_associations, _) = hkcu
+        .create_subkey(&file_associations_key)
         .map_err(registry_error)?;
 
-    for key_path in [MD_OPEN_WITH_KEY, MARKDOWN_OPEN_WITH_KEY] {
-        let (key, _) = hkcu.create_subkey(key_path).map_err(registry_error)?;
+    for extension in MARKDOWN_EXTENSIONS {
+        supported_types
+            .set_value(extension, &"")
+            .map_err(registry_error)?;
+        file_associations
+            .set_value(extension, &PROG_ID)
+            .map_err(registry_error)?;
+    }
+
+    let (registered_applications, _) = hkcu
+        .create_subkey(REGISTERED_APPLICATIONS_KEY)
+        .map_err(registry_error)?;
+    registered_applications
+        .set_value(REGISTERED_APPLICATIONS_VALUE, &capabilities_key)
+        .map_err(registry_error)?;
+
+    for extension in MARKDOWN_EXTENSIONS {
+        let open_with_key = open_with_progids_key(extension);
+        let (key, _) = hkcu.create_subkey(&open_with_key).map_err(registry_error)?;
         key.set_raw_value(
             PROG_ID,
             &RegValue {
@@ -270,9 +335,10 @@ fn register_windows_integration(install_path: &Path) -> Result<(), String> {
         .map_err(registry_error)?;
     }
 
-    for key_path in [MD_CONTEXT_MENU_KEY, MARKDOWN_CONTEXT_MENU_KEY] {
-        let (key, _) = hkcu.create_subkey(key_path).map_err(registry_error)?;
-        key.set_value("", &"Open with Marlo")
+    for extension in MARKDOWN_EXTENSIONS {
+        let key_path = context_menu_key(extension);
+        let (key, _) = hkcu.create_subkey(&key_path).map_err(registry_error)?;
+        key.set_value("", &CONTEXT_MENU_LABEL)
             .map_err(registry_error)?;
         key.set_value("Icon", &icon).map_err(registry_error)?;
         let (command_key, _) = hkcu
@@ -297,20 +363,26 @@ fn unregister_windows_integration() -> Result<(), String> {
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
-    for key_path in [
-        APP_PATHS_KEY,
-        PROG_ID_KEY,
-        APPLICATION_KEY,
-        MD_CONTEXT_MENU_KEY,
-        MARKDOWN_CONTEXT_MENU_KEY,
-    ] {
-        delete_subkey_all_if_exists(&hkcu, key_path)?;
+    for key_path in [app_paths_key(), prog_id_key(), application_key()] {
+        delete_subkey_all_if_exists(&hkcu, &key_path)?;
     }
 
-    for key_path in [MD_OPEN_WITH_KEY, MARKDOWN_OPEN_WITH_KEY] {
-        if let Ok(key) = hkcu.open_subkey_with_flags(key_path, winreg::enums::KEY_SET_VALUE) {
+    for extension in MARKDOWN_EXTENSIONS {
+        let key_path = context_menu_key(extension);
+        delete_subkey_all_if_exists(&hkcu, &key_path)?;
+    }
+
+    for extension in MARKDOWN_EXTENSIONS {
+        let key_path = open_with_progids_key(extension);
+        if let Ok(key) = hkcu.open_subkey_with_flags(&key_path, winreg::enums::KEY_SET_VALUE) {
             let _ = key.delete_value(PROG_ID);
         }
+    }
+
+    if let Ok(key) =
+        hkcu.open_subkey_with_flags(REGISTERED_APPLICATIONS_KEY, winreg::enums::KEY_SET_VALUE)
+    {
+        let _ = key.delete_value(REGISTERED_APPLICATIONS_VALUE);
     }
 
     Ok(())
@@ -335,9 +407,9 @@ fn is_app_path_registered(install_path: &Path) -> bool {
     use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    hkcu.open_subkey(APP_PATHS_KEY)
+    hkcu.open_subkey(app_paths_key())
         .and_then(|key| key.get_value::<String, _>(""))
-        .map(|value| value.eq_ignore_ascii_case(&path_to_string(install_path)))
+        .map(|value| same_path(Path::new(&value), install_path))
         .unwrap_or(false)
 }
 
@@ -351,17 +423,21 @@ fn are_file_handlers_registered(install_path: &Path) -> bool {
     use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let prog_id_key = prog_id_key();
     let expected_command = open_command(install_path);
 
     let prog_id_registered = hkcu
-        .open_subkey(format!(r"{PROG_ID_KEY}\shell\open\command"))
+        .open_subkey(format!(r"{prog_id_key}\shell\open\command"))
         .and_then(|key| key.get_value::<String, _>(""))
         .map(|value| value.eq_ignore_ascii_case(&expected_command))
         .unwrap_or(false);
 
     prog_id_registered
-        && has_open_with_progid(&hkcu, MD_OPEN_WITH_KEY)
-        && has_open_with_progid(&hkcu, MARKDOWN_OPEN_WITH_KEY)
+        && is_registered_application(&hkcu)
+        && MARKDOWN_EXTENSIONS.iter().all(|extension| {
+            let key_path = open_with_progids_key(extension);
+            has_open_with_progid(&hkcu, &key_path)
+        })
 }
 
 #[cfg(not(windows))]
@@ -377,20 +453,27 @@ fn has_open_with_progid(hkcu: &winreg::RegKey, key_path: &str) -> bool {
 }
 
 #[cfg(windows)]
+fn is_registered_application(hkcu: &winreg::RegKey) -> bool {
+    hkcu.open_subkey(REGISTERED_APPLICATIONS_KEY)
+        .and_then(|key| key.get_value::<String, _>(REGISTERED_APPLICATIONS_VALUE))
+        .map(|value| value == application_capabilities_key())
+        .unwrap_or(false)
+}
+
+#[cfg(windows)]
 fn is_context_menu_registered(install_path: &Path) -> bool {
     use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let expected_command = open_command(install_path);
 
-    [MD_CONTEXT_MENU_KEY, MARKDOWN_CONTEXT_MENU_KEY]
-        .iter()
-        .all(|key_path| {
-            hkcu.open_subkey(format!(r"{key_path}\command"))
-                .and_then(|key| key.get_value::<String, _>(""))
-                .map(|value| value.eq_ignore_ascii_case(&expected_command))
-                .unwrap_or(false)
-        })
+    MARKDOWN_EXTENSIONS.iter().all(|extension| {
+        let key_path = context_menu_key(extension);
+        hkcu.open_subkey(format!(r"{key_path}\command"))
+            .and_then(|key| key.get_value::<String, _>(""))
+            .map(|value| value.eq_ignore_ascii_case(&expected_command))
+            .unwrap_or(false)
+    })
 }
 
 #[cfg(not(windows))]
@@ -496,8 +579,8 @@ mod tests {
 
     #[test]
     fn open_command_quotes_executable_and_file_placeholder() {
-        let command = open_command(&PathBuf::from(r"C:\Users\me\App Data\Marlo.exe"));
+        let command = open_command(&PathBuf::from(r"C:\Users\me\App Data\Hushmark.exe"));
 
-        assert_eq!(command, r#""C:\Users\me\App Data\Marlo.exe" "%1""#);
+        assert_eq!(command, r#""C:\Users\me\App Data\Hushmark.exe" "%1""#);
     }
 }

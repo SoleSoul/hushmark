@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { PRODUCT } from "./product";
 import "./styles.css";
 
 type LoadedDocument = {
@@ -12,6 +13,9 @@ type LoadedDocument = {
 type SetupStatus = {
   appName: string;
   version: string;
+  releaseExeName: string;
+  installedExeName: string;
+  progId: string;
   installPath: string;
   currentExePath: string;
   installed: boolean;
@@ -41,11 +45,13 @@ const currentWindow = getCurrentWindow();
 function titleFor(documentView: LoadedDocument): string {
   if (documentView.error) {
     return documentView.fileName
-      ? `Error: ${documentView.fileName} - Marlo`
-      : "Error - Marlo";
+      ? `Error: ${documentView.fileName} - ${PRODUCT.displayName}`
+      : `Error - ${PRODUCT.displayName}`;
   }
 
-  return documentView.fileName ? `${documentView.fileName} - Marlo` : "Marlo";
+  return documentView.fileName
+    ? `${documentView.fileName} - ${PRODUCT.displayName}`
+    : PRODUCT.displayName;
 }
 
 function renderState(
@@ -122,7 +128,7 @@ function createStatusRow(label: string, value: string): HTMLDivElement {
 }
 
 function renderSetup(status: SetupStatus): void {
-  document.title = `${status.appName} Setup`;
+  document.title = PRODUCT.setupTitle;
 
   const section = document.createElement("section");
   section.className = "setup";
@@ -133,7 +139,7 @@ function renderSetup(status: SetupStatus): void {
   const heading = createTextElement("h1", status.appName);
   const intro = createTextElement(
     "p",
-    "Install Marlo for the current user and register it as an Open with option for Markdown files.",
+    `Install ${status.appName} for the current user and register it as an Open with option for Markdown files.`,
     "setup__intro",
   );
 
@@ -141,6 +147,9 @@ function renderSetup(status: SetupStatus): void {
   details.className = "setup__details";
   details.append(
     createStatusRow("Version", status.version),
+    createStatusRow("Release binary", status.releaseExeName),
+    createStatusRow("Installed executable", status.installedExeName),
+    createStatusRow("ProgID", status.progId),
     createStatusRow("Install path", status.installPath),
     createStatusRow("Current executable", status.currentExePath),
     createStatusRow("Installed", statusText(status.installed)),
@@ -152,26 +161,26 @@ function renderSetup(status: SetupStatus): void {
 
   const defaultAppsNote = createTextElement(
     "p",
-    "Marlo will not take over .md or .markdown defaults automatically. After installing, choose Marlo in Windows Default Apps if you want it as the default handler.",
+    `${status.appName} will not take over ${PRODUCT.markdownExtensions} defaults automatically. After installing, choose ${status.appName} in Windows Default Apps if you want it as the default handler.`,
     "setup__note",
   );
 
   const actions = document.createElement("div");
   actions.className = "setup__actions";
 
-  const installButton = createTextElement("button", "Install / Update Marlo");
+  const installButton = createTextElement("button", PRODUCT.installButtonLabel);
   installButton.type = "button";
   installButton.addEventListener("click", () => {
     void runSetupAction(installButton, "install_or_update", status);
   });
 
-  const removeButton = createTextElement("button", "Remove integration / uninstall");
+  const removeButton = createTextElement("button", PRODUCT.removeButtonLabel);
   removeButton.type = "button";
   removeButton.addEventListener("click", () => {
     void runSetupAction(removeButton, "remove_integration", status);
   });
 
-  const defaultAppsButton = createTextElement("button", "Open Windows Default Apps");
+  const defaultAppsButton = createTextElement("button", PRODUCT.defaultAppsButtonLabel);
   defaultAppsButton.type = "button";
   defaultAppsButton.addEventListener("click", () => {
     void openDefaultApps(status);
@@ -210,7 +219,7 @@ async function openDefaultApps(status: SetupStatus): Promise<void> {
     await invoke("open_default_apps_settings");
     renderSetup({
       ...status,
-      message: "Windows Default Apps settings opened. Search for .md or .markdown and choose Marlo if you want it as the default.",
+      message: `Windows Default Apps settings opened. Search for ${PRODUCT.markdownExtensions} and choose ${status.appName} if you want it as the default.`,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -228,7 +237,7 @@ async function openDroppedFile(path: string): Promise<void> {
     renderDocument(documentView);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    document.title = "Error - Marlo";
+    document.title = `Error - ${PRODUCT.displayName}`;
     renderState("error", "Could not open the Markdown file.", message);
   }
 }
@@ -274,8 +283,8 @@ async function start(): Promise<void> {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    document.title = "Error - Marlo";
-    renderState("error", "Could not start Marlo.", message);
+    document.title = `Error - ${PRODUCT.displayName}`;
+    renderState("error", `Could not start ${PRODUCT.displayName}.`, message);
   } finally {
     await revealWindow();
   }

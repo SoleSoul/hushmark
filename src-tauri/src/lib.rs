@@ -1,11 +1,13 @@
 mod document;
+mod identity;
 mod setup;
 
 use std::path::PathBuf;
 
 use document::{
-    load_dropped_markdown_file, load_initial_document_from_arg, title_for, LoadedDocument, APP_NAME,
+    load_dropped_markdown_file, load_initial_document_from_arg, title_for, LoadedDocument,
 };
+use identity::setup_window_title;
 use serde::Serialize;
 use setup::{
     first_document_arg, install_or_update as install_or_update_app,
@@ -27,7 +29,7 @@ fn load_initial_view(window: tauri::Window) -> Result<StartupView, String> {
 
     if args.iter().any(|arg| setup::is_install_mode_arg(arg)) {
         window
-            .set_title(&format!("{APP_NAME} Setup"))
+            .set_title(&setup_window_title())
             .map_err(|error| format!("Could not set setup window title: {error}"))?;
 
         return Ok(StartupView {

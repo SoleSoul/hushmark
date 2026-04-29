@@ -1350,6 +1350,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
 
 [[package]]
+name = "hushmark"
+version = "0.1.0"
+dependencies = [
+ "ammonia",
+ "pulldown-cmark",
+ "serde",
+ "tauri",
+ "tauri-build",
+ "windows-sys 0.61.2",
+ "winreg",
+]
+
+[[package]]
 name = "hyper"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1841,19 +1854,6 @@ dependencies = [
  "log",
  "tendril 0.5.0",
  "web_atoms 0.2.4",
-]
-
-[[package]]
-name = "marlo"
-version = "0.1.0"
-dependencies = [
- "ammonia",
- "pulldown-cmark",
- "serde",
- "tauri",
- "tauri-build",
- "windows-sys 0.61.2",
- "winreg",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capability for the main Marlo window.",
+  "description": "Default capability for the main Hushmark window.",
   "windows": ["main"],
   "permissions": ["core:default", "core:window:allow-show"]
 }

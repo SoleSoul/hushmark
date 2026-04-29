@@ -1,4 +1,4 @@
-# Marlo
+# Hushmark
 
 This is a small example document for Phase 1.
 

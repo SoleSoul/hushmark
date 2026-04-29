@@ -8,7 +8,7 @@ use ammonia::Builder;
 use pulldown_cmark::{html, Options, Parser};
 use serde::Serialize;
 
-pub const APP_NAME: &str = "Marlo";
+use crate::identity::DISPLAY_NAME;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -83,10 +83,10 @@ pub fn load_dropped_markdown_file(path: PathBuf) -> LoadedDocument {
 
 pub fn title_for(document: &LoadedDocument) -> String {
     match (&document.file_name, &document.error) {
-        (Some(file_name), Some(_)) => format!("Error: {file_name} - {APP_NAME}"),
-        (Some(file_name), None) => format!("{file_name} - {APP_NAME}"),
-        (None, Some(_)) => format!("Error - {APP_NAME}"),
-        (None, None) => APP_NAME.to_string(),
+        (Some(file_name), Some(_)) => format!("Error: {file_name} - {DISPLAY_NAME}"),
+        (Some(file_name), None) => format!("{file_name} - {DISPLAY_NAME}"),
+        (None, Some(_)) => format!("Error - {DISPLAY_NAME}"),
+        (None, None) => DISPLAY_NAME.to_string(),
     }
 }
 
@@ -146,7 +146,7 @@ mod tests {
             error: None,
         };
 
-        assert_eq!(title_for(&document), "notes.md - Marlo");
+        assert_eq!(title_for(&document), "notes.md - Hushmark");
     }
 
     #[test]
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn missing_file_returns_error_document() {
-        let document = load_markdown_file(env::temp_dir().join("markdown-reader-missing.md"));
+        let document = load_markdown_file(env::temp_dir().join("hushmark-missing.md"));
 
         assert!(document.html.is_none());
         assert!(document.error.is_some());
@@ -168,8 +168,7 @@ mod tests {
 
     #[test]
     fn invalid_utf8_returns_error_document() {
-        let path =
-            env::temp_dir().join(format!("markdown-reader-invalid-{}.md", std::process::id()));
+        let path = env::temp_dir().join(format!("hushmark-invalid-{}.md", std::process::id()));
 
         fs::write(&path, [0xff, 0xfe, 0xfd]).expect("write invalid UTF-8 fixture");
         let document = load_markdown_file(path.clone());
@@ -181,8 +180,7 @@ mod tests {
 
     #[test]
     fn dropped_markdown_file_uses_loader() {
-        let path =
-            env::temp_dir().join(format!("markdown-reader-dropped-{}.md", std::process::id()));
+        let path = env::temp_dir().join(format!("hushmark-dropped-{}.md", std::process::id()));
 
         fs::write(&path, "# Dropped").expect("write dropped Markdown fixture");
         let document = load_dropped_markdown_file(path.clone());
@@ -198,7 +196,7 @@ mod tests {
 
     #[test]
     fn dropped_non_markdown_file_returns_error_document() {
-        let path = env::temp_dir().join("markdown-reader-dropped.txt");
+        let path = env::temp_dir().join("hushmark-dropped.txt");
         let document = load_dropped_markdown_file(path);
 
         assert!(document.html.is_none());
