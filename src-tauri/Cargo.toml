@@ -1,0 +1,19 @@
+[package]
+name = "markdown-reader"
+version = "0.1.0"
+description = "A small Markdown reader built with Tauri."
+authors = ["Markdown Reader Contributors"]
+edition = "2021"
+
+[lib]
+name = "markdown_reader_lib"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+ammonia = "4"
+pulldown-cmark = "0.13"
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = [] }
+
