@@ -1,7 +1,6 @@
 use std::{
     ffi::OsString,
     fs,
-    io::ErrorKind,
     path::{Path, PathBuf},
 };
 
@@ -62,7 +61,9 @@ pub fn load_markdown_file(path: PathBuf) -> LoadedDocument {
             let html = render_markdown_to_safe_html(&markdown);
             LoadedDocument::loaded(&path, html)
         }
-        Err(error) => LoadedDocument::failed(&path, read_error_message(&path, error)),
+        Err(error) => {
+            LoadedDocument::failed(&path, format!("Could not read {}: {error}", path.display()))
+        }
     }
 }
 
@@ -71,7 +72,7 @@ pub fn load_dropped_markdown_file(path: PathBuf) -> LoadedDocument {
         return LoadedDocument::failed(
             &path,
             format!(
-                "Only .md and .markdown files can be opened here. {} was not opened.",
+                "Only .md and .markdown files can be dropped. {} was not opened.",
                 path.display()
             ),
         );
@@ -106,23 +107,6 @@ fn file_name(path: &Path) -> String {
         .and_then(|name| name.to_str())
         .map(str::to_owned)
         .unwrap_or_else(|| path.display().to_string())
-}
-
-fn read_error_message(path: &Path, error: std::io::Error) -> String {
-    let path = path.display();
-
-    match error.kind() {
-        ErrorKind::NotFound => {
-            format!("Hushmark could not find {path}. The file may have moved or been deleted.")
-        }
-        ErrorKind::PermissionDenied => {
-            format!("Hushmark does not have permission to read {path}.")
-        }
-        ErrorKind::InvalidData => {
-            format!("Hushmark could not read {path} as UTF-8 Markdown.")
-        }
-        _ => format!("Hushmark could not read {path}. {error}"),
-    }
 }
 
 fn is_markdown_path(path: &Path) -> bool {
