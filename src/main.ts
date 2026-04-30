@@ -103,12 +103,12 @@ function renderDocument(documentView: LoadedDocument): void {
   document.title = titleFor(documentView);
 
   if (documentView.error) {
-    renderState("error", "Could not open the Markdown file.", documentView.error);
+    renderState("error", "This file could not be opened.", documentView.error);
     return;
   }
 
   if (!documentView.path && !documentView.html) {
-    renderState("empty", "Open a Markdown file to read.");
+    renderState("empty", PRODUCT.displayName, "Open a Markdown file to read.");
     return;
   }
 
@@ -401,7 +401,7 @@ async function openDroppedFile(path: string): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     document.title = `Error - ${PRODUCT.displayName}`;
-    renderState("error", "Could not open the Markdown file.", message);
+    renderState("error", "This file could not be opened.", message);
   }
 }
 
