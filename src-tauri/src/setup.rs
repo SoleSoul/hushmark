@@ -54,6 +54,14 @@ impl SetupMessage {
         }
     }
 
+    fn success_with_details(text: impl Into<String>, details: impl Into<String>) -> Self {
+        Self {
+            kind: "success",
+            text: text.into(),
+            details: Some(details.into()),
+        }
+    }
+
     fn warning(text: impl Into<String>, details: Option<String>) -> Self {
         Self {
             kind: "warning",
@@ -149,8 +157,9 @@ pub fn toggle_install() -> Result<SetupStatus, String> {
         }
 
         if message.kind == "success" {
-            message.text.push_str(
-                " Open With support and right-click entries were removed because they need the installed copy.",
+            append_message_details(
+                &mut message,
+                "Open With support and right-click entries were removed because they need the installed copy.",
             );
         }
 
@@ -272,13 +281,25 @@ pub fn remove_all_integration() -> Result<SetupStatus, String> {
 
 pub fn open_default_apps_settings() -> Result<SetupStatus, String> {
     match open_default_apps_settings_impl() {
-        Ok(()) => setup_status(Some(SetupMessage::success(
-            "Windows Default Apps settings opened. Choose Hushmark manually if you want it as the default for Markdown files.",
+        Ok(()) => setup_status(Some(SetupMessage::success_with_details(
+            "Windows Default Apps settings opened.",
+            "Choose Hushmark manually if you want it as the default for Markdown files.",
         ))),
         Err(error) => setup_status(Some(SetupMessage::warning(
-            "Windows did not open Default Apps automatically. You can still choose Hushmark manually in Windows Settings > Apps > Default apps.",
-            Some(error),
+            "Windows did not open Default Apps automatically.",
+            Some(format!(
+                "You can still choose Hushmark manually in Windows Settings > Apps > Default apps.\n\nTechnical error: {error}"
+            )),
         ))),
+    }
+}
+
+fn append_message_details(message: &mut SetupMessage, details: &str) {
+    if let Some(existing_details) = &mut message.details {
+        existing_details.push('\n');
+        existing_details.push_str(details);
+    } else {
+        message.details = Some(details.to_string());
     }
 }
 
@@ -418,12 +439,16 @@ fn remove_installed_exe() -> Result<SetupMessage, String> {
 
     match fs::remove_file(&install_path) {
         Ok(()) => {
-            let mut text = format!("{DISPLAY_NAME} was uninstalled.");
             if let Some(note) = remove_empty_install_dir(&install_path) {
-                text.push(' ');
-                text.push_str(&note);
+                Ok(SetupMessage::success_with_details(
+                    format!("{DISPLAY_NAME} was uninstalled."),
+                    note,
+                ))
+            } else {
+                Ok(SetupMessage::success(format!(
+                    "{DISPLAY_NAME} was uninstalled."
+                )))
             }
-            Ok(SetupMessage::success(text))
         }
         Err(error) => Ok(SetupMessage::warning(
             "The installed executable could not be removed because it is currently running.",

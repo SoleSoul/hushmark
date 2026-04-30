@@ -264,7 +264,7 @@ function createDetails(status: SetupStatus): HTMLDetailsElement {
   );
 
   if (status.message?.details) {
-    rows.append(createDetailRow("Last error details", status.message.details));
+    rows.append(createDetailRow("Last message details", status.message.details));
   }
 
   details.append(summary, rows);
