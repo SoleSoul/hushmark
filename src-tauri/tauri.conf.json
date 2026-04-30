@@ -27,7 +27,8 @@
   },
   "bundle": {
     "active": false,
-    "targets": "all"
+    "targets": "all",
+    "publisher": "Jonathan Lahav"
   }
 }
 

@@ -1,4 +1,5 @@
 pub const DISPLAY_NAME: &str = "Hushmark";
+pub const DEVELOPER_NAME: &str = "Jonathan Lahav";
 pub const RELEASE_EXE_NAME: &str = "hushmark.exe";
 pub const INSTALLED_EXE_NAME: &str = "Hushmark.exe";
 pub const INSTALL_DIR_NAME: &str = "Hushmark";

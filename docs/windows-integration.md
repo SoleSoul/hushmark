@@ -12,6 +12,8 @@ The product identity is centralized in:
 Current values:
 
 - Display name: `Hushmark`
+- Version: `0.1.0`
+- Developer: `Jonathan Lahav`
 - Release binary: `hushmark.exe`
 - Installed executable: `Hushmark.exe`
 - Install directory name: `Hushmark`
@@ -63,7 +65,7 @@ After install/remove, Hushmark calls `SHChangeNotify(SHCNE_ASSOCCHANGED, ...)` s
 
 ## Setup control panel behavior
 
-Setup mode is an immediate integration control panel. There is no Apply button.
+Setup mode is an immediate integration control panel. There is no Apply button. Version, developer, executable, and registry status information lives in the collapsed **Details** section so the main UI stays compact.
 
 Rows:
 

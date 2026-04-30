@@ -8,9 +8,9 @@ use serde::Serialize;
 use crate::identity::{
     app_paths_key, application_capabilities_file_associations_key, application_capabilities_key,
     application_key, context_menu_key, open_with_progids_key, prog_id_key, APPLICATION_DESCRIPTION,
-    CONTEXT_MENU_LABEL, DEFAULT_APPS_URI, DISPLAY_NAME, DOCUMENT_FRIENDLY_NAME, INSTALLED_EXE_NAME,
-    INSTALL_DIR_NAME, MARKDOWN_EXTENSIONS, PROG_ID, REGISTERED_APPLICATIONS_KEY,
-    REGISTERED_APPLICATIONS_VALUE,
+    CONTEXT_MENU_LABEL, DEFAULT_APPS_URI, DEVELOPER_NAME, DISPLAY_NAME, DOCUMENT_FRIENDLY_NAME,
+    INSTALLED_EXE_NAME, INSTALL_DIR_NAME, MARKDOWN_EXTENSIONS, PROG_ID,
+    REGISTERED_APPLICATIONS_KEY, REGISTERED_APPLICATIONS_VALUE,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -26,6 +26,7 @@ pub struct SetupMessage {
 pub struct SetupStatus {
     pub app_name: &'static str,
     pub version: &'static str,
+    pub developer: &'static str,
     pub release_exe_name: &'static str,
     pub installed_exe_name: &'static str,
     pub prog_id: &'static str,
@@ -96,6 +97,7 @@ pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String
     Ok(SetupStatus {
         app_name: DISPLAY_NAME,
         version: env!("CARGO_PKG_VERSION"),
+        developer: DEVELOPER_NAME,
         release_exe_name: crate::identity::RELEASE_EXE_NAME,
         installed_exe_name: INSTALLED_EXE_NAME,
         prog_id: PROG_ID,

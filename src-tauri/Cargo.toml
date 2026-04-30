@@ -2,7 +2,7 @@
 name = "hushmark"
 version = "0.1.0"
 description = "A small Markdown reader built with Tauri."
-authors = ["Hushmark Contributors"]
+authors = ["Jonathan Lahav"]
 edition = "2021"
 
 [lib]

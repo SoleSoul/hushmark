@@ -19,6 +19,7 @@ type SetupMessage = {
 type SetupStatus = {
   appName: string;
   version: string;
+  developer: string;
   releaseExeName: string;
   installedExeName: string;
   progId: string;
@@ -248,7 +249,9 @@ function createDetails(status: SetupStatus): HTMLDetailsElement {
   const rows = document.createElement("dl");
   rows.className = "setup-details__rows";
   rows.append(
+    createDetailRow("App name", status.appName),
     createDetailRow("Version", status.version),
+    createDetailRow("Developer", status.developer),
     createDetailRow("Release binary", status.releaseExeName),
     createDetailRow("Installed executable", status.installedExeName),
     createDetailRow("Current executable", status.currentExePath),
