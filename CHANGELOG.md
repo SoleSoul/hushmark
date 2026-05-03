@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-- No changes yet.
+- Show the installed executable version in setup Details when an update is available.
 
 ## 0.1.1
 

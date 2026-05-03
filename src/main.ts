@@ -19,6 +19,7 @@ type SetupMessage = {
 type SetupStatus = {
   appName: string;
   version: string;
+  installedVersion: string | null;
   developer: string;
   releaseExeName: string;
   installedExeName: string;
@@ -234,10 +235,17 @@ function createDetails(status: SetupStatus): HTMLDetailsElement {
   const summary = createTextElement("summary", "Details");
   const rows = document.createElement("dl");
   rows.className = "setup-details__rows";
-  rows.append(
+  const detailRows = [
     createDetailRow("App", status.appName),
     createDetailRow("Version", status.version),
     createDetailRow("Developer", status.developer),
+  ];
+
+  if (status.installedVersion) {
+    detailRows.push(createDetailRow("Installed version", status.installedVersion));
+  }
+
+  detailRows.push(
     createDetailRow("Release binary", status.releaseExeName),
     createDetailRow("Installed executable", status.installedExeName),
     createDetailRow("Current executable", status.currentExePath),
@@ -252,6 +260,7 @@ function createDetails(status: SetupStatus): HTMLDetailsElement {
     createDetailRow("Right-click .markdown", boolText(status.contextMenuMarkdownRegistered)),
     createDetailRow("Install path", status.installPath),
   );
+  rows.append(...detailRows);
 
   if (status.message?.details) {
     rows.append(createDetailRow("Last message details", status.message.details));

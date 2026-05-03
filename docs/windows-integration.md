@@ -65,7 +65,7 @@ After install/remove, Hushmark calls `SHChangeNotify(SHCNE_ASSOCCHANGED, ...)` s
 
 ## Setup control panel behavior
 
-Setup mode is an immediate integration control panel. There is no Apply button. Version, developer, executable, and registry status information lives in the collapsed **Details** section so the main UI stays compact.
+Setup mode is an immediate integration control panel. There is no Apply button. Version, developer, executable, and registry status information lives in the collapsed **Details** section so the main UI stays compact. When an installed executable exists but differs from the running build, Details also shows the installed executable's Windows file version if it can be read.
 
 Rows:
 

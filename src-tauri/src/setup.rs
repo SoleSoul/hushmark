@@ -26,6 +26,7 @@ pub struct SetupMessage {
 pub struct SetupStatus {
     pub app_name: &'static str,
     pub version: &'static str,
+    pub installed_version: Option<String>,
     pub developer: &'static str,
     pub release_exe_name: &'static str,
     pub installed_exe_name: &'static str,
@@ -85,6 +86,15 @@ pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String
     let install_path = installed_exe_path()?;
     let installed = install_path.exists();
     let installed_matches_current = installed && files_match(&current_exe, &install_path);
+    let installed_version = if installed && !installed_matches_current {
+        installed_version_for_status(
+            installed,
+            installed_matches_current,
+            executable_version(&install_path),
+        )
+    } else {
+        None
+    };
     let app_path_registered = is_app_path_registered(&install_path);
     let application_registered = is_application_registered(&install_path);
     let open_with_md_registered = is_open_with_extension_registered(MARKDOWN_EXTENSIONS[0]);
@@ -97,6 +107,7 @@ pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String
     Ok(SetupStatus {
         app_name: DISPLAY_NAME,
         version: env!("CARGO_PKG_VERSION"),
+        installed_version,
         developer: DEVELOPER_NAME,
         release_exe_name: crate::identity::RELEASE_EXE_NAME,
         installed_exe_name: INSTALLED_EXE_NAME,
@@ -148,6 +159,18 @@ fn is_context_menu_registered(
     context_menu_markdown_registered: bool,
 ) -> bool {
     installed && context_menu_md_registered && context_menu_markdown_registered
+}
+
+fn installed_version_for_status(
+    installed: bool,
+    installed_matches_current: bool,
+    version: Option<String>,
+) -> Option<String> {
+    if installed && !installed_matches_current {
+        Some(version.unwrap_or_else(|| "Unknown".to_string()))
+    } else {
+        None
+    }
 }
 
 pub fn install_hushmark() -> Result<SetupStatus, String> {
@@ -359,6 +382,170 @@ fn installed_exe_path() -> Result<PathBuf, String> {
 
 fn path_to_string(path: &Path) -> String {
     path.display().to_string()
+}
+
+#[cfg(windows)]
+fn executable_version(path: &Path) -> Option<String> {
+    use windows_sys::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW};
+
+    let path = path_to_wide(path);
+    let mut handle = 0;
+    let size = unsafe { GetFileVersionInfoSizeW(path.as_ptr(), &mut handle) };
+    if size == 0 {
+        return None;
+    }
+
+    let mut data = vec![0_u8; size as usize];
+    let info_read =
+        unsafe { GetFileVersionInfoW(path.as_ptr(), 0, size, data.as_mut_ptr().cast()) };
+    if info_read == 0 {
+        return None;
+    }
+
+    query_version_string(&data, "ProductVersion")
+        .or_else(|| query_version_string(&data, "FileVersion"))
+        .or_else(|| query_fixed_file_version(&data))
+}
+
+#[cfg(not(windows))]
+fn executable_version(_path: &Path) -> Option<String> {
+    None
+}
+
+#[cfg(windows)]
+fn query_version_string(data: &[u8], field_name: &str) -> Option<String> {
+    let mut translations = query_version_translations(data);
+    if translations.is_empty() {
+        translations.push((0x0409, 1200));
+        translations.push((0x0409, 1252));
+    }
+
+    translations
+        .into_iter()
+        .find_map(|(language, code_page)| {
+            let sub_block = format!(r"\StringFileInfo\{language:04x}{code_page:04x}\{field_name}");
+            query_wide_version_value(data, &sub_block)
+        })
+        .map(|version| version.trim().to_string())
+        .filter(|version| !version.is_empty())
+}
+
+#[cfg(windows)]
+fn query_version_translations(data: &[u8]) -> Vec<(u16, u16)> {
+    use std::{ffi::c_void, mem, ptr, slice};
+    use windows_sys::Win32::Storage::FileSystem::VerQueryValueW;
+
+    let sub_block = wide_null(r"\VarFileInfo\Translation");
+    let mut buffer: *mut c_void = ptr::null_mut();
+    let mut length = 0;
+    let found = unsafe {
+        VerQueryValueW(
+            data.as_ptr().cast(),
+            sub_block.as_ptr(),
+            &mut buffer,
+            &mut length,
+        )
+    };
+
+    if found == 0 || buffer.is_null() || length < 4 {
+        return Vec::new();
+    }
+
+    let words = unsafe {
+        slice::from_raw_parts(
+            buffer.cast::<u16>(),
+            length as usize / mem::size_of::<u16>(),
+        )
+    };
+    words
+        .chunks_exact(2)
+        .map(|translation| (translation[0], translation[1]))
+        .collect()
+}
+
+#[cfg(windows)]
+fn query_wide_version_value(data: &[u8], sub_block: &str) -> Option<String> {
+    use std::{ffi::c_void, ptr, slice};
+    use windows_sys::Win32::Storage::FileSystem::VerQueryValueW;
+
+    let sub_block = wide_null(sub_block);
+    let mut buffer: *mut c_void = ptr::null_mut();
+    let mut length = 0;
+    let found = unsafe {
+        VerQueryValueW(
+            data.as_ptr().cast(),
+            sub_block.as_ptr(),
+            &mut buffer,
+            &mut length,
+        )
+    };
+
+    if found == 0 || buffer.is_null() || length == 0 {
+        return None;
+    }
+
+    let value = unsafe { slice::from_raw_parts(buffer.cast::<u16>(), length as usize) };
+    let value_end = value
+        .iter()
+        .position(|character| *character == 0)
+        .unwrap_or(value.len());
+
+    String::from_utf16(&value[..value_end]).ok()
+}
+
+#[cfg(windows)]
+fn query_fixed_file_version(data: &[u8]) -> Option<String> {
+    use std::{ffi::c_void, mem, ptr};
+    use windows_sys::Win32::Storage::FileSystem::{VerQueryValueW, VS_FIXEDFILEINFO};
+
+    let sub_block = wide_null(r"\");
+    let mut buffer: *mut c_void = ptr::null_mut();
+    let mut length = 0;
+    let found = unsafe {
+        VerQueryValueW(
+            data.as_ptr().cast(),
+            sub_block.as_ptr(),
+            &mut buffer,
+            &mut length,
+        )
+    };
+
+    if found == 0 || buffer.is_null() || length as usize != mem::size_of::<VS_FIXEDFILEINFO>() {
+        return None;
+    }
+
+    let info = unsafe { &*buffer.cast::<VS_FIXEDFILEINFO>() };
+    if info.dwSignature != 0xfeef04bd {
+        return None;
+    }
+
+    let mut parts = vec![
+        high_word(info.dwFileVersionMS),
+        low_word(info.dwFileVersionMS),
+        high_word(info.dwFileVersionLS),
+        low_word(info.dwFileVersionLS),
+    ];
+    while parts.len() > 3 && parts.last() == Some(&0) {
+        parts.pop();
+    }
+
+    Some(
+        parts
+            .into_iter()
+            .map(|part| part.to_string())
+            .collect::<Vec<_>>()
+            .join("."),
+    )
+}
+
+#[cfg(windows)]
+fn high_word(value: u32) -> u16 {
+    (value >> 16) as u16
+}
+
+#[cfg(windows)]
+fn low_word(value: u32) -> u16 {
+    value as u16
 }
 
 fn same_path(left: &Path, right: &Path) -> bool {
@@ -922,8 +1109,8 @@ fn wide_null(value: &str) -> Vec<u16> {
 #[cfg(test)]
 mod tests {
     use super::{
-        are_file_handlers_registered, first_document_arg, is_context_menu_registered,
-        is_install_mode_arg, open_command,
+        are_file_handlers_registered, first_document_arg, installed_version_for_status,
+        is_context_menu_registered, is_install_mode_arg, open_command,
     };
     use std::{ffi::OsString, path::PathBuf};
 
@@ -962,5 +1149,41 @@ mod tests {
         assert!(is_context_menu_registered(true, true, true));
         assert!(!is_context_menu_registered(false, true, true));
         assert!(!is_context_menu_registered(true, true, false));
+    }
+
+    #[test]
+    fn installed_version_is_hidden_when_no_update_is_available() {
+        assert_eq!(
+            installed_version_for_status(false, false, Some("0.1.0".to_string())),
+            None
+        );
+        assert_eq!(
+            installed_version_for_status(true, true, Some("0.1.0".to_string())),
+            None
+        );
+    }
+
+    #[test]
+    fn installed_version_is_shown_when_update_is_available() {
+        assert_eq!(
+            installed_version_for_status(true, false, Some("0.1.0".to_string())),
+            Some("0.1.0".to_string())
+        );
+    }
+
+    #[test]
+    fn installed_version_is_unknown_when_update_is_available_but_version_is_unreadable() {
+        assert_eq!(
+            installed_version_for_status(true, false, None),
+            Some("Unknown".to_string())
+        );
+    }
+
+    #[test]
+    fn executable_version_is_missing_for_a_missing_file() {
+        assert_eq!(
+            super::executable_version(&PathBuf::from(r"C:\definitely\missing\Hushmark.exe")),
+            None
+        );
     }
 }
