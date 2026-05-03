@@ -464,6 +464,21 @@ body {
   text-align: left;
 }
 
+.document th.hushmark-align-left,
+.document td.hushmark-align-left {
+  text-align: left;
+}
+
+.document th.hushmark-align-center,
+.document td.hushmark-align-center {
+  text-align: center;
+}
+
+.document th.hushmark-align-right,
+.document td.hushmark-align-right {
+  text-align: right;
+}
+
 .document img {
   display: block;
   max-width: 100%;

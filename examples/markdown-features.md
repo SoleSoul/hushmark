@@ -83,8 +83,9 @@ The local placeholder above should render from `examples\assets\hushmark-placeho
 
 | Left aligned | Center aligned | Right aligned |
 | :--- | :---: | ---: |
-| short | centered | 123 |
-| a much longer table cell that should not make the whole app unusable | value | 456 |
+| apple | banana | 123 |
+| longer left text | centered text | 456 |
+| a much longer table cell that should not make the whole app unusable | middle | 789 |
 
 ## Unsupported extension examples
 

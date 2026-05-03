@@ -9,7 +9,7 @@ use std::{
 use ammonia::Builder;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use percent_encoding::percent_decode_str;
-use pulldown_cmark::{html, CowStr, Event, Options, Parser, Tag};
+use pulldown_cmark::{html, Alignment, CowStr, Event, Options, Parser, Tag, TagEnd};
 use serde::Serialize;
 
 use crate::identity::DISPLAY_NAME;
@@ -103,16 +103,32 @@ fn render_markdown_to_safe_html(markdown: &str) -> String {
 
 fn render_markdown_with_document_path(markdown: &str, document_path: Option<&Path>) -> String {
     let mut local_images = LocalImageResolver::new(document_path);
+    let mut table_alignments = TableAlignmentRewriter::new();
     let mut rendered = String::new();
 
     {
-        let parser = Parser::new_ext(markdown, markdown_options())
-            .map(|event| local_images.rewrite_event(event));
+        let parser = Parser::new_ext(markdown, markdown_options()).map(|event| {
+            let event = local_images.rewrite_event(event);
+            table_alignments.rewrite_event(event)
+        });
         html::push_html(&mut rendered, parser);
     }
 
-    let safe_html = Builder::default().clean(&rendered).to_string();
+    let allowed_table_classes = table_alignments.allowed_classes();
+    let safe_html = sanitize_rendered_html(&rendered, &allowed_table_classes);
+    let safe_html = table_alignments.apply_replacements(safe_html);
     local_images.apply_replacements(safe_html)
+}
+
+fn sanitize_rendered_html(rendered: &str, allowed_table_classes: &[String]) -> String {
+    let allowed_table_classes: Vec<&str> =
+        allowed_table_classes.iter().map(String::as_str).collect();
+    let mut builder = Builder::default();
+
+    builder.add_allowed_classes("th", &allowed_table_classes);
+    builder.add_allowed_classes("td", &allowed_table_classes);
+
+    builder.clean(rendered).to_string()
 }
 
 fn markdown_options() -> Options {
@@ -120,6 +136,130 @@ fn markdown_options() -> Options {
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
     options
+}
+
+struct TableAlignmentRewriter {
+    alignments: Vec<Alignment>,
+    table_part: TablePart,
+    cell_index: usize,
+    placeholder_prefix: String,
+    replacements: Vec<(String, &'static str)>,
+}
+
+impl TableAlignmentRewriter {
+    fn new() -> Self {
+        Self {
+            alignments: Vec::new(),
+            table_part: TablePart::Body,
+            cell_index: 0,
+            placeholder_prefix: table_alignment_placeholder_prefix(),
+            replacements: Vec::new(),
+        }
+    }
+
+    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Event<'a> {
+        match event {
+            Event::Start(Tag::Table(alignments)) => {
+                self.alignments = alignments;
+                self.table_part = TablePart::Head;
+                self.cell_index = 0;
+                Event::Start(Tag::Table(Vec::new()))
+            }
+            Event::Start(Tag::TableHead) => {
+                self.table_part = TablePart::Head;
+                self.cell_index = 0;
+                Event::Start(Tag::TableHead)
+            }
+            Event::End(TagEnd::TableHead) => {
+                self.table_part = TablePart::Body;
+                self.cell_index = 0;
+                Event::End(TagEnd::TableHead)
+            }
+            Event::Start(Tag::TableRow) => {
+                self.cell_index = 0;
+                Event::Start(Tag::TableRow)
+            }
+            Event::Start(Tag::TableCell) => Event::Html(CowStr::from(self.table_cell_start_tag())),
+            Event::End(TagEnd::TableCell) => {
+                let tag = self.table_part.cell_tag();
+                self.cell_index += 1;
+                Event::Html(CowStr::from(format!("</{tag}>")))
+            }
+            Event::End(TagEnd::Table) => {
+                self.alignments.clear();
+                self.table_part = TablePart::Body;
+                self.cell_index = 0;
+                Event::End(TagEnd::Table)
+            }
+            _ => event,
+        }
+    }
+
+    fn table_cell_start_tag(&mut self) -> String {
+        let tag = self.table_part.cell_tag();
+
+        match self
+            .alignments
+            .get(self.cell_index)
+            .and_then(markdown_alignment_class)
+        {
+            Some(public_class) => {
+                let placeholder =
+                    format!("{}-{}", self.placeholder_prefix, self.replacements.len());
+                self.replacements.push((placeholder.clone(), public_class));
+                format!("<{tag} class=\"{placeholder}\">")
+            }
+            None => format!("<{tag}>"),
+        }
+    }
+
+    fn allowed_classes(&self) -> Vec<String> {
+        self.replacements
+            .iter()
+            .map(|(placeholder, _)| placeholder.clone())
+            .collect()
+    }
+
+    fn apply_replacements(&self, mut safe_html: String) -> String {
+        for (placeholder, public_class) in &self.replacements {
+            safe_html = safe_html.replace(placeholder, public_class);
+        }
+
+        safe_html
+    }
+}
+
+#[derive(Clone, Copy)]
+enum TablePart {
+    Head,
+    Body,
+}
+
+impl TablePart {
+    fn cell_tag(self) -> &'static str {
+        match self {
+            Self::Head => "th",
+            Self::Body => "td",
+        }
+    }
+}
+
+fn markdown_alignment_class(alignment: &Alignment) -> Option<&'static str> {
+    match alignment {
+        Alignment::Left => Some("hushmark-align-left"),
+        Alignment::Center => Some("hushmark-align-center"),
+        Alignment::Right => Some("hushmark-align-right"),
+        Alignment::None => None,
+    }
+}
+
+fn table_alignment_placeholder_prefix() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+
+    format!("hushmark-align-token-{nanos}-{}", std::process::id())
 }
 
 struct LocalImageResolver {
@@ -362,6 +502,40 @@ mod tests {
         assert!(html.contains("<th>Feature</th>"));
         assert!(html.contains("<td>Enabled</td>"));
         assert!(html.contains("<del>removed</del>"));
+    }
+
+    #[test]
+    fn markdown_table_alignment_renders_as_controlled_classes() {
+        let html = render_markdown_to_safe_html(
+            "| Left | Center | Right |\n| :--- | :---: | ---: |\n| apple | banana | 123 |",
+        );
+
+        assert!(html.contains("<th class=\"hushmark-align-left\">Left</th>"));
+        assert!(html.contains("<th class=\"hushmark-align-center\">Center</th>"));
+        assert!(html.contains("<th class=\"hushmark-align-right\">Right</th>"));
+        assert!(html.contains("<td class=\"hushmark-align-left\">apple</td>"));
+        assert!(html.contains("<td class=\"hushmark-align-center\">banana</td>"));
+        assert!(html.contains("<td class=\"hushmark-align-right\">123</td>"));
+        assert!(!html.contains("style="));
+        assert!(!html.contains("hushmark-align-token"));
+    }
+
+    #[test]
+    fn raw_html_table_styles_and_classes_are_still_stripped() {
+        let html = render_markdown_to_safe_html(
+            r#"<table>
+<tr>
+<td style="text-align: right" class="hushmark-align-right evil" onclick="alert(1)">Raw</td>
+</tr>
+</table>"#,
+        );
+
+        assert!(html.contains("<td"));
+        assert!(html.contains("Raw"));
+        assert!(!html.contains("style="));
+        assert!(!html.contains("onclick"));
+        assert!(!html.contains("hushmark-align-right"));
+        assert!(!html.contains("evil"));
     }
 
     #[test]
