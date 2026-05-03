@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="120" viewBox="0 0 360 120" role="img" aria-labelledby="title desc">
+  <title id="title">Hushmark placeholder</title>
+  <desc id="desc">A quiet local placeholder image for Markdown rendering checks.</desc>
+  <rect width="360" height="120" rx="18" fill="#eee9dc"/>
+  <rect x="12" y="12" width="336" height="96" rx="14" fill="#fffdf8" stroke="#d8d2c4"/>
+  <text x="180" y="68" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600" fill="#57606a">Hushmark</text>
+</svg>

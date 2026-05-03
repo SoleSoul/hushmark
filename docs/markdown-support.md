@@ -1,0 +1,60 @@
+# Hushmark Markdown support
+
+Hushmark targets CommonMark-style Markdown with selected extensions. It uses `pulldown-cmark` in Rust to parse and render Markdown, then sanitizes the generated HTML with `ammonia` before the content reaches the WebView.
+
+This is a support baseline, not a claim of full GitHub-Flavored Markdown, MultiMarkdown, or editor-grade Markdown compatibility.
+
+## Current parser configuration
+
+Markdown rendering is configured in `src-tauri/src/document.rs`.
+
+The current `pulldown-cmark` options are:
+
+- `Options::ENABLE_TABLES`
+- `Options::ENABLE_STRIKETHROUGH`
+
+All other non-CommonMark options remain disabled for now.
+
+## Supported baseline
+
+The reader is expected to handle ordinary CommonMark-style documents with:
+
+- headings
+- paragraphs
+- soft and hard line breaks
+- emphasis and strong emphasis
+- inline code and fenced code blocks
+- blockquotes
+- unordered, ordered, and nested lists
+- links
+- images as Markdown syntax
+- horizontal rules
+- tables
+- strikethrough
+- Unicode text, including Hebrew
+
+## Known limitations
+
+- Task lists are not enabled. `- [x] item` renders as ordinary list text, not as a checkbox.
+- Footnotes are not enabled. Footnote syntax is not rendered as numbered footnotes; depending on the exact text, it remains visible text or is treated as ordinary CommonMark link-reference syntax.
+- Heading attributes are not enabled. `# Heading {#id .class}` remains heading text instead of setting an HTML `id` or class.
+- Broader GitHub-Flavored Markdown behavior is not enabled beyond tables and strikethrough.
+- Definition lists, math, metadata blocks, smart punctuation, superscript, subscript, and wikilinks are not enabled.
+- Raw HTML is parsed by `pulldown-cmark`, but Hushmark sanitizes the resulting HTML with `ammonia`. Safe tags and attributes may remain; unsafe elements, event handlers, and dangerous URL schemes should not.
+- Relative local image paths are not rewritten relative to the Markdown file location yet. The fixture includes a local image reference to make this behavior visible during manual checks.
+
+## Visual fixture
+
+Open `examples/markdown-features.md` when checking reader changes. It intentionally covers common Markdown shapes plus unsupported syntax examples.
+
+Manual visual checklist:
+
+- The document stays within the reading column.
+- Headings H1-H6 are readable and clearly ordered.
+- Paragraphs, lists, blockquotes, and horizontal rules remain calm and readable.
+- Code blocks and very long code/path lines scroll horizontally instead of breaking the page.
+- Tables remain usable and do not force the whole window wider.
+- Images do not overflow the reading column when they resolve.
+- Hebrew and mixed English/Hebrew text display correctly.
+- Raw unsafe HTML does not execute or display unsafe script/link behavior.
+

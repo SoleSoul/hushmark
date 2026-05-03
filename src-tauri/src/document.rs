@@ -90,15 +90,18 @@ pub fn title_for(document: &LoadedDocument) -> String {
 }
 
 fn render_markdown_to_safe_html(markdown: &str) -> String {
-    let mut options = Options::empty();
-    options.insert(Options::ENABLE_TABLES);
-    options.insert(Options::ENABLE_STRIKETHROUGH);
-
-    let parser = Parser::new_ext(markdown, options);
+    let parser = Parser::new_ext(markdown, markdown_options());
     let mut rendered = String::new();
     html::push_html(&mut rendered, parser);
 
     Builder::default().clean(&rendered).to_string()
+}
+
+fn markdown_options() -> Options {
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options
 }
 
 fn file_name(path: &Path) -> String {
@@ -138,19 +141,80 @@ fn is_markdown_path(path: &Path) -> bool {
 mod tests {
     use std::{env, fs};
 
+    use pulldown_cmark::Options;
+
     use super::{
         load_dropped_markdown_file, load_initial_document_from_arg, load_markdown_file,
-        render_markdown_to_safe_html, title_for, LoadedDocument,
+        markdown_options, render_markdown_to_safe_html, title_for, LoadedDocument,
     };
 
     #[test]
-    fn renders_markdown_without_unsafe_html() {
+    fn markdown_options_define_current_support_baseline() {
+        let options = markdown_options();
+
+        assert!(options.contains(Options::ENABLE_TABLES));
+        assert!(options.contains(Options::ENABLE_STRIKETHROUGH));
+        assert!(!options.contains(Options::ENABLE_TASKLISTS));
+        assert!(!options.contains(Options::ENABLE_FOOTNOTES));
+        assert!(!options.contains(Options::ENABLE_HEADING_ATTRIBUTES));
+        assert!(!options.contains(Options::ENABLE_GFM));
+    }
+
+    #[test]
+    fn enabled_markdown_extensions_render_as_html() {
+        let html = render_markdown_to_safe_html(
+            "| Feature | State |\n| --- | --- |\n| Tables | Enabled |\n\n~~removed~~",
+        );
+
+        assert!(html.contains("<table>"));
+        assert!(html.contains("<th>Feature</th>"));
+        assert!(html.contains("<td>Enabled</td>"));
+        assert!(html.contains("<del>removed</del>"));
+    }
+
+    #[test]
+    fn unsupported_markdown_extensions_remain_plain_content() {
+        let html = render_markdown_to_safe_html(
+            "- [x] Task item\n\nFootnote reference[^1]\n\n[^1]: Footnote body\n\n# Heading {#custom .accent}",
+        );
+
+        assert!(html.contains("[x] Task item"));
+        assert!(!html.contains("checkbox"));
+        assert!(html.contains("Footnote reference[^1]"));
+        assert!(!html.contains("footnote-reference"));
+        assert!(html.contains("Heading {#custom .accent}"));
+        assert!(!html.contains("id=\"custom\""));
+        assert!(!html.contains("class=\"accent\""));
+    }
+
+    #[test]
+    fn sanitizes_unsafe_raw_html() {
         let html =
             render_markdown_to_safe_html("# Hello\n\n<script>alert('xss')</script>\n\n**world**");
 
         assert!(html.contains("<h1>Hello</h1>"));
         assert!(html.contains("<strong>world</strong>"));
         assert!(!html.contains("<script>"));
+        assert!(!html.contains("alert('xss')"));
+    }
+
+    #[test]
+    fn sanitizes_unsafe_attributes_and_links() {
+        let html = render_markdown_to_safe_html(
+            r#"<img src="example.png" alt="Example" onerror="alert(1)">
+<a href="https://example.com" onclick="alert(1)">safe link</a>
+
+[bad link](javascript:alert(1))
+![bad image](javascript:alert(1))"#,
+        );
+
+        assert!(html.contains("src=\"example.png\""));
+        assert!(html.contains("href=\"https://example.com\""));
+        assert!(html.contains("safe link"));
+        assert!(html.contains("bad link"));
+        assert!(!html.contains("onerror"));
+        assert!(!html.contains("onclick"));
+        assert!(!html.contains("javascript:"));
     }
 
     #[test]
@@ -179,7 +243,10 @@ mod tests {
         let document = load_markdown_file(env::temp_dir().join("hushmark-missing.md"));
 
         assert!(document.html.is_none());
-        assert!(document.error.is_some());
+        assert!(document
+            .error
+            .as_deref()
+            .is_some_and(|error| error.contains("could not find")));
     }
 
     #[test]
@@ -191,7 +258,10 @@ mod tests {
         let _ = fs::remove_file(path);
 
         assert!(document.html.is_none());
-        assert!(document.error.is_some());
+        assert!(document
+            .error
+            .as_deref()
+            .is_some_and(|error| error.contains("UTF-8 Markdown")));
     }
 
     #[test]
