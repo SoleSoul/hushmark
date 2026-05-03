@@ -89,44 +89,10 @@ body {
   line-height: 1.45;
 }
 
-.setup-summary {
-  display: grid;
-  grid-template-columns: minmax(6rem, 0.8fr) minmax(0, 2fr) minmax(4rem, 0.55fr);
-  gap: 0.75rem;
-  margin: 0.9rem 0;
-  padding: 0.72rem;
-  border: 1px solid #eee7d8;
-  border-radius: 0.85rem;
-  background: #fbf8f0;
-}
-
-.setup-summary__item {
-  min-width: 0;
-}
-
-.setup-summary__label {
-  display: block;
-  color: #6e6250;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.setup-summary__value {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  color: #24292f;
-  font-size: 0.92rem;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .integration-rows {
   display: grid;
   gap: 0.55rem;
+  margin-top: 0.9rem;
 }
 
 .integration-row {
@@ -307,10 +273,6 @@ body {
 }
 
 @media (max-width: 640px) {
-  .setup-summary {
-    grid-template-columns: 1fr;
-  }
-
   .integration-row {
     grid-template-columns: 2rem minmax(0, 1fr);
   }

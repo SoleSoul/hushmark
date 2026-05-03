@@ -148,38 +148,10 @@ function createDetailRow(label: string, value: string): HTMLDivElement {
   return row;
 }
 
-function createSummaryItem(label: string, value: string, title?: string): HTMLDivElement {
-  const item = document.createElement("div");
-  item.className = "setup-summary__item";
-
-  const labelElement = createTextElement("span", label, "setup-summary__label");
-  const valueElement = createTextElement("span", value, "setup-summary__value");
-
-  if (title) {
-    valueElement.title = title;
-  }
-
-  item.append(labelElement, valueElement);
-  return item;
-}
-
-function createSetupSummary(status: SetupStatus): HTMLDivElement {
-  const summary = document.createElement("div");
-  summary.className = "setup-summary";
-  summary.append(
-    createSummaryItem("Status", installSummaryText(status)),
-    createSummaryItem("Install location", status.installPath, status.installPath),
-    createSummaryItem("Version", status.version),
-  );
-  return summary;
-}
-
-function installSummaryText(status: SetupStatus): string {
-  if (status.installedMatchesCurrent) {
-    return "Installed";
-  }
-
-  return status.installed ? "Update available" : "Not installed";
+function installRowLabel(status: SetupStatus): string {
+  return status.installed && !status.installedMatchesCurrent
+    ? PRODUCT.updateRowLabel
+    : PRODUCT.installRowLabel;
 }
 
 function installRowStateText(status: SetupStatus): string {
@@ -310,7 +282,7 @@ function renderSetup(status: SetupStatus, workingAction: SetupActionId | null = 
   rows.append(
     createIntegrationRow(
       "install",
-      PRODUCT.installRowLabel,
+      installRowLabel(status),
       PRODUCT.installRowDescription,
       status.installedMatchesCurrent,
       installRowStateText(status),
@@ -366,7 +338,7 @@ function renderSetup(status: SetupStatus, workingAction: SetupActionId | null = 
     ),
   );
 
-  panel.append(heading, intro, createSetupSummary(status), rows, defaultAppsNote, actions);
+  panel.append(heading, intro, rows, defaultAppsNote, actions);
 
   if (workingAction) {
     panel.append(createTextElement("p", "Working...", "setup-message setup-message--working"));

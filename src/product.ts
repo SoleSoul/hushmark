@@ -3,6 +3,7 @@ export const PRODUCT = {
   markdownExtensions: ".md and .markdown",
   setupTitle: "Hushmark Setup",
   installRowLabel: "Install Hushmark",
+  updateRowLabel: "Update Hushmark",
   installRowDescription: "Copy or update Hushmark in your local Programs folder.",
   openWithRowLabel: "Show Hushmark in Open With",
   openWithRowDescription:
