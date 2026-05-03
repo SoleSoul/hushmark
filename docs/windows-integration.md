@@ -69,9 +69,9 @@ Setup mode is an immediate integration control panel. There is no Apply button. 
 
 Rows:
 
-1. **Install Hushmark** copies or removes `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe`. Turning it off also removes Hushmark Open With and right-click entries so Windows is not left pointing at a missing executable.
-2. **Show Hushmark in Open With** installs/updates Hushmark first if needed, then adds or removes only Hushmark Open With registration.
-3. **Add right-click menu entry** installs/updates Hushmark first if needed, then adds or removes only Hushmark context-menu entries.
+1. **Install Hushmark** copies, updates, or removes `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe`. If an installed copy exists but does not match the running build, setup shows it as installed with an update available rather than not installed. Turning off a current install also removes Hushmark Open With and right-click entries so Windows is not left pointing at a missing executable.
+2. **Show Hushmark in Open With** installs/updates Hushmark first if needed, then adds or removes only Hushmark Open With registration. If Open With already points at an older installed copy that still exists, the row remains checked while the install row offers the update.
+3. **Add right-click menu entry** installs/updates Hushmark first if needed, then adds or removes only Hushmark context-menu entries. If the right-click command points at an older installed copy that still exists, the row remains checked while the install row offers the update.
 
 Each row refreshes from actual file/registry state after the operation. The **Remove all Hushmark integration** action removes Hushmark Open With registration, right-click entries, App Paths/application registration, and the installed executable when safe. It removes `%LOCALAPPDATA%\Programs\Hushmark` only if the directory is empty.
 

@@ -107,21 +107,47 @@ pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String
         installed_matches_current,
         app_path_registered,
         application_registered,
-        file_handlers_registered: installed_matches_current
-            && app_path_registered
-            && application_registered
-            && open_with_md_registered
-            && open_with_markdown_registered,
+        file_handlers_registered: are_file_handlers_registered(
+            installed,
+            app_path_registered,
+            application_registered,
+            open_with_md_registered,
+            open_with_markdown_registered,
+        ),
         open_with_md_registered,
         open_with_markdown_registered,
-        context_menu_registered: installed_matches_current
-            && context_menu_md_registered
-            && context_menu_markdown_registered,
+        context_menu_registered: is_context_menu_registered(
+            installed,
+            context_menu_md_registered,
+            context_menu_markdown_registered,
+        ),
         context_menu_md_registered,
         context_menu_markdown_registered,
         default_apps_uri: DEFAULT_APPS_URI,
         message,
     })
+}
+
+fn are_file_handlers_registered(
+    installed: bool,
+    app_path_registered: bool,
+    application_registered: bool,
+    open_with_md_registered: bool,
+    open_with_markdown_registered: bool,
+) -> bool {
+    installed
+        && app_path_registered
+        && application_registered
+        && open_with_md_registered
+        && open_with_markdown_registered
+}
+
+fn is_context_menu_registered(
+    installed: bool,
+    context_menu_md_registered: bool,
+    context_menu_markdown_registered: bool,
+) -> bool {
+    installed && context_menu_md_registered && context_menu_markdown_registered
 }
 
 pub fn install_hushmark() -> Result<SetupStatus, String> {
@@ -895,7 +921,10 @@ fn wide_null(value: &str) -> Vec<u16> {
 
 #[cfg(test)]
 mod tests {
-    use super::{first_document_arg, is_install_mode_arg, open_command};
+    use super::{
+        are_file_handlers_registered, first_document_arg, is_context_menu_registered,
+        is_install_mode_arg, open_command,
+    };
     use std::{ffi::OsString, path::PathBuf};
 
     #[test]
@@ -919,5 +948,19 @@ mod tests {
         let command = open_command(&PathBuf::from(r"C:\Users\me\App Data\Hushmark.exe"));
 
         assert_eq!(command, r#""C:\Users\me\App Data\Hushmark.exe" "%1""#);
+    }
+
+    #[test]
+    fn file_handlers_can_be_registered_for_an_installed_copy_that_needs_update() {
+        assert!(are_file_handlers_registered(true, true, true, true, true));
+        assert!(!are_file_handlers_registered(false, true, true, true, true));
+        assert!(!are_file_handlers_registered(true, true, true, true, false));
+    }
+
+    #[test]
+    fn context_menu_can_be_registered_for_an_installed_copy_that_needs_update() {
+        assert!(is_context_menu_registered(true, true, true));
+        assert!(!is_context_menu_registered(false, true, true));
+        assert!(!is_context_menu_registered(true, true, false));
     }
 }

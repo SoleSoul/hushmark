@@ -167,14 +167,27 @@ function createSetupSummary(status: SetupStatus): HTMLDivElement {
   const summary = document.createElement("div");
   summary.className = "setup-summary";
   summary.append(
-    createSummaryItem(
-      "Status",
-      status.installedMatchesCurrent ? "Installed" : "Not installed",
-    ),
+    createSummaryItem("Status", installSummaryText(status)),
     createSummaryItem("Install location", status.installPath, status.installPath),
     createSummaryItem("Version", status.version),
   );
   return summary;
+}
+
+function installSummaryText(status: SetupStatus): string {
+  if (status.installedMatchesCurrent) {
+    return "Installed";
+  }
+
+  return status.installed ? "Update available" : "Not installed";
+}
+
+function installRowStateText(status: SetupStatus): string {
+  if (status.installedMatchesCurrent) {
+    return "Installed";
+  }
+
+  return status.installed ? "Update available" : "Not installed";
 }
 
 function createIntegrationRow(
@@ -182,6 +195,7 @@ function createIntegrationRow(
   label: string,
   description: string,
   checked: boolean,
+  stateLabel: string | null,
   command: SetupCommand,
   status: SetupStatus,
   workingAction: SetupActionId | null,
@@ -208,7 +222,7 @@ function createIntegrationRow(
   );
 
   const stateText =
-    workingAction === id ? "Working..." : checked ? "Enabled" : "Not enabled";
+    workingAction === id ? "Working..." : stateLabel ?? (checked ? "Enabled" : "Not enabled");
   const state = createTextElement("span", stateText, "integration-row__state");
 
   row.append(check, copy, state);
@@ -256,6 +270,7 @@ function createDetails(status: SetupStatus): HTMLDetailsElement {
     createDetailRow("Installed executable", status.installedExeName),
     createDetailRow("Current executable", status.currentExePath),
     createDetailRow("ProgID", status.progId),
+    createDetailRow("Installed copy exists", boolText(status.installed)),
     createDetailRow("Installed copy current", boolText(status.installedMatchesCurrent)),
     createDetailRow("App Paths status", boolText(status.appPathRegistered)),
     createDetailRow("Application registration", boolText(status.applicationRegistered)),
@@ -298,6 +313,7 @@ function renderSetup(status: SetupStatus, workingAction: SetupActionId | null = 
       PRODUCT.installRowLabel,
       PRODUCT.installRowDescription,
       status.installedMatchesCurrent,
+      installRowStateText(status),
       "toggle_install",
       status,
       workingAction,
@@ -307,6 +323,7 @@ function renderSetup(status: SetupStatus, workingAction: SetupActionId | null = 
       PRODUCT.openWithRowLabel,
       PRODUCT.openWithRowDescription,
       status.fileHandlersRegistered,
+      null,
       "toggle_open_with_support",
       status,
       workingAction,
@@ -316,6 +333,7 @@ function renderSetup(status: SetupStatus, workingAction: SetupActionId | null = 
       PRODUCT.contextMenuRowLabel,
       PRODUCT.contextMenuRowDescription,
       status.contextMenuRegistered,
+      null,
       "toggle_context_menu",
       status,
       workingAction,
