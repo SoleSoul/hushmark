@@ -2,11 +2,14 @@ use std::{
     ffi::OsString,
     fs,
     io::ErrorKind,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use ammonia::Builder;
-use pulldown_cmark::{html, Options, Parser};
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
+use percent_encoding::percent_decode_str;
+use pulldown_cmark::{html, CowStr, Event, Options, Parser, Tag};
 use serde::Serialize;
 
 use crate::identity::DISPLAY_NAME;
@@ -59,7 +62,7 @@ pub fn load_initial_document_from_arg(arg: Option<OsString>) -> LoadedDocument {
 pub fn load_markdown_file(path: PathBuf) -> LoadedDocument {
     match fs::read_to_string(&path) {
         Ok(markdown) => {
-            let html = render_markdown_to_safe_html(&markdown);
+            let html = render_markdown_file_to_safe_html(&markdown, &path);
             LoadedDocument::loaded(&path, html)
         }
         Err(error) => LoadedDocument::failed(&path, read_error_message(&path, error)),
@@ -89,12 +92,27 @@ pub fn title_for(document: &LoadedDocument) -> String {
     }
 }
 
-fn render_markdown_to_safe_html(markdown: &str) -> String {
-    let parser = Parser::new_ext(markdown, markdown_options());
-    let mut rendered = String::new();
-    html::push_html(&mut rendered, parser);
+fn render_markdown_file_to_safe_html(markdown: &str, document_path: &Path) -> String {
+    render_markdown_with_document_path(markdown, Some(document_path))
+}
 
-    Builder::default().clean(&rendered).to_string()
+#[cfg(test)]
+fn render_markdown_to_safe_html(markdown: &str) -> String {
+    render_markdown_with_document_path(markdown, None)
+}
+
+fn render_markdown_with_document_path(markdown: &str, document_path: Option<&Path>) -> String {
+    let mut local_images = LocalImageResolver::new(document_path);
+    let mut rendered = String::new();
+
+    {
+        let parser = Parser::new_ext(markdown, markdown_options())
+            .map(|event| local_images.rewrite_event(event));
+        html::push_html(&mut rendered, parser);
+    }
+
+    let safe_html = Builder::default().clean(&rendered).to_string();
+    local_images.apply_replacements(safe_html)
 }
 
 fn markdown_options() -> Options {
@@ -102,6 +120,180 @@ fn markdown_options() -> Options {
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
     options
+}
+
+struct LocalImageResolver {
+    base_dir: Option<PathBuf>,
+    placeholder_prefix: String,
+    replacements: Vec<(String, String)>,
+}
+
+impl LocalImageResolver {
+    fn new(document_path: Option<&Path>) -> Self {
+        Self {
+            base_dir: document_path.and_then(canonical_document_dir),
+            placeholder_prefix: local_image_placeholder_prefix(),
+            replacements: Vec::new(),
+        }
+    }
+
+    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Event<'a> {
+        match event {
+            Event::Start(Tag::Image {
+                link_type,
+                dest_url,
+                title,
+                id,
+            }) => {
+                let dest_url = self
+                    .rewrite_image_destination(&dest_url)
+                    .map(CowStr::from)
+                    .unwrap_or(dest_url);
+
+                Event::Start(Tag::Image {
+                    link_type,
+                    dest_url,
+                    title,
+                    id,
+                })
+            }
+            _ => event,
+        }
+    }
+
+    fn rewrite_image_destination(&mut self, src: &str) -> Option<String> {
+        match local_image_data_uri(self.base_dir.as_deref(), src) {
+            ImageResolution::Resolved(data_uri) => {
+                let placeholder =
+                    format!("{}/{}", self.placeholder_prefix, self.replacements.len());
+                self.replacements.push((placeholder.clone(), data_uri));
+                Some(placeholder)
+            }
+            ImageResolution::RejectedLocal => Some(String::new()),
+            ImageResolution::NotLocal => None,
+        }
+    }
+
+    fn apply_replacements(&self, mut safe_html: String) -> String {
+        for (placeholder, data_uri) in &self.replacements {
+            safe_html = safe_html.replace(
+                &format!("src=\"{placeholder}\""),
+                &format!("src=\"{data_uri}\""),
+            );
+        }
+
+        safe_html
+    }
+}
+
+fn local_image_placeholder_prefix() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+
+    format!(
+        "https://hushmark.local/__local-image/{nanos}-{}",
+        std::process::id()
+    )
+}
+
+enum ImageResolution {
+    Resolved(String),
+    RejectedLocal,
+    NotLocal,
+}
+
+fn local_image_data_uri(base_dir: Option<&Path>, src: &str) -> ImageResolution {
+    if has_url_scheme(src) {
+        return ImageResolution::NotLocal;
+    }
+
+    let Some(base_dir) = base_dir else {
+        return ImageResolution::NotLocal;
+    };
+
+    let Ok(decoded_src) = percent_decode_str(src).decode_utf8() else {
+        return ImageResolution::RejectedLocal;
+    };
+
+    let relative_path = Path::new(decoded_src.as_ref());
+    if !is_safe_relative_image_path(relative_path) {
+        return ImageResolution::RejectedLocal;
+    }
+
+    let Some(mime_type) = image_mime_type(relative_path) else {
+        return ImageResolution::RejectedLocal;
+    };
+
+    let candidate = base_dir.join(relative_path);
+    let Ok(candidate) = fs::canonicalize(candidate) else {
+        return ImageResolution::RejectedLocal;
+    };
+
+    if !candidate.starts_with(base_dir) || !candidate.is_file() {
+        return ImageResolution::RejectedLocal;
+    }
+
+    let Ok(bytes) = fs::read(candidate) else {
+        return ImageResolution::RejectedLocal;
+    };
+
+    ImageResolution::Resolved(format!(
+        "data:{mime_type};base64,{}",
+        BASE64_STANDARD.encode(bytes)
+    ))
+}
+
+fn canonical_document_dir(document_path: &Path) -> Option<PathBuf> {
+    fs::canonicalize(document_path)
+        .ok()
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+}
+
+fn has_url_scheme(src: &str) -> bool {
+    let Some(separator) = src.find(':') else {
+        return false;
+    };
+
+    let scheme = &src[..separator];
+    !scheme.is_empty()
+        && scheme.starts_with(|character: char| character.is_ascii_alphabetic())
+        && scheme.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '+' | '-' | '.')
+        })
+}
+
+fn is_safe_relative_image_path(path: &Path) -> bool {
+    let mut has_normal_component = false;
+
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => has_normal_component = true,
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => return false,
+        }
+    }
+
+    has_normal_component
+}
+
+fn image_mime_type(path: &Path) -> Option<&'static str> {
+    let extension = path.extension()?.to_str()?;
+
+    if extension.eq_ignore_ascii_case("png") {
+        Some("image/png")
+    } else if extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg") {
+        Some("image/jpeg")
+    } else if extension.eq_ignore_ascii_case("gif") {
+        Some("image/gif")
+    } else if extension.eq_ignore_ascii_case("svg") {
+        Some("image/svg+xml")
+    } else if extension.eq_ignore_ascii_case("webp") {
+        Some("image/webp")
+    } else {
+        None
+    }
 }
 
 fn file_name(path: &Path) -> String {
@@ -218,6 +410,133 @@ mod tests {
     }
 
     #[test]
+    fn resolves_relative_markdown_image_paths_against_document_directory() {
+        let fixture = TestFixture::new("relative-image");
+        let image_path = fixture.path.join("assets").join("example.png");
+        fs::create_dir_all(image_path.parent().expect("image parent")).expect("create image dir");
+        fs::write(&image_path, b"fake png").expect("write image");
+
+        let document_path = fixture.path.join("doc.md");
+        fs::write(&document_path, "![Example](assets/example.png)").expect("write Markdown");
+
+        let document = load_markdown_file(document_path);
+        let html = document.html.expect("rendered HTML");
+
+        assert!(html.contains("src=\"data:image/png;base64,"));
+        assert!(html.contains("alt=\"Example\""));
+        assert!(!html.contains("assets/example.png"));
+    }
+
+    #[test]
+    fn resolves_markdown_image_paths_with_spaces() {
+        let fixture = TestFixture::new("spaced-image");
+        let image_path = fixture
+            .path
+            .join("assets with spaces")
+            .join("image with spaces.jpg");
+        fs::create_dir_all(image_path.parent().expect("image parent")).expect("create image dir");
+        fs::write(&image_path, b"fake jpg").expect("write image");
+
+        let document_path = fixture.path.join("doc.md");
+        fs::write(
+            &document_path,
+            "![Spaced](<assets with spaces/image with spaces.jpg>)",
+        )
+        .expect("write Markdown");
+
+        let document = load_markdown_file(document_path);
+        let html = document.html.expect("rendered HTML");
+
+        assert!(html.contains("src=\"data:image/jpeg;base64,"));
+        assert!(html.contains("alt=\"Spaced\""));
+        assert!(!html.contains("image with spaces.jpg"));
+    }
+
+    #[test]
+    fn resolves_markdown_image_paths_with_unicode_names() {
+        let fixture = TestFixture::new("unicode-image");
+        let image_path = fixture.path.join("assets").join("שלום.webp");
+        fs::create_dir_all(image_path.parent().expect("image parent")).expect("create image dir");
+        fs::write(&image_path, b"fake webp").expect("write image");
+
+        let document_path = fixture.path.join("doc.md");
+        fs::write(&document_path, "![Hebrew](<assets/שלום.webp>)").expect("write Markdown");
+
+        let document = load_markdown_file(document_path);
+        let html = document.html.expect("rendered HTML");
+
+        assert!(html.contains("src=\"data:image/webp;base64,"));
+        assert!(html.contains("alt=\"Hebrew\""));
+        assert!(!html.contains("שלום.webp"));
+    }
+
+    #[test]
+    fn keeps_remote_markdown_image_urls_unchanged() {
+        let html = render_markdown_to_safe_html("![Remote](https://example.com/image.png)");
+
+        assert!(html.contains("src=\"https://example.com/image.png\""));
+        assert!(html.contains("alt=\"Remote\""));
+    }
+
+    #[test]
+    fn rejects_traversal_and_unsupported_local_markdown_image_paths() {
+        let fixture = TestFixture::new("rejected-images");
+        let assets_dir = fixture.path.join("assets");
+        fs::create_dir_all(&assets_dir).expect("create image dir");
+        fs::write(fixture.path.join("secret.png"), b"fake png").expect("write nearby image");
+        fs::write(assets_dir.join("notes.txt"), b"not an image").expect("write text");
+
+        let document_path = fixture.path.join("doc.md");
+        fs::write(
+            &document_path,
+            "![Traversal](../secret.png)\n\n![Text](assets/notes.txt)",
+        )
+        .expect("write Markdown");
+
+        let document = load_markdown_file(document_path);
+        let html = document.html.expect("rendered HTML");
+
+        assert!(html.contains("alt=\"Traversal\""));
+        assert!(html.contains("alt=\"Text\""));
+        assert!(!html.contains("../secret.png"));
+        assert!(!html.contains("assets/notes.txt"));
+        assert!(!html.contains("data:image/"));
+    }
+
+    #[test]
+    fn does_not_rewrite_raw_html_image_paths_against_document_directory() {
+        let fixture = TestFixture::new("raw-html-image");
+        let image_path = fixture.path.join("assets").join("example.svg");
+        fs::create_dir_all(image_path.parent().expect("image parent")).expect("create image dir");
+        fs::write(&image_path, b"<svg></svg>").expect("write image");
+
+        let document_path = fixture.path.join("doc.md");
+        fs::write(
+            &document_path,
+            "<img src=\"assets/example.svg\" alt=\"Raw\">\n\n![Markdown](assets/example.svg)",
+        )
+        .expect("write Markdown");
+
+        let document = load_markdown_file(document_path);
+        let html = document.html.expect("rendered HTML");
+
+        assert!(html.contains("src=\"assets/example.svg\""));
+        assert!(html.contains("src=\"data:image/svg+xml;base64,"));
+        assert!(html.contains("alt=\"Raw\""));
+        assert!(html.contains("alt=\"Markdown\""));
+    }
+
+    #[test]
+    fn does_not_pass_file_scheme_markdown_images_through() {
+        let html = render_markdown_to_safe_html("![File](file:///C:/Users/example/secret.png)");
+
+        assert!(html.contains("alt=\"File\""));
+        assert!(!html.contains("file:///"));
+        assert!(!html.contains("secret.png"));
+        assert!(!html.contains("data:image/"));
+    }
+
+    #[test]
     fn title_uses_file_name_when_loaded() {
         let document = LoadedDocument {
             path: Some("notes.md".to_string()),
@@ -287,5 +606,24 @@ mod tests {
 
         assert!(document.html.is_none());
         assert!(document.error.is_some());
+    }
+
+    struct TestFixture {
+        path: std::path::PathBuf,
+    }
+
+    impl TestFixture {
+        fn new(name: &str) -> Self {
+            let path = env::temp_dir().join(format!("hushmark-{name}-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&path);
+            fs::create_dir_all(&path).expect("create fixture directory");
+            Self { path }
+        }
+    }
+
+    impl Drop for TestFixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
     }
 }

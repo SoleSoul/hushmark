@@ -13,6 +13,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 ammonia = "4"
+base64 = "0.22"
+percent-encoding = "2.3"
 pulldown-cmark = "0.13"
 serde = { version = "1", features = ["derive"] }
 tauri = { version = "2", features = [] }

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="120" viewBox="0 0 360 120" role="img" aria-labelledby="title desc">
+  <title id="title">Image with spaces</title>
+  <desc id="desc">A local placeholder image whose filename contains spaces.</desc>
+  <rect width="360" height="120" rx="18" fill="#e9efe6"/>
+  <rect x="12" y="12" width="336" height="96" rx="14" fill="#fffdf8" stroke="#cddcc8"/>
+  <text x="180" y="68" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="600" fill="#57606a">image with spaces</text>
+</svg>

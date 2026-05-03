@@ -65,7 +65,11 @@ Ordered list:
 
 ![Local placeholder image](assets/hushmark-placeholder.svg)
 
-If the local image does not appear, that reflects the current document-relative image limitation rather than a parser failure.
+The local placeholder above should render from `examples\assets\hushmark-placeholder.svg`.
+
+![Local image with spaces](<assets/image with spaces.svg>)
+
+![Local image with Hebrew filename](<assets/שלום.svg>)
 
 ---
 

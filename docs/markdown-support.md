@@ -27,7 +27,7 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - blockquotes
 - unordered, ordered, and nested lists
 - links
-- images as Markdown syntax
+- images as Markdown syntax, including relative local image paths under the opened document's folder
 - horizontal rules
 - tables
 - strikethrough
@@ -41,7 +41,9 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - Broader GitHub-Flavored Markdown behavior is not enabled beyond tables and strikethrough.
 - Definition lists, math, metadata blocks, smart punctuation, superscript, subscript, and wikilinks are not enabled.
 - Raw HTML is parsed by `pulldown-cmark`, but Hushmark sanitizes the resulting HTML with `ammonia`. Safe tags and attributes may remain; unsafe elements, event handlers, and dangerous URL schemes should not.
-- Relative local image paths are not rewritten relative to the Markdown file location yet. The fixture includes a local image reference to make this behavior visible during manual checks.
+- Relative local image paths are resolved only for Markdown image syntax. Raw HTML image tags are sanitized but are not rewritten against the Markdown file location.
+- Local image paths must stay inside the opened document's folder. Parent-directory traversal such as `../`, absolute local paths, and unsupported local file extensions are not resolved.
+- Local image files are embedded into the rendered document as `data:` image URLs after sanitization. This keeps Hushmark from exposing a broader local-file protocol to the WebView.
 
 ## Visual fixture
 
@@ -54,7 +56,8 @@ Manual visual checklist:
 - Paragraphs, lists, blockquotes, and horizontal rules remain calm and readable.
 - Code blocks and very long code/path lines scroll horizontally instead of breaking the page.
 - Tables remain usable and do not force the whole window wider.
-- Images do not overflow the reading column when they resolve.
+- Relative Markdown images render when the referenced file is under the document folder.
+- Images do not overflow the reading column.
 - Hebrew and mixed English/Hebrew text display correctly.
 - Raw unsafe HTML does not execute or display unsafe script/link behavior.
 

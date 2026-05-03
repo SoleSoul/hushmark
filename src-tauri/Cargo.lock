@@ -1354,6 +1354,8 @@ name = "hushmark"
 version = "0.1.0"
 dependencies = [
  "ammonia",
+ "base64 0.22.1",
+ "percent-encoding",
  "pulldown-cmark",
  "serde",
  "tauri",
