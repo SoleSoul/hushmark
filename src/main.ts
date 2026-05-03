@@ -235,7 +235,7 @@ function createDetails(status: SetupStatus): HTMLDetailsElement {
   const rows = document.createElement("dl");
   rows.className = "setup-details__rows";
   rows.append(
-    createDetailRow("App name", status.appName),
+    createDetailRow("App", status.appName),
     createDetailRow("Version", status.version),
     createDetailRow("Developer", status.developer),
     createDetailRow("Release binary", status.releaseExeName),
