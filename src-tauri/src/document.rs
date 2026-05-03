@@ -295,7 +295,7 @@ impl HeadingIdRewriter {
     }
 
     fn apply_replacements(&self, mut safe_html: String) -> String {
-        for (placeholder, public_id) in &self.replacements {
+        for (placeholder, public_id) in self.replacements.iter().rev() {
             safe_html = safe_html.replace(placeholder, public_id);
         }
 
@@ -395,7 +395,7 @@ impl TableAlignmentRewriter {
     }
 
     fn apply_replacements(&self, mut safe_html: String) -> String {
-        for (placeholder, public_class) in &self.replacements {
+        for (placeholder, public_class) in self.replacements.iter().rev() {
             safe_html = safe_html.replace(placeholder, public_class);
         }
 
@@ -489,7 +489,7 @@ impl LocalImageResolver {
     }
 
     fn apply_replacements(&self, mut safe_html: String) -> String {
-        for (placeholder, data_uri) in &self.replacements {
+        for (placeholder, data_uri) in self.replacements.iter().rev() {
             safe_html = safe_html.replace(
                 &format!("src=\"{placeholder}\""),
                 &format!("src=\"{data_uri}\""),
@@ -743,6 +743,44 @@ mod tests {
     }
 
     #[test]
+    fn many_heading_ids_are_not_corrupted_by_placeholder_prefixes() {
+        let html = render_markdown_to_safe_html(
+            "# Root
+
+## Alpha
+
+## Beta
+
+## Gamma
+
+## Delta
+
+## Epsilon
+
+## Zeta
+
+## Eta
+
+## Theta
+
+## Iota
+
+## Duplicate heading
+
+## Duplicate heading
+
+## Install / Update",
+        );
+
+        assert!(html.contains("<h2 id=\"duplicate-heading\">Duplicate heading</h2>"));
+        assert!(html.contains("<h2 id=\"duplicate-heading-1\">Duplicate heading</h2>"));
+        assert!(html.contains("<h2 id=\"install-update\">Install / Update</h2>"));
+        assert!(!html.contains("alpha0"));
+        assert!(!html.contains("alpha1"));
+        assert!(!html.contains("hushmark-heading-token"));
+    }
+
+    #[test]
     fn raw_html_heading_ids_and_attributes_are_still_stripped() {
         let html = render_markdown_to_safe_html(
             r#"<h2 id="my-section" class="evil" onclick="alert(1)">Raw</h2>
@@ -755,6 +793,54 @@ mod tests {
         assert!(html.contains("<h2 id=\"my-section\">My Section</h2>"));
         assert!(!html.contains("onclick"));
         assert!(!html.contains("class=\"evil\""));
+    }
+
+    #[test]
+    fn many_table_alignment_classes_are_not_corrupted_by_placeholder_prefixes() {
+        let html = render_markdown_to_safe_html(
+            "| Left | Center | Right |\n| :--- | :---: | ---: |\n| one | two | 3 |\n| four | five | 6 |\n| seven | eight | 9 |",
+        );
+
+        assert_eq!(html.matches("class=\"hushmark-align-left\"").count(), 4);
+        assert_eq!(html.matches("class=\"hushmark-align-center\"").count(), 4);
+        assert_eq!(html.matches("class=\"hushmark-align-right\"").count(), 4);
+        assert!(!html.contains("hushmark-align-center0"));
+        assert!(!html.contains("hushmark-align-right1"));
+        assert!(!html.contains("hushmark-align-token"));
+    }
+
+    #[test]
+    fn markdown_features_fixture_links_and_table_alignment_render_correctly() {
+        let html =
+            render_markdown_to_safe_html(include_str!("../../examples/markdown-features.md"));
+
+        for fragment in [
+            "h2-text-formatting",
+            "tables",
+            "heading-with-spaces",
+            "duplicate-heading",
+            "duplicate-heading-1",
+            "install-update",
+            "heading",
+        ] {
+            assert!(
+                html.contains(&format!("href=\"#{fragment}\"")),
+                "missing fixture href #{fragment}"
+            );
+            assert!(
+                html.contains(&format!("id=\"{fragment}\"")),
+                "missing fixture id {fragment}"
+            );
+        }
+
+        assert!(html.contains("href=\"#%D7%A9%D7%9C%D7%95%D7%9D-%D7%A2%D7%95%D7%9C%D7%9D\""));
+        assert!(html.contains("id=\"שלום-עולם\""));
+        assert!(html.contains("href=\"#missing-fragment\""));
+        assert!(!html.contains("id=\"missing-fragment\""));
+        assert!(html.contains("<td class=\"hushmark-align-center\">middle</td>"));
+        assert!(html.contains("<td class=\"hushmark-align-right\">789</td>"));
+        assert!(!html.contains("hushmark-align-center0"));
+        assert!(!html.contains("hushmark-heading-token"));
     }
 
     #[test]
