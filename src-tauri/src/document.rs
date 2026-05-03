@@ -1,4 +1,5 @@
 use std::{
+    collections::{HashMap, HashSet, VecDeque},
     ffi::OsString,
     fs,
     io::ErrorKind,
@@ -104,29 +105,42 @@ fn render_markdown_to_safe_html(markdown: &str) -> String {
 fn render_markdown_with_document_path(markdown: &str, document_path: Option<&Path>) -> String {
     let mut local_images = LocalImageResolver::new(document_path);
     let mut table_alignments = TableAlignmentRewriter::new();
+    let mut heading_ids = HeadingIdRewriter::new(collect_heading_ids(markdown));
     let mut rendered = String::new();
 
     {
         let parser = Parser::new_ext(markdown, markdown_options()).map(|event| {
             let event = local_images.rewrite_event(event);
-            table_alignments.rewrite_event(event)
+            let event = table_alignments.rewrite_event(event);
+            heading_ids.rewrite_event(event)
         });
         html::push_html(&mut rendered, parser);
     }
 
     let allowed_table_classes = table_alignments.allowed_classes();
-    let safe_html = sanitize_rendered_html(&rendered, &allowed_table_classes);
+    let allowed_heading_ids = heading_ids.allowed_ids();
+    let safe_html = sanitize_rendered_html(&rendered, &allowed_table_classes, &allowed_heading_ids);
+    let safe_html = heading_ids.apply_replacements(safe_html);
     let safe_html = table_alignments.apply_replacements(safe_html);
     local_images.apply_replacements(safe_html)
 }
 
-fn sanitize_rendered_html(rendered: &str, allowed_table_classes: &[String]) -> String {
+fn sanitize_rendered_html(
+    rendered: &str,
+    allowed_table_classes: &[String],
+    allowed_heading_ids: &[String],
+) -> String {
     let allowed_table_classes: Vec<&str> =
         allowed_table_classes.iter().map(String::as_str).collect();
+    let allowed_heading_ids: Vec<&str> = allowed_heading_ids.iter().map(String::as_str).collect();
     let mut builder = Builder::default();
 
     builder.add_allowed_classes("th", &allowed_table_classes);
     builder.add_allowed_classes("td", &allowed_table_classes);
+
+    for tag in ["h1", "h2", "h3", "h4", "h5", "h6"] {
+        builder.add_tag_attribute_values(tag, "id", &allowed_heading_ids);
+    }
 
     builder.clean(rendered).to_string()
 }
@@ -136,6 +150,166 @@ fn markdown_options() -> Options {
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
     options
+}
+
+fn collect_heading_ids(markdown: &str) -> Vec<String> {
+    let mut slugs = HeadingSlugger::new();
+    let mut heading_text = String::new();
+    let mut in_heading = false;
+    let mut heading_ids = Vec::new();
+
+    for event in Parser::new_ext(markdown, markdown_options()) {
+        match event {
+            Event::Start(Tag::Heading { .. }) => {
+                in_heading = true;
+                heading_text.clear();
+            }
+            Event::End(TagEnd::Heading(_)) if in_heading => {
+                heading_ids.push(slugs.unique_slug(&heading_text));
+                heading_text.clear();
+                in_heading = false;
+            }
+            Event::Text(text)
+            | Event::Code(text)
+            | Event::InlineMath(text)
+            | Event::DisplayMath(text)
+                if in_heading =>
+            {
+                heading_text.push_str(&text);
+            }
+            Event::SoftBreak | Event::HardBreak if in_heading => {
+                heading_text.push(' ');
+            }
+            _ => {}
+        }
+    }
+
+    heading_ids
+}
+
+struct HeadingSlugger {
+    next_suffix: HashMap<String, usize>,
+    used: HashSet<String>,
+}
+
+impl HeadingSlugger {
+    fn new() -> Self {
+        Self {
+            next_suffix: HashMap::new(),
+            used: HashSet::new(),
+        }
+    }
+
+    fn unique_slug(&mut self, text: &str) -> String {
+        let base = slugify_heading(text);
+
+        if self.used.insert(base.clone()) {
+            self.next_suffix.entry(base.clone()).or_insert(1);
+            return base;
+        }
+
+        let mut suffix = self.next_suffix.get(&base).copied().unwrap_or(1);
+        loop {
+            let candidate = format!("{base}-{suffix}");
+            suffix += 1;
+
+            if self.used.insert(candidate.clone()) {
+                self.next_suffix.insert(base, suffix);
+                return candidate;
+            }
+        }
+    }
+}
+
+fn slugify_heading(text: &str) -> String {
+    let mut slug = String::new();
+    let mut previous_was_separator = false;
+
+    for character in text.trim().chars().flat_map(char::to_lowercase) {
+        if character.is_alphanumeric() {
+            slug.push(character);
+            previous_was_separator = false;
+        } else if !slug.is_empty() && !previous_was_separator {
+            slug.push('-');
+            previous_was_separator = true;
+        }
+    }
+
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+
+    if slug.is_empty() {
+        "heading".to_string()
+    } else {
+        slug
+    }
+}
+
+struct HeadingIdRewriter {
+    ids: VecDeque<String>,
+    placeholder_prefix: String,
+    replacements: Vec<(String, String)>,
+}
+
+impl HeadingIdRewriter {
+    fn new(ids: Vec<String>) -> Self {
+        Self {
+            ids: ids.into(),
+            placeholder_prefix: heading_id_placeholder_prefix(),
+            replacements: Vec::new(),
+        }
+    }
+
+    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Event<'a> {
+        match event {
+            Event::Start(Tag::Heading {
+                level,
+                id: _,
+                classes,
+                attrs,
+            }) => {
+                let id = self.ids.pop_front().map(|public_id| {
+                    let placeholder =
+                        format!("{}-{}", self.placeholder_prefix, self.replacements.len());
+                    self.replacements.push((placeholder.clone(), public_id));
+                    CowStr::from(placeholder)
+                });
+
+                Event::Start(Tag::Heading {
+                    level,
+                    id,
+                    classes,
+                    attrs,
+                })
+            }
+            _ => event,
+        }
+    }
+
+    fn allowed_ids(&self) -> Vec<String> {
+        self.replacements
+            .iter()
+            .map(|(placeholder, _)| placeholder.clone())
+            .collect()
+    }
+
+    fn apply_replacements(&self, mut safe_html: String) -> String {
+        for (placeholder, public_id) in &self.replacements {
+            safe_html = safe_html.replace(placeholder, public_id);
+        }
+
+        safe_html
+    }
+}
+
+fn heading_id_placeholder_prefix() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+
+    format!("hushmark-heading-token-{nanos}-{}", std::process::id())
 }
 
 struct TableAlignmentRewriter {
@@ -521,6 +695,69 @@ mod tests {
     }
 
     #[test]
+    fn generates_heading_ids_from_markdown_heading_text() {
+        let html = render_markdown_to_safe_html(
+            "# Introduction\n\n## My Section\n\n### Install / Update\n\n#### Four\n\n##### Five\n\n###### Six",
+        );
+
+        assert!(html.contains("<h1 id=\"introduction\">Introduction</h1>"));
+        assert!(html.contains("<h2 id=\"my-section\">My Section</h2>"));
+        assert!(html.contains("<h3 id=\"install-update\">Install / Update</h3>"));
+        assert!(html.contains("<h4 id=\"four\">Four</h4>"));
+        assert!(html.contains("<h5 id=\"five\">Five</h5>"));
+        assert!(html.contains("<h6 id=\"six\">Six</h6>"));
+        assert!(!html.contains("hushmark-heading-token"));
+    }
+
+    #[test]
+    fn duplicate_heading_ids_get_stable_suffixes() {
+        let html = render_markdown_to_safe_html("# Intro\n\n## Intro\n\n### Intro");
+
+        assert!(html.contains("<h1 id=\"intro\">Intro</h1>"));
+        assert!(html.contains("<h2 id=\"intro-1\">Intro</h2>"));
+        assert!(html.contains("<h3 id=\"intro-2\">Intro</h3>"));
+    }
+
+    #[test]
+    fn punctuation_and_empty_heading_slugs_are_predictable() {
+        let html = render_markdown_to_safe_html("# !!!\n\n## Install / Update\n\n### ...");
+
+        assert!(html.contains("<h1 id=\"heading\">!!!</h1>"));
+        assert!(html.contains("<h2 id=\"install-update\">Install / Update</h2>"));
+        assert!(html.contains("<h3 id=\"heading-1\">...</h3>"));
+    }
+
+    #[test]
+    fn unicode_heading_ids_are_preserved() {
+        let html = render_markdown_to_safe_html("# שלום עולם");
+
+        assert!(html.contains("<h1 id=\"שלום-עולם\">שלום עולם</h1>"));
+    }
+
+    #[test]
+    fn fragment_links_are_preserved_for_generated_heading_ids() {
+        let html = render_markdown_to_safe_html("[Jump](#my-section)\n\n## My Section");
+
+        assert!(html.contains("<a href=\"#my-section\""));
+        assert!(html.contains("<h2 id=\"my-section\">My Section</h2>"));
+    }
+
+    #[test]
+    fn raw_html_heading_ids_and_attributes_are_still_stripped() {
+        let html = render_markdown_to_safe_html(
+            r#"<h2 id="my-section" class="evil" onclick="alert(1)">Raw</h2>
+
+## My Section"#,
+        );
+
+        assert_eq!(html.matches("id=\"my-section\"").count(), 1);
+        assert!(html.contains("<h2>Raw</h2>"));
+        assert!(html.contains("<h2 id=\"my-section\">My Section</h2>"));
+        assert!(!html.contains("onclick"));
+        assert!(!html.contains("class=\"evil\""));
+    }
+
+    #[test]
     fn raw_html_table_styles_and_classes_are_still_stripped() {
         let html = render_markdown_to_safe_html(
             r#"<table>
@@ -558,7 +795,7 @@ mod tests {
         let html =
             render_markdown_to_safe_html("# Hello\n\n<script>alert('xss')</script>\n\n**world**");
 
-        assert!(html.contains("<h1>Hello</h1>"));
+        assert!(html.contains("<h1 id=\"hello\">Hello</h1>"));
         assert!(html.contains("<strong>world</strong>"));
         assert!(!html.contains("<script>"));
         assert!(!html.contains("alert('xss')"));

@@ -2,6 +2,20 @@
 
 This document is a visual fixture for Hushmark's current Markdown rendering baseline. It should stay readable and contained without turning the app into an editor or a busy web page.
 
+## Intra-document link checklist
+
+These links should scroll within this document:
+
+- [Jump to text formatting](#h2-text-formatting)
+- [Jump to table alignment](#tables)
+- [Jump to heading with spaces](#heading-with-spaces)
+- [Jump to duplicate heading](#duplicate-heading)
+- [Jump to second duplicate heading](#duplicate-heading-1)
+- [Jump to install/update punctuation heading](#install-update)
+- [Jump to punctuation-only heading](#heading)
+- [Jump to Hebrew heading](#שלום-עולם)
+- [Missing fragment should fail harmlessly](#missing-fragment)
+
 The second sentence in this paragraph verifies ordinary paragraph spacing. The next two lines are separated by a soft line break:
 this line follows a normal newline
 and should remain part of the same paragraph.
@@ -86,6 +100,34 @@ The local placeholder above should render from `examples\assets\hushmark-placeho
 | apple | banana | 123 |
 | longer left text | centered text | 456 |
 | a much longer table cell that should not make the whole app unusable | middle | 789 |
+
+## Heading anchor examples
+
+Use the links near the top of this document to check generated heading anchors.
+
+## Heading with spaces
+
+This heading should receive the generated id `heading-with-spaces`.
+
+## Duplicate heading
+
+This first duplicate heading should receive the generated id `duplicate-heading`.
+
+## Duplicate heading
+
+This second duplicate heading should receive the generated id `duplicate-heading-1`.
+
+## Install / Update
+
+This punctuation heading should receive the generated id `install-update`.
+
+## !!!
+
+This punctuation-only heading should receive the fallback generated id `heading`.
+
+## שלום עולם
+
+This Hebrew heading should receive the generated id `שלום-עולם`.
 
 ## Unsupported extension examples
 
