@@ -75,7 +75,12 @@ Ordered list:
 
 ###### H6 Links and images
 
-[Hushmark project link text](https://example.com)
+External links should open outside Hushmark:
+
+- [HTTPS link should open in the default browser](https://example.com)
+- [Mail link should open in the default mail app](mailto:reader@example.com)
+- [Unsupported FTP link should not navigate Hushmark](ftp://example.com/file.md)
+- [Intra-document link should stay inside Hushmark](#tables)
 
 ![Local placeholder image](assets/hushmark-placeholder.svg)
 
@@ -167,4 +172,3 @@ one-very-long-code-line-without-natural-breaks-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 שלום עולם. זהו משפט בעברית כדי לבדוק תצוגת Unicode בסיסית.
 
 This mixed paragraph includes English and עברית in the same line so Hushmark can be checked with bidirectional text in a normal reading flow.
-

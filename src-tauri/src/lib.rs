@@ -1,4 +1,5 @@
 mod document;
+mod external_links;
 mod identity;
 mod setup;
 
@@ -88,6 +89,11 @@ fn open_default_apps_settings() -> Result<SetupStatus, String> {
     open_windows_default_apps_settings()
 }
 
+#[tauri::command]
+fn open_external_link(url: String) -> Result<(), String> {
+    external_links::open_external_link(&url)
+}
+
 fn set_window_title(window: &tauri::Window, document: &LoadedDocument) {
     if let Err(error) = window.set_title(&title_for(document)) {
         eprintln!("failed to set window title: {error}");
@@ -105,7 +111,8 @@ pub fn run() {
             toggle_open_with_support,
             toggle_context_menu,
             remove_all_integration,
-            open_default_apps_settings
+            open_default_apps_settings,
+            open_external_link
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

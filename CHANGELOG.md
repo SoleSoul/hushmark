@@ -4,6 +4,7 @@
 
 - Show the installed executable version in setup Details when an update is available.
 - Regenerated the Windows app icon from a checked-in SVG source.
+- Open Markdown `http`, `https`, and `mailto` links in the system default app while keeping fragment links inside Hushmark.
 
 ## 0.1.1
 

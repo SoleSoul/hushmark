@@ -46,6 +46,12 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - Local image paths must stay inside the opened document's folder. Parent-directory traversal such as `../`, absolute local paths, and unsupported local file extensions are not resolved.
 - Local image files are embedded into the rendered document as `data:` image URLs after sanitization. This keeps Hushmark from exposing a broader local-file protocol to the WebView.
 
+## Link behavior
+
+- Same-document `#fragment` links stay inside Hushmark and scroll to generated heading anchors when a matching heading exists.
+- External `http://`, `https://`, and `mailto:` links open in the system default browser or mail app.
+- Other schemes, including `javascript:`, `file:`, and `data:`, are not opened by Hushmark.
+
 ## Heading anchors
 
 Hushmark generates safe heading IDs for Markdown headings so links like `[Jump](#my-section)` can move within the current document.
@@ -80,8 +86,8 @@ Manual visual checklist:
 - Code blocks and very long code/path lines scroll horizontally instead of breaking the page.
 - Tables remain usable and do not force the whole window wider.
 - Intra-document links scroll to the expected generated heading anchors.
+- External `https:` links open outside Hushmark, while unsupported schemes fail harmlessly.
 - Relative Markdown images render when the referenced file is under the document folder.
 - Images do not overflow the reading column.
 - Hebrew and mixed English/Hebrew text display correctly.
 - Raw unsafe HTML does not execute or display unsafe script/link behavior.
-

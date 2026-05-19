@@ -49,6 +49,11 @@ type SetupCommand =
   | "open_default_apps_settings"
   | "remove_all_integration";
 
+type LinkAction =
+  | { kind: "internal" }
+  | { kind: "external"; url: string }
+  | { kind: "unsupported" };
+
 type StartupView = {
   mode: "reader" | "setup";
   document: LoadedDocument | null;
@@ -119,8 +124,71 @@ function renderDocument(documentView: LoadedDocument): void {
 
   // The HTML is rendered and sanitized by Rust before it reaches the UI.
   article.innerHTML = documentView.html ?? "";
+  article.addEventListener("click", handleDocumentLinkClick);
 
   app.replaceChildren(article);
+}
+
+function handleDocumentLinkClick(event: MouseEvent): void {
+  if (event.defaultPrevented || event.button !== 0) {
+    return;
+  }
+
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
+
+  const link = target.closest<HTMLAnchorElement>("a[href]");
+  if (!link) {
+    return;
+  }
+
+  const action = classifyDocumentLink(link.getAttribute("href"));
+  if (action.kind === "internal") {
+    return;
+  }
+
+  event.preventDefault();
+
+  if (action.kind === "external") {
+    void openExternalLink(action.url);
+  }
+}
+
+function classifyDocumentLink(href: string | null): LinkAction {
+  const value = href?.trim();
+  if (!value) {
+    return { kind: "unsupported" };
+  }
+
+  if (value.startsWith("#")) {
+    return { kind: "internal" };
+  }
+
+  const schemeMatch = /^([a-z][a-z0-9+.-]*):/i.exec(value);
+  const scheme = schemeMatch?.[1]?.toLowerCase();
+
+  if (
+    (scheme === "http" || scheme === "https") &&
+    /^https?:\/\/[^/?#].+/i.test(value)
+  ) {
+    return { kind: "external", url: value };
+  }
+
+  if (scheme === "mailto" && value.length > "mailto:".length) {
+    return { kind: "external", url: value };
+  }
+
+  return { kind: "unsupported" };
+}
+
+async function openExternalLink(url: string): Promise<void> {
+  try {
+    await invoke("open_external_link", { url });
+  } catch (error) {
+    console.warn("failed to open external link", error);
+  }
 }
 
 function createTextElement<K extends keyof HTMLElementTagNameMap>(
@@ -456,4 +524,3 @@ async function start(): Promise<void> {
 }
 
 void start();
-

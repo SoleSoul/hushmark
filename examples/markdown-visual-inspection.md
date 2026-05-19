@@ -257,17 +257,21 @@ C:\Users\Jonathan Lahav\Documents\Hushmark Notes\A folder with spaces\A very lon
 
 ## Feature: Links
 
-**Expect:** A clickable link with calm link styling.
+**Expect:** The HTTPS link should open in the system browser. The mail link should open in the system mail app if one is configured. The unsupported FTP link should not navigate the Hushmark WebView.
 
 **Usage:**
 
 [Visit example.com](https://example.com)
 
+[Email reader@example.com](mailto:reader@example.com)
+
+[Unsupported FTP link](ftp://example.com/file.md)
+
 ---
 
 ## Feature: Intra-document links
 
-**Expect:** Each existing fragment link should scroll to a heading in this same document. The missing-fragment link should fail harmlessly and leave the document usable.
+**Expect:** Each existing fragment link should scroll to a heading in this same document instead of opening an external browser. The missing-fragment link should fail harmlessly and leave the document usable.
 
 **Usage:**
 
@@ -709,4 +713,3 @@ This text is inside a raw HTML details element.
 - Local Markdown images should render.
 - Unsafe HTML should not execute.
 - Unsupported future features should be clearly visible as unsupported syntax.
-
