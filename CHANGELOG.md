@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Show the installed executable version in setup Details when an update is available.
+- Regenerated the Windows app icon from a checked-in SVG source.
 
 ## 0.1.1
 
@@ -30,4 +31,3 @@ Initial Hushmark reader release.
 - Added selected reader improvements: branded empty state, calmer read errors, and conservative overflow guards for code, tables, and images.
 - Added release size optimization for the executable.
 - Kept Windows default-app assignment user-guided instead of writing protected `UserChoice` defaults.
-
