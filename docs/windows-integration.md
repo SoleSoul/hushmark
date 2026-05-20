@@ -12,7 +12,7 @@ The product identity is centralized in:
 Current values:
 
 - Display name: `Hushmark`
-- Version: `0.1.1`
+- Version: `0.1.2`
 - Developer: `Jonathan Lahav`
 - Release binary: `hushmark.exe`
 - Installed executable: `Hushmark.exe`
@@ -127,4 +127,3 @@ In setup:
 9. Click **Remove all Hushmark integration** and confirm Hushmark registry entries and the installed executable are removed when safe.
 
 If setup is running from the installed executable, or another Hushmark window is holding the installed executable open, Hushmark removes registry integration but leaves the executable in place. Close Hushmark, then manually delete `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe` if needed.
-

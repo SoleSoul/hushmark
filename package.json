@@ -1,6 +1,6 @@
 {
   "name": "hushmark",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "Jonathan Lahav",
   "private": true,
   "type": "module",
@@ -19,4 +19,3 @@
     "vite": "^7.1.0"
   }
 }
-

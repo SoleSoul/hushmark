@@ -69,6 +69,14 @@ if (!appElement) {
 const app = appElement;
 const currentWindow = getCurrentWindow();
 
+document.addEventListener("contextmenu", preventInternalContextMenu, {
+  capture: true,
+});
+
+function preventInternalContextMenu(event: MouseEvent): void {
+  event.preventDefault();
+}
+
 function titleFor(documentView: LoadedDocument): string {
   if (documentView.error) {
     return documentView.fileName

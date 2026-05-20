@@ -2,9 +2,17 @@
 
 ## [Unreleased]
 
+No changes yet.
+
+## 0.1.2
+
+Tester-visible link handling and polish update.
+
 - Show the installed executable version in setup Details when an update is available.
 - Regenerated the Windows app icon from a checked-in SVG source.
 - Open Markdown `http`, `https`, and `mailto` links in the system default app while keeping fragment links inside Hushmark.
+- Disabled the internal WebView right-click menu inside Hushmark without changing Windows Explorer right-click integration.
+- Verified generated heading anchors, table alignment, and local Markdown images against the visual inspection fixture for this tester build.
 
 ## 0.1.1
 
