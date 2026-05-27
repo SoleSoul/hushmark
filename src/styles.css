@@ -305,6 +305,35 @@ body {
   margin-bottom: 0;
 }
 
+.document-message {
+  margin: 0 0 1.5rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid #e1b4a8;
+  border-radius: 0.75rem;
+  background: #fff1ed;
+  color: #424a53;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.document-message h2,
+.document-message p {
+  margin: 0;
+}
+
+.document-message h2 {
+  color: #9a3412;
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.document-message p {
+  margin-top: 0.35rem;
+  overflow-wrap: anywhere;
+}
+
 .document h1,
 .document h2,
 .document h3,
@@ -447,4 +476,3 @@ body {
   height: auto;
   margin: 1.5rem auto;
 }
-

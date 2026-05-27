@@ -6,7 +6,8 @@ mod setup;
 use std::path::PathBuf;
 
 use document::{
-    load_dropped_markdown_file, load_initial_document_from_arg, title_for, LoadedDocument,
+    load_dropped_markdown_file, load_initial_document_from_arg, load_linked_markdown_file,
+    title_for, LinkedDocument, LoadedDocument,
 };
 use identity::setup_window_title;
 use serde::Serialize;
@@ -60,6 +61,26 @@ fn load_dropped_document(path: String, window: tauri::Window) -> LoadedDocument 
 }
 
 #[tauri::command]
+fn load_linked_document(
+    current_path: String,
+    navigation_root: String,
+    href: String,
+    window: tauri::Window,
+) -> LinkedDocument {
+    let linked_document = load_linked_markdown_file(
+        PathBuf::from(current_path),
+        PathBuf::from(navigation_root),
+        href,
+    );
+
+    if linked_document.document.error.is_none() {
+        set_window_title(&window, &linked_document.document);
+    }
+
+    linked_document
+}
+
+#[tauri::command]
 fn get_setup_status() -> Result<SetupStatus, String> {
     setup_status(None)
 }
@@ -106,6 +127,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load_initial_view,
             load_dropped_document,
+            load_linked_document,
             get_setup_status,
             toggle_install,
             toggle_open_with_support,

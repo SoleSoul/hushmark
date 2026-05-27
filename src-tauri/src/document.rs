@@ -19,33 +19,44 @@ use crate::identity::DISPLAY_NAME;
 #[serde(rename_all = "camelCase")]
 pub struct LoadedDocument {
     pub path: Option<String>,
+    pub navigation_root: Option<String>,
     pub file_name: Option<String>,
     pub html: Option<String>,
     pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkedDocument {
+    pub document: LoadedDocument,
+    pub fragment: Option<String>,
 }
 
 impl LoadedDocument {
     fn empty() -> Self {
         Self {
             path: None,
+            navigation_root: None,
             file_name: None,
             html: None,
             error: None,
         }
     }
 
-    fn loaded(path: &Path, html: String) -> Self {
+    fn loaded(path: &Path, navigation_root: Option<&Path>, html: String) -> Self {
         Self {
             path: Some(path.display().to_string()),
+            navigation_root: navigation_root.map(path_to_string),
             file_name: Some(file_name(path)),
             html: Some(html),
             error: None,
         }
     }
 
-    fn failed(path: &Path, error: String) -> Self {
+    fn failed(path: &Path, navigation_root: Option<&Path>, error: String) -> Self {
         Self {
             path: Some(path.display().to_string()),
+            navigation_root: navigation_root.map(path_to_string),
             file_name: Some(file_name(path)),
             html: None,
             error: Some(error),
@@ -61,12 +72,24 @@ pub fn load_initial_document_from_arg(arg: Option<OsString>) -> LoadedDocument {
 }
 
 pub fn load_markdown_file(path: PathBuf) -> LoadedDocument {
+    let navigation_root = navigation_root_for_document_path(&path);
+    load_markdown_file_with_navigation_root(path, navigation_root)
+}
+
+fn load_markdown_file_with_navigation_root(
+    path: PathBuf,
+    navigation_root: Option<PathBuf>,
+) -> LoadedDocument {
     match fs::read_to_string(&path) {
         Ok(markdown) => {
             let html = render_markdown_file_to_safe_html(&markdown, &path);
-            LoadedDocument::loaded(&path, html)
+            LoadedDocument::loaded(&path, navigation_root.as_deref(), html)
         }
-        Err(error) => LoadedDocument::failed(&path, read_error_message(&path, error)),
+        Err(error) => LoadedDocument::failed(
+            &path,
+            navigation_root.as_deref(),
+            read_error_message(&path, error),
+        ),
     }
 }
 
@@ -74,6 +97,7 @@ pub fn load_dropped_markdown_file(path: PathBuf) -> LoadedDocument {
     if !is_markdown_path(&path) {
         return LoadedDocument::failed(
             &path,
+            navigation_root_for_document_path(&path).as_deref(),
             format!(
                 "Only .md and .markdown files can be opened here. {} was not opened.",
                 path.display()
@@ -82,6 +106,26 @@ pub fn load_dropped_markdown_file(path: PathBuf) -> LoadedDocument {
     }
 
     load_markdown_file(path)
+}
+
+pub fn load_linked_markdown_file(
+    current_path: PathBuf,
+    navigation_root: PathBuf,
+    href: String,
+) -> LinkedDocument {
+    match resolve_linked_markdown_path(&current_path, &navigation_root, &href) {
+        Ok(resolved) => LinkedDocument {
+            document: load_markdown_file_with_navigation_root(
+                resolved.path,
+                Some(resolved.navigation_root),
+            ),
+            fragment: resolved.fragment,
+        },
+        Err(error) => LinkedDocument {
+            document: LoadedDocument::failed(&current_path, Some(&navigation_root), error),
+            fragment: None,
+        },
+    }
 }
 
 pub fn title_for(document: &LoadedDocument) -> String {
@@ -565,6 +609,143 @@ fn canonical_document_dir(document_path: &Path) -> Option<PathBuf> {
         .and_then(|path| path.parent().map(Path::to_path_buf))
 }
 
+fn navigation_root_for_document_path(document_path: &Path) -> Option<PathBuf> {
+    canonical_document_dir(document_path)
+}
+
+struct ResolvedLinkedMarkdownPath {
+    path: PathBuf,
+    navigation_root: PathBuf,
+    fragment: Option<String>,
+}
+
+fn resolve_linked_markdown_path(
+    current_path: &Path,
+    navigation_root: &Path,
+    href: &str,
+) -> Result<ResolvedLinkedMarkdownPath, String> {
+    let parsed = parse_relative_markdown_link(href)?;
+    let navigation_root = fs::canonicalize(navigation_root).map_err(|error| {
+        format!(
+            "Hushmark could not resolve the Markdown navigation root {}. {error}",
+            navigation_root.display()
+        )
+    })?;
+
+    if !navigation_root.is_dir() {
+        return Err(format!(
+            "Hushmark could not use {} as a Markdown navigation root.",
+            navigation_root.display()
+        ));
+    }
+
+    let current_path = fs::canonicalize(current_path).map_err(|error| {
+        format!(
+            "Hushmark could not resolve the current Markdown document {}. {error}",
+            current_path.display()
+        )
+    })?;
+
+    if !current_path.is_file() || !current_path.starts_with(&navigation_root) {
+        return Err("Hushmark could not open that link from this document.".to_string());
+    }
+
+    let Some(current_dir) = current_path.parent() else {
+        return Err("Hushmark could not determine the current document folder.".to_string());
+    };
+
+    let target_path = current_dir.join(&parsed.path);
+    let target_path = fs::canonicalize(&target_path).map_err(|error| {
+        format!(
+            "Hushmark could not resolve linked Markdown file {}. {error}",
+            target_path.display()
+        )
+    })?;
+
+    if !target_path.starts_with(&navigation_root) {
+        return Err(
+            "Hushmark blocked a linked Markdown file outside this document folder.".to_string(),
+        );
+    }
+
+    if !target_path.is_file() || !is_markdown_path(&target_path) {
+        return Err(format!(
+            "Only .md and .markdown links can be opened in Hushmark. {} was not opened.",
+            target_path.display()
+        ));
+    }
+
+    Ok(ResolvedLinkedMarkdownPath {
+        path: target_path,
+        navigation_root,
+        fragment: parsed.fragment,
+    })
+}
+
+struct ParsedRelativeMarkdownLink {
+    path: PathBuf,
+    fragment: Option<String>,
+}
+
+fn parse_relative_markdown_link(href: &str) -> Result<ParsedRelativeMarkdownLink, String> {
+    let href = href.trim();
+    if href.is_empty() || href.chars().any(char::is_control) {
+        return Err("Hushmark could not open that Markdown link.".to_string());
+    }
+
+    if has_url_scheme(href) {
+        return Err("Hushmark does not open that link as a local Markdown document.".to_string());
+    }
+
+    let (path_part, fragment) = href.split_once('#').unwrap_or((href, ""));
+    if path_part.is_empty() {
+        return Err("Hushmark could not open an empty Markdown link.".to_string());
+    }
+
+    let decoded_path = percent_decode_str(path_part)
+        .decode_utf8()
+        .map_err(|_| "Hushmark could not decode that Markdown link.".to_string())?;
+
+    if decoded_path
+        .chars()
+        .any(|character| character.is_control() || character == '\0')
+    {
+        return Err("Hushmark could not open that Markdown link.".to_string());
+    }
+
+    let path = Path::new(decoded_path.as_ref());
+    if !is_safe_relative_document_link_path(path) {
+        return Err("Hushmark only opens relative Markdown document links.".to_string());
+    }
+
+    if !is_markdown_path(path) {
+        return Err("Hushmark only opens .md and .markdown document links.".to_string());
+    }
+
+    Ok(ParsedRelativeMarkdownLink {
+        path: path.to_path_buf(),
+        fragment: (!fragment.is_empty()).then(|| fragment.to_string()),
+    })
+}
+
+fn is_safe_relative_document_link_path(path: &Path) -> bool {
+    let mut has_normal_component = false;
+
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => has_normal_component = true,
+            Component::CurDir | Component::ParentDir => {}
+            Component::RootDir | Component::Prefix(_) => return false,
+        }
+    }
+
+    has_normal_component
+}
+
+fn path_to_string(path: &Path) -> String {
+    path.display().to_string()
+}
+
 fn has_url_scheme(src: &str) -> bool {
     let Some(separator) = src.find(':') else {
         return false;
@@ -650,8 +831,9 @@ mod tests {
     use pulldown_cmark::Options;
 
     use super::{
-        load_dropped_markdown_file, load_initial_document_from_arg, load_markdown_file,
-        markdown_options, render_markdown_to_safe_html, title_for, LoadedDocument,
+        load_dropped_markdown_file, load_initial_document_from_arg, load_linked_markdown_file,
+        load_markdown_file, markdown_options, render_markdown_to_safe_html, title_for,
+        LoadedDocument,
     };
 
     #[test]
@@ -1037,6 +1219,7 @@ mod tests {
     fn title_uses_file_name_when_loaded() {
         let document = LoadedDocument {
             path: Some("notes.md".to_string()),
+            navigation_root: None,
             file_name: Some("notes.md".to_string()),
             html: Some("<h1>Notes</h1>".to_string()),
             error: None,
@@ -1103,6 +1286,152 @@ mod tests {
 
         assert!(document.html.is_none());
         assert!(document.error.is_some());
+    }
+
+    #[test]
+    fn linked_relative_md_document_opens_inside_navigation_root() {
+        let fixture = TestFixture::new("linked-md");
+        let current_path = fixture.path.join("index.md");
+        let target_path = fixture.path.join("chapter-2.md");
+        fs::write(&current_path, "# Index").expect("write current");
+        fs::write(&target_path, "# Chapter 2").expect("write target");
+
+        let linked =
+            load_linked_markdown_file(current_path, fixture.path.clone(), "chapter-2.md".into());
+
+        assert!(linked.fragment.is_none());
+        assert!(linked.document.error.is_none());
+        assert!(linked
+            .document
+            .html
+            .as_deref()
+            .is_some_and(|html| html.contains("Chapter 2")));
+        let expected_root = fixture
+            .path
+            .canonicalize()
+            .expect("canonical root")
+            .display()
+            .to_string();
+        assert_eq!(
+            linked.document.navigation_root.as_deref(),
+            Some(expected_root.as_str())
+        );
+    }
+
+    #[test]
+    fn linked_relative_markdown_document_opens_with_fragment() {
+        let fixture = TestFixture::new("linked-markdown-fragment");
+        let current_path = fixture.path.join("index.md");
+        let target_path = fixture.path.join("setup.markdown");
+        fs::write(&current_path, "# Index").expect("write current");
+        fs::write(&target_path, "# Setup\n\n## Install Hushmark").expect("write target");
+
+        let linked = load_linked_markdown_file(
+            current_path,
+            fixture.path.clone(),
+            "setup.markdown#install-hushmark".into(),
+        );
+
+        assert_eq!(linked.fragment.as_deref(), Some("install-hushmark"));
+        assert!(linked.document.error.is_none());
+        assert!(linked
+            .document
+            .html
+            .as_deref()
+            .is_some_and(|html| html.contains("id=\"install-hushmark\"")));
+    }
+
+    #[test]
+    fn child_document_can_link_back_up_within_navigation_root() {
+        let fixture = TestFixture::new("linked-child-back");
+        let nested_dir = fixture.path.join("nested");
+        fs::create_dir_all(&nested_dir).expect("create nested dir");
+        let root_doc = fixture.path.join("index.md");
+        let child_doc = nested_dir.join("child.md");
+        fs::write(&root_doc, "# Root\n\n## Back Target").expect("write root");
+        fs::write(&child_doc, "# Child").expect("write child");
+
+        let linked = load_linked_markdown_file(
+            child_doc,
+            fixture.path.clone(),
+            "../index.md#back-target".into(),
+        );
+
+        assert_eq!(linked.fragment.as_deref(), Some("back-target"));
+        assert!(linked.document.error.is_none());
+        assert!(linked
+            .document
+            .html
+            .as_deref()
+            .is_some_and(|html| html.contains("id=\"back-target\"")));
+    }
+
+    #[test]
+    fn linked_document_rejects_escape_outside_navigation_root() {
+        let fixture = TestFixture::new("linked-escape");
+        let outside = fixture
+            .path
+            .parent()
+            .expect("fixture parent")
+            .join(format!("hushmark-outside-{}.md", std::process::id()));
+        let current_path = fixture.path.join("index.md");
+        fs::write(&current_path, "# Index").expect("write current");
+        fs::write(&outside, "# Outside").expect("write outside");
+
+        let linked = load_linked_markdown_file(
+            current_path,
+            fixture.path.clone(),
+            format!("../{}", outside.file_name().unwrap().to_string_lossy()),
+        );
+        let _ = fs::remove_file(outside);
+
+        assert!(linked.document.html.is_none());
+        assert!(linked
+            .document
+            .error
+            .as_deref()
+            .is_some_and(|error| error.contains("outside")));
+    }
+
+    #[test]
+    fn linked_document_rejects_absolute_file_and_unsupported_schemes() {
+        let fixture = TestFixture::new("linked-rejected-schemes");
+        let current_path = fixture.path.join("index.md");
+        let target_path = fixture.path.join("target.md");
+        fs::write(&current_path, "# Index").expect("write current");
+        fs::write(&target_path, "# Target").expect("write target");
+
+        for href in [
+            target_path.display().to_string(),
+            "file:///C:/Users/example/notes.md".to_string(),
+            "https://example.com/notes.md".to_string(),
+        ] {
+            let linked =
+                load_linked_markdown_file(current_path.clone(), fixture.path.clone(), href);
+
+            assert!(linked.document.html.is_none());
+            assert!(linked.document.error.is_some());
+        }
+    }
+
+    #[test]
+    fn linked_document_rejects_unsupported_extension_and_malformed_links() {
+        let fixture = TestFixture::new("linked-rejected-files");
+        let current_path = fixture.path.join("index.md");
+        let text_path = fixture.path.join("notes.txt");
+        fs::write(&current_path, "# Index").expect("write current");
+        fs::write(&text_path, "notes").expect("write text");
+
+        for href in ["notes.txt", "bad%FF.md", ""] {
+            let linked = load_linked_markdown_file(
+                current_path.clone(),
+                fixture.path.clone(),
+                href.to_string(),
+            );
+
+            assert!(linked.document.html.is_none(), "{href}");
+            assert!(linked.document.error.is_some(), "{href}");
+        }
     }
 
     struct TestFixture {

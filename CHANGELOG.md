@@ -4,6 +4,16 @@
 
 No changes yet.
 
+## 0.1.3
+
+Tester-visible relative Markdown navigation update.
+
+- Open relative `.md` and `.markdown` document links inside Hushmark.
+- Preserve fragments for linked Markdown documents, so links like `setup.md#install-hushmark` open the target document and scroll to the generated heading anchor.
+- Added app-level Back navigation for linked Markdown documents, including Alt+Left handling and scroll restoration.
+- Keep the navigation root constrained to the first opened document's folder; absolute local paths, `file://` links, links outside that root, and non-Markdown relative files are not opened.
+- Added linked-document fixtures and backend path-validation tests for relative links, fragments, root escapes, absolute paths, unsupported schemes, unsupported extensions, and malformed links.
+
 ## 0.1.2
 
 Tester-visible link handling and polish update.

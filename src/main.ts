@@ -5,6 +5,7 @@ import "./styles.css";
 
 type LoadedDocument = {
   path: string | null;
+  navigationRoot: string | null;
   fileName: string | null;
   html: string | null;
   error: string | null;
@@ -50,14 +51,33 @@ type SetupCommand =
   | "remove_all_integration";
 
 type LinkAction =
-  | { kind: "internal" }
+  | { kind: "internal"; fragment: string }
   | { kind: "external"; url: string }
+  | { kind: "document"; href: string }
   | { kind: "unsupported" };
+
+type LinkedDocument = {
+  document: LoadedDocument;
+  fragment: string | null;
+};
 
 type StartupView = {
   mode: "reader" | "setup";
   document: LoadedDocument | null;
   setup: SetupStatus | null;
+};
+
+type DocumentNavigationEntry = {
+  id: number;
+  document: LoadedDocument;
+  fragment: string | null;
+  scrollY: number;
+};
+
+type HushmarkHistoryState = {
+  kind: "hushmark-document";
+  sessionId: number;
+  entryId: number;
 };
 
 const appElement = document.querySelector<HTMLElement>("#app");
@@ -68,10 +88,25 @@ if (!appElement) {
 
 const app = appElement;
 const currentWindow = getCurrentWindow();
+const navigationEntries = new Map<number, DocumentNavigationEntry>();
+let currentDocument: LoadedDocument | null = null;
+let activeNavigationEntryId: number | null = null;
+let activeNavigationIndex = -1;
+let navigationOrder: number[] = [];
+let navigationSessionId = 0;
+let nextNavigationEntryId = 1;
 
 document.addEventListener("contextmenu", preventInternalContextMenu, {
   capture: true,
 });
+document.addEventListener("keydown", handleNavigationKeydown, {
+  capture: true,
+});
+window.addEventListener("popstate", handleHistoryPopState);
+
+if ("scrollRestoration" in window.history) {
+  window.history.scrollRestoration = "manual";
+}
 
 function preventInternalContextMenu(event: MouseEvent): void {
   event.preventDefault();
@@ -114,7 +149,11 @@ function renderState(
   app.replaceChildren(section);
 }
 
-function renderDocument(documentView: LoadedDocument): void {
+function renderDocument(
+  documentView: LoadedDocument,
+  options: { fragment?: string | null; scrollY?: number | null } = {},
+): void {
+  currentDocument = documentView;
   document.title = titleFor(documentView);
 
   if (documentView.error) {
@@ -135,6 +174,12 @@ function renderDocument(documentView: LoadedDocument): void {
   article.addEventListener("click", handleDocumentLinkClick);
 
   app.replaceChildren(article);
+
+  if (options.fragment) {
+    scrollToFragmentAfterRender(options.fragment);
+  } else if (options.scrollY !== undefined && options.scrollY !== null) {
+    restoreScrollAfterRender(options.scrollY);
+  }
 }
 
 function handleDocumentLinkClick(event: MouseEvent): void {
@@ -154,6 +199,8 @@ function handleDocumentLinkClick(event: MouseEvent): void {
 
   const action = classifyDocumentLink(link.getAttribute("href"));
   if (action.kind === "internal") {
+    event.preventDefault();
+    scrollToFragmentAfterRender(action.fragment);
     return;
   }
 
@@ -161,6 +208,8 @@ function handleDocumentLinkClick(event: MouseEvent): void {
 
   if (action.kind === "external") {
     void openExternalLink(action.url);
+  } else if (action.kind === "document") {
+    void openLinkedDocument(action.href);
   }
 }
 
@@ -171,7 +220,7 @@ function classifyDocumentLink(href: string | null): LinkAction {
   }
 
   if (value.startsWith("#")) {
-    return { kind: "internal" };
+    return { kind: "internal", fragment: value };
   }
 
   const schemeMatch = /^([a-z][a-z0-9+.-]*):/i.exec(value);
@@ -188,7 +237,31 @@ function classifyDocumentLink(href: string | null): LinkAction {
     return { kind: "external", url: value };
   }
 
+  if (!scheme && isRelativeMarkdownHref(value)) {
+    return { kind: "document", href: value };
+  }
+
   return { kind: "unsupported" };
+}
+
+function isRelativeMarkdownHref(href: string): boolean {
+  const [pathPart] = href.split("#", 1);
+  if (!pathPart || pathPart.startsWith("/") || pathPart.startsWith("\\")) {
+    return false;
+  }
+
+  try {
+    const decodedPath = decodeURIComponent(pathPart);
+    return (
+      decodedPath.length > 0 &&
+      !decodedPath.startsWith("/") &&
+      !decodedPath.startsWith("\\") &&
+      !/[\u0000-\u001f\u007f]/.test(decodedPath) &&
+      /\.(md|markdown)$/i.test(decodedPath)
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function openExternalLink(url: string): Promise<void> {
@@ -197,6 +270,238 @@ async function openExternalLink(url: string): Promise<void> {
   } catch (error) {
     console.warn("failed to open external link", error);
   }
+}
+
+async function openLinkedDocument(href: string): Promise<void> {
+  const currentPath = currentDocument?.path;
+  const navigationRoot = currentDocument?.navigationRoot;
+
+  if (!currentPath || !navigationRoot) {
+    return;
+  }
+
+  saveActiveScrollPosition();
+
+  try {
+    const linkedDocument = await invoke<LinkedDocument>("load_linked_document", {
+      currentPath,
+      navigationRoot,
+      href,
+    });
+
+    if (linkedDocument.document.error) {
+      showDocumentMessage(
+        "This linked file could not be opened.",
+        linkedDocument.document.error,
+      );
+      return;
+    }
+
+    pushLinkedDocumentNavigation(linkedDocument.document, linkedDocument.fragment);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    showDocumentMessage("This linked file could not be opened.", message);
+  }
+}
+
+function resetDocumentNavigation(documentView: LoadedDocument): void {
+  navigationSessionId += 1;
+  navigationEntries.clear();
+  navigationOrder = [];
+
+  const entry = createNavigationEntry(documentView, null, 0);
+  navigationEntries.set(entry.id, entry);
+  navigationOrder.push(entry.id);
+  activeNavigationEntryId = entry.id;
+  activeNavigationIndex = 0;
+
+  window.history.replaceState(historyStateFor(entry.id), "");
+  renderDocument(documentView, { scrollY: 0 });
+}
+
+function pushLinkedDocumentNavigation(
+  documentView: LoadedDocument,
+  fragment: string | null,
+): void {
+  if (activeNavigationIndex < navigationOrder.length - 1) {
+    for (const staleEntryId of navigationOrder.slice(activeNavigationIndex + 1)) {
+      navigationEntries.delete(staleEntryId);
+    }
+    navigationOrder = navigationOrder.slice(0, activeNavigationIndex + 1);
+  }
+
+  const entry = createNavigationEntry(documentView, fragment, 0);
+  navigationEntries.set(entry.id, entry);
+  navigationOrder.push(entry.id);
+  activeNavigationEntryId = entry.id;
+  activeNavigationIndex = navigationOrder.length - 1;
+
+  window.history.pushState(historyStateFor(entry.id), "");
+  renderDocument(documentView, {
+    fragment,
+    scrollY: fragment ? null : 0,
+  });
+}
+
+function createNavigationEntry(
+  documentView: LoadedDocument,
+  fragment: string | null,
+  scrollY: number,
+): DocumentNavigationEntry {
+  const id = nextNavigationEntryId;
+  nextNavigationEntryId += 1;
+
+  return {
+    id,
+    document: documentView,
+    fragment,
+    scrollY,
+  };
+}
+
+function historyStateFor(entryId: number): HushmarkHistoryState {
+  return {
+    kind: "hushmark-document",
+    sessionId: navigationSessionId,
+    entryId,
+  };
+}
+
+function saveActiveScrollPosition(): void {
+  if (activeNavigationEntryId === null) {
+    return;
+  }
+
+  const entry = navigationEntries.get(activeNavigationEntryId);
+  if (entry) {
+    entry.scrollY = window.scrollY;
+  }
+}
+
+function handleHistoryPopState(event: PopStateEvent): void {
+  const state = parseHistoryState(event.state);
+
+  if (!state || state.sessionId !== navigationSessionId) {
+    keepCurrentHistoryEntry();
+    return;
+  }
+
+  if (state.entryId === activeNavigationEntryId) {
+    return;
+  }
+
+  const entry = navigationEntries.get(state.entryId);
+  const entryIndex = navigationOrder.indexOf(state.entryId);
+  if (!entry || entryIndex === -1) {
+    keepCurrentHistoryEntry();
+    return;
+  }
+
+  saveActiveScrollPosition();
+  activeNavigationEntryId = state.entryId;
+  activeNavigationIndex = entryIndex;
+  renderDocument(entry.document, {
+    fragment: entry.fragment,
+    scrollY: entry.fragment ? null : entry.scrollY,
+  });
+}
+
+function keepCurrentHistoryEntry(): void {
+  if (activeNavigationEntryId !== null) {
+    window.history.pushState(historyStateFor(activeNavigationEntryId), "");
+  }
+}
+
+function parseHistoryState(state: unknown): HushmarkHistoryState | null {
+  if (!state || typeof state !== "object") {
+    return null;
+  }
+
+  const candidate = state as Partial<HushmarkHistoryState>;
+  if (
+    candidate.kind !== "hushmark-document" ||
+    typeof candidate.sessionId !== "number" ||
+    typeof candidate.entryId !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    kind: candidate.kind,
+    sessionId: candidate.sessionId,
+    entryId: candidate.entryId,
+  };
+}
+
+function handleNavigationKeydown(event: KeyboardEvent): void {
+  const isBackShortcut =
+    (event.altKey && event.key === "ArrowLeft") || event.key === "BrowserBack";
+  if (!isBackShortcut || event.ctrlKey || event.metaKey || event.shiftKey) {
+    return;
+  }
+
+  if (activeNavigationEntryId === null) {
+    return;
+  }
+
+  event.preventDefault();
+
+  if (activeNavigationIndex > 0) {
+    window.history.back();
+  }
+}
+
+function showDocumentMessage(heading: string, detail: string): void {
+  const article = app.querySelector<HTMLElement>(".document");
+
+  if (!article) {
+    document.title = `Error - ${PRODUCT.displayName}`;
+    renderState("error", heading, detail);
+    return;
+  }
+
+  article.querySelector(".document-message")?.remove();
+
+  const message = document.createElement("aside");
+  message.className = "document-message";
+  message.setAttribute("role", "status");
+  message.append(createTextElement("h2", heading), createTextElement("p", detail));
+  article.prepend(message);
+  message.scrollIntoView({ block: "nearest" });
+}
+
+function scrollToFragmentAfterRender(fragment: string): void {
+  window.requestAnimationFrame(() => {
+    for (const id of fragmentIdCandidates(fragment)) {
+      const target = document.getElementById(id);
+      if (target) {
+        target.scrollIntoView();
+        return;
+      }
+    }
+  });
+}
+
+function restoreScrollAfterRender(scrollY: number): void {
+  window.requestAnimationFrame(() => {
+    window.scrollTo(0, scrollY);
+  });
+}
+
+function fragmentIdCandidates(fragment: string): string[] {
+  const cleanFragment = fragment.startsWith("#") ? fragment.slice(1) : fragment;
+  const candidates = [cleanFragment];
+
+  try {
+    const decoded = decodeURIComponent(cleanFragment);
+    if (!candidates.includes(decoded)) {
+      candidates.unshift(decoded);
+    }
+  } catch {
+    // Use the original fragment when percent-decoding fails.
+  }
+
+  return candidates.filter((candidate) => candidate.length > 0);
 }
 
 function createTextElement<K extends keyof HTMLElementTagNameMap>(
@@ -475,7 +780,7 @@ async function openDroppedFile(path: string): Promise<void> {
     const documentView = await invoke<LoadedDocument>("load_dropped_document", {
       path,
     });
-    renderDocument(documentView);
+    resetDocumentNavigation(documentView);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     document.title = `Error - ${PRODUCT.displayName}`;
@@ -520,7 +825,7 @@ async function start(): Promise<void> {
         throw new Error("Initial document state was not returned.");
       }
 
-      renderDocument(startupView.document);
+      resetDocumentNavigation(startupView.document);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

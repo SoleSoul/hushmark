@@ -284,6 +284,26 @@ C:\Users\Jonathan Lahav\Documents\Hushmark Notes\A folder with spaces\A very lon
 
 ---
 
+## Feature: Relative Markdown document links
+
+**Expect:** The `.md` and `.markdown` links should open inside Hushmark. The fragment link should open the linked document and scroll to its matching heading. Alt+Left should return to this document and restore the previous scroll position. The link outside the starting folder and the non-Markdown link should fail harmlessly.
+
+**Usage:**
+
+- [Open a linked Markdown document](linked-doc.md)
+- [Open a linked `.markdown` document](linked-markdown.markdown)
+- [Open a linked Markdown document at a heading](linked-doc.md#linked-fragment-target)
+- [Open a child Markdown document](nested/child-doc.md)
+- [Blocked link outside this navigation root](../CHANGELOG.md)
+- [Unsupported non-Markdown relative link](assets/hushmark-placeholder.svg)
+
+**Manual Back check:**
+
+1. Click `linked-doc.md`, then press Alt+Left and confirm this document returns near this section.
+2. Click `linked-doc.md#linked-fragment-target`, confirm the linked heading is shown, then press Alt+Left and confirm this document returns near this section.
+
+---
+
 ## Feature: Reference-style links
 
 **Expect:** A clickable link whose URL is defined elsewhere in the document.
