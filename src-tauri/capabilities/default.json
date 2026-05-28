@@ -3,6 +3,5 @@
   "identifier": "default",
   "description": "Default capability for the main Hushmark window.",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-show"]
+  "permissions": ["core:default", "core:window:allow-show", "dialog:allow-open"]
 }
-

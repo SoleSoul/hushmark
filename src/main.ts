@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createTextElement } from "./dom";
 import { PRODUCT } from "./product";
@@ -23,6 +24,8 @@ const app = appElement;
 const currentWindow = getCurrentWindow();
 const navigationEntries = new Map<number, DocumentNavigationEntry>();
 let currentDocument: LoadedDocument | null = null;
+let currentMode: StartupView["mode"] = "reader";
+let filePickerOpen = false;
 let activeNavigationEntryId: number | null = null;
 let activeNavigationIndex = -1;
 let navigationOrder: number[] = [];
@@ -367,6 +370,20 @@ function parseHistoryState(state: unknown): HushmarkHistoryState | null {
 }
 
 function handleNavigationKeydown(event: KeyboardEvent): void {
+  if (
+    event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === "o"
+  ) {
+    event.preventDefault();
+    if (currentMode === "reader") {
+      void openDocumentFromPicker();
+    }
+    return;
+  }
+
   const isBackShortcut =
     (event.altKey && event.key === "ArrowLeft") || event.key === "BrowserBack";
   if (!isBackShortcut || event.ctrlKey || event.metaKey || event.shiftKey) {
@@ -382,6 +399,38 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
   if (activeNavigationIndex > 0) {
     window.history.back();
   }
+}
+
+async function openDocumentFromPicker(): Promise<void> {
+  if (filePickerOpen) {
+    return;
+  }
+
+  filePickerOpen = true;
+
+  let selectedPath: string | null | string[];
+  try {
+    selectedPath = await openDialog({
+      multiple: false,
+      filters: [
+        {
+          name: "Markdown files",
+          extensions: ["md", "markdown"],
+        },
+      ],
+    });
+  } catch (error) {
+    console.warn("failed to open file picker", error);
+    return;
+  } finally {
+    filePickerOpen = false;
+  }
+
+  if (typeof selectedPath !== "string") {
+    return;
+  }
+
+  await openTopLevelDocument(selectedPath);
 }
 
 function showDocumentMessage(heading: string, detail: string): void {
@@ -437,13 +486,14 @@ function fragmentIdCandidates(fragment: string): string[] {
   return candidates.filter((candidate) => candidate.length > 0);
 }
 
-async function openDroppedFile(path: string): Promise<void> {
+async function openTopLevelDocument(path: string): Promise<void> {
   renderState("loading", "Opening Markdown file...");
 
   try {
     const documentView = await invoke<LoadedDocument>("load_dropped_document", {
       path,
     });
+    currentMode = "reader";
     resetDocumentNavigation(documentView);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -461,7 +511,7 @@ async function registerDragAndDrop(): Promise<void> {
     const [path] = event.payload.paths;
 
     if (path) {
-      void openDroppedFile(path);
+      void openTopLevelDocument(path);
     }
   });
 }
@@ -477,6 +527,7 @@ async function start(): Promise<void> {
 
   try {
     const startupView = await invoke<StartupView>("load_initial_view");
+    currentMode = startupView.mode;
 
     if (startupView.mode === "setup") {
       if (!startupView.setup) {
