@@ -354,14 +354,14 @@ fn append_message_details(message: &mut SetupMessage, details: &str) {
     }
 }
 
-pub fn is_install_mode_arg(arg: &std::ffi::OsStr) -> bool {
-    arg == "--install"
+pub fn is_setup_mode_arg(arg: &std::ffi::OsStr) -> bool {
+    arg == "--setup"
 }
 
 pub fn first_document_arg(
     args: impl Iterator<Item = std::ffi::OsString>,
 ) -> Option<std::ffi::OsString> {
-    args.filter(|arg| !is_install_mode_arg(arg.as_os_str()))
+    args.filter(|arg| !is_setup_mode_arg(arg.as_os_str()))
         .next()
 }
 
@@ -1110,19 +1110,20 @@ fn wide_null(value: &str) -> Vec<u16> {
 mod tests {
     use super::{
         are_file_handlers_registered, first_document_arg, installed_version_for_status,
-        is_context_menu_registered, is_install_mode_arg, open_command,
+        is_context_menu_registered, is_setup_mode_arg, open_command,
     };
     use std::{ffi::OsString, path::PathBuf};
 
     #[test]
-    fn detects_install_mode_arg() {
-        assert!(is_install_mode_arg("--install".as_ref()));
-        assert!(!is_install_mode_arg("notes.md".as_ref()));
+    fn detects_setup_mode_arg() {
+        assert!(is_setup_mode_arg("--setup".as_ref()));
+        assert!(!is_setup_mode_arg("--install".as_ref()));
+        assert!(!is_setup_mode_arg("notes.md".as_ref()));
     }
 
     #[test]
-    fn first_document_arg_skips_install_flag() {
-        let args = vec![OsString::from("--install"), OsString::from("notes.md")];
+    fn first_document_arg_skips_setup_flag() {
+        let args = vec![OsString::from("--setup"), OsString::from("notes.md")];
 
         assert_eq!(
             first_document_arg(args.into_iter()),

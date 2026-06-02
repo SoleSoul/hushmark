@@ -111,7 +111,7 @@ Copy-Item .\src-tauri\target\release\hushmark.exe "$temp\Hushmark.exe"
 Open setup:
 
 ```powershell
-.\src-tauri\target\release\hushmark.exe --install
+.\src-tauri\target\release\hushmark.exe --setup
 ```
 
 In setup:

@@ -30,7 +30,7 @@ struct StartupView {
 fn load_initial_view(window: tauri::Window) -> Result<StartupView, String> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
 
-    if args.iter().any(|arg| setup::is_install_mode_arg(arg)) {
+    if args.iter().any(|arg| setup::is_setup_mode_arg(arg)) {
         window
             .set_title(&setup_window_title())
             .map_err(|error| format!("Could not set setup window title: {error}"))?;

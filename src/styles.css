@@ -51,6 +51,26 @@ body {
   line-height: 1.6;
 }
 
+.state__setup-action {
+  position: fixed;
+  inset-block-start: 1rem;
+  inset-inline-end: 1rem;
+  padding: 0.35rem 0.45rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: #6e6250;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.state__setup-action:hover,
+.state__setup-action:focus-visible {
+  background: #eee9dc;
+  color: #424a53;
+}
+
 .state--empty h1 {
   font-size: clamp(2rem, 7vw, 3rem);
 }

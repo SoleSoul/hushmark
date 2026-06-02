@@ -11,6 +11,7 @@ import type {
   LinkAction,
   LinkedDocument,
   LoadedDocument,
+  SetupStatus,
   StartupView,
 } from "./types";
 
@@ -64,7 +65,7 @@ function renderState(
   kind: "empty" | "error" | "loading",
   heading: string,
   detail?: string,
-): void {
+): HTMLElement {
   const section = document.createElement("section");
   section.className = `state state--${kind}`;
 
@@ -83,6 +84,8 @@ function renderState(
 
   section.append(content);
   app.replaceChildren(section);
+
+  return section;
 }
 
 function renderDocument(
@@ -98,7 +101,7 @@ function renderDocument(
   }
 
   if (!documentView.path && !documentView.html) {
-    renderState("empty", PRODUCT.displayName, "Open a Markdown file to read.");
+    renderEmptyState();
     return;
   }
 
@@ -116,6 +119,60 @@ function renderDocument(
   } else if (options.scrollY !== undefined && options.scrollY !== null) {
     restoreScrollAfterRender(options.scrollY);
   }
+}
+
+function renderEmptyState(): void {
+  const section = renderState("empty", PRODUCT.displayName, "Open a Markdown file to read.");
+  void renderEmptySetupAffordance(section);
+}
+
+async function renderEmptySetupAffordance(section: HTMLElement): Promise<void> {
+  let status: SetupStatus;
+
+  try {
+    status = await invoke<SetupStatus>("get_setup_status");
+  } catch (error) {
+    console.warn("failed to get setup status", error);
+    return;
+  }
+
+  if (!section.isConnected || currentMode !== "reader" || currentDocument?.path) {
+    return;
+  }
+
+  const label = emptySetupActionLabel(status);
+  if (!label) {
+    return;
+  }
+
+  const button = createTextElement("button", label, "state__setup-action");
+  button.type = "button";
+  button.addEventListener("click", () => {
+    openSetupFromEmptyState(status);
+  });
+
+  section.append(button);
+}
+
+function emptySetupActionLabel(status: SetupStatus): string | null {
+  if (!status.installed) {
+    return "Install";
+  }
+
+  if (!status.installedMatchesCurrent) {
+    return "Update";
+  }
+
+  return null;
+}
+
+function openSetupFromEmptyState(status: SetupStatus): void {
+  currentMode = "setup";
+  document.title = PRODUCT.setupTitle;
+  void currentWindow.setTitle(PRODUCT.setupTitle).catch((error) => {
+    console.warn("failed to set setup window title", error);
+  });
+  renderSetup(app, status);
 }
 
 function handleDocumentLinkClick(event: MouseEvent): void {
