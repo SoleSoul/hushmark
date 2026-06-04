@@ -4,6 +4,15 @@
 
 No changes yet.
 
+## 0.1.4
+
+Tester-visible navigation consistency update.
+
+- Add Hushmark Back/Forward history for same-document `#fragment` links.
+- Add Alt+Right and BrowserForward support for Hushmark document and fragment history after going back.
+- Keep missing same-document fragments harmless by not adding broken history entries.
+- Document the unified navigation model in the Markdown support docs and visual inspection fixture.
+
 ## 0.1.3
 
 Tester-visible relative Markdown navigation update.
