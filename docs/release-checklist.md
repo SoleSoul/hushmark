@@ -56,7 +56,7 @@ Tagged draft release:
 5. Download and smoke-test the attached Windows artifact.
 6. Publish the draft release only after manual testing; clear the prerelease flag if this is no longer a tester-only release.
 
-Workflow artifacts are available from the run summary under **Artifacts**. Tag builds also attach the Windows artifact to the draft GitHub Release. Release artifacts use a readable `Hushmark-<version>-<platform>-<arch>-<bundle>` naming pattern.
+Workflow artifacts are available from the run summary under **Artifacts**. The workflow uploads the standalone executable from `src-tauri/target/release/hushmark.exe` using a `Hushmark-<version>-windows-x86_64-exe` artifact name. Tag builds also attach the Windows artifact to the draft GitHub Release.
 
 ## Smoke Tests
 

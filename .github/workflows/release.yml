@@ -37,6 +37,13 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Read app version
+        id: app-version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          "version=$version" >> $env:GITHUB_OUTPUT
+
       - name: Build frontend
         run: npm run build
 
@@ -82,6 +89,13 @@ jobs:
           releaseDraft: true
           prerelease: true
 
+      - name: Upload Windows executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hushmark-${{ steps.app-version.outputs.version }}-windows-x86_64-exe
+          path: src-tauri/target/release/hushmark.exe
+          if-no-files-found: error
+
       - name: Summarize generated artifacts
         if: ${{ always() }}
         shell: pwsh
@@ -89,7 +103,7 @@ jobs:
           MANUAL_ARTIFACT_PATHS: ${{ steps.build-artifact.outputs.artifactPaths }}
           RELEASE_ARTIFACT_PATHS: ${{ steps.release-artifact.outputs.artifactPaths }}
         run: |
-          $artifactPaths = @($env:MANUAL_ARTIFACT_PATHS, $env:RELEASE_ARTIFACT_PATHS) | Where-Object { $_.Trim() }
+          $artifactPaths = @($env:MANUAL_ARTIFACT_PATHS, $env:RELEASE_ARTIFACT_PATHS, "src-tauri/target/release/hushmark.exe") | Where-Object { $_.Trim() }
           "### Hushmark release artifacts" >> $env:GITHUB_STEP_SUMMARY
           "" >> $env:GITHUB_STEP_SUMMARY
           if ($artifactPaths) {
