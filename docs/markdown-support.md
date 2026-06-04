@@ -50,9 +50,10 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 
 ## Link behavior
 
-- Same-document `#fragment` links stay inside Hushmark and scroll to generated heading anchors when a matching heading exists.
+- Same-document `#fragment` links stay inside Hushmark, scroll to generated heading anchors when a matching heading exists, and participate in Hushmark Back/Forward history.
 - Relative links to `.md` and `.markdown` files open inside Hushmark. Links with fragments, such as `chapter-2.md#install`, open the linked document and then scroll to the matching heading anchor.
-- Back navigation for relative Markdown document links is handled by Hushmark's app history. Alt+Left returns to the previous Markdown document and restores its scroll position when the target history entry does not include an explicit fragment.
+- Back/Forward navigation for same-document fragments and relative Markdown document links is handled by Hushmark's app history. Alt+Left returns to the previous document or scroll position; Alt+Right returns to the next document or fragment after going back.
+- Missing same-document fragments fail harmlessly and do not add broken history entries.
 - External `http://`, `https://`, and `mailto:` links open in the system default browser or mail app.
 - Other schemes, including `javascript:`, `file:`, and `data:`, are not opened by Hushmark.
 

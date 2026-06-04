@@ -193,7 +193,7 @@ function handleDocumentLinkClick(event: MouseEvent): void {
   const action = classifyDocumentLink(link.getAttribute("href"));
   if (action.kind === "internal") {
     event.preventDefault();
-    scrollToFragmentAfterRender(action.fragment);
+    pushSameDocumentFragmentNavigation(action.fragment);
     return;
   }
 
@@ -290,11 +290,26 @@ async function openLinkedDocument(href: string): Promise<void> {
       return;
     }
 
-    pushLinkedDocumentNavigation(linkedDocument.document, linkedDocument.fragment);
+    pushDocumentNavigation(linkedDocument.document, linkedDocument.fragment);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     showDocumentMessage("This linked file could not be opened.", message);
   }
+}
+
+function pushSameDocumentFragmentNavigation(fragment: string): void {
+  const documentView = currentDocument;
+
+  if (!documentView || documentView.error || !documentView.html) {
+    return;
+  }
+
+  if (!findFragmentTarget(fragment)) {
+    return;
+  }
+
+  saveActiveScrollPosition();
+  pushDocumentNavigation(documentView, fragment);
 }
 
 function resetDocumentNavigation(documentView: LoadedDocument): void {
@@ -312,7 +327,7 @@ function resetDocumentNavigation(documentView: LoadedDocument): void {
   renderDocument(documentView, { scrollY: 0 });
 }
 
-function pushLinkedDocumentNavigation(
+function pushDocumentNavigation(
   documentView: LoadedDocument,
   fragment: string | null,
 ): void {
@@ -441,9 +456,8 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  const isBackShortcut =
-    (event.altKey && event.key === "ArrowLeft") || event.key === "BrowserBack";
-  if (!isBackShortcut || event.ctrlKey || event.metaKey || event.shiftKey) {
+  const navigationDirection = navigationDirectionForEvent(event);
+  if (!navigationDirection || event.ctrlKey || event.metaKey || event.shiftKey) {
     return;
   }
 
@@ -453,9 +467,26 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
 
   event.preventDefault();
 
-  if (activeNavigationIndex > 0) {
+  if (navigationDirection === "back" && activeNavigationIndex > 0) {
     window.history.back();
+  } else if (
+    navigationDirection === "forward" &&
+    activeNavigationIndex < navigationOrder.length - 1
+  ) {
+    window.history.forward();
   }
+}
+
+function navigationDirectionForEvent(event: KeyboardEvent): "back" | "forward" | null {
+  if ((event.altKey && event.key === "ArrowLeft") || event.key === "BrowserBack") {
+    return "back";
+  }
+
+  if ((event.altKey && event.key === "ArrowRight") || event.key === "BrowserForward") {
+    return "forward";
+  }
+
+  return null;
 }
 
 async function openDocumentFromPicker(): Promise<void> {
@@ -511,12 +542,9 @@ function showDocumentMessage(heading: string, detail: string): void {
 
 function scrollToFragmentAfterRender(fragment: string): void {
   window.requestAnimationFrame(() => {
-    for (const id of fragmentIdCandidates(fragment)) {
-      const target = document.getElementById(id);
-      if (target) {
-        target.scrollIntoView();
-        return;
-      }
+    const target = findFragmentTarget(fragment);
+    if (target) {
+      target.scrollIntoView();
     }
   });
 }
@@ -541,6 +569,17 @@ function fragmentIdCandidates(fragment: string): string[] {
   }
 
   return candidates.filter((candidate) => candidate.length > 0);
+}
+
+function findFragmentTarget(fragment: string): HTMLElement | null {
+  for (const id of fragmentIdCandidates(fragment)) {
+    const target = document.getElementById(id);
+    if (target) {
+      return target;
+    }
+  }
+
+  return null;
 }
 
 async function openTopLevelDocument(path: string): Promise<void> {

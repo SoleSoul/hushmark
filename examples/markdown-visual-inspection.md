@@ -271,7 +271,7 @@ C:\Users\Jonathan Lahav\Documents\Hushmark Notes\A folder with spaces\A very lon
 
 ## Feature: Intra-document links
 
-**Expect:** Each existing fragment link should scroll to a heading in this same document instead of opening an external browser. The missing-fragment link should fail harmlessly and leave the document usable.
+**Expect:** Each existing fragment link should scroll to a heading in this same document instead of opening an external browser. Alt+Left should return to the previous scroll position, and Alt+Right should return to the fragment after going back. The missing-fragment link should fail harmlessly, leave the document usable, and not add a broken history entry.
 
 **Usage:**
 
@@ -282,11 +282,17 @@ C:\Users\Jonathan Lahav\Documents\Hushmark Notes\A folder with spaces\A very lon
 - [Jump to Hebrew heading](#שלום-עולם)
 - [Missing fragment](#missing-fragment)
 
+**Manual Back/Forward check:**
+
+1. Click `#feature-table-alignment`, then press Alt+Left and confirm this section returns near its previous position.
+2. Press Alt+Right and confirm the table-alignment heading returns.
+3. Click `#missing-fragment`, then press Alt+Left and confirm no broken missing-fragment entry was added.
+
 ---
 
 ## Feature: Relative Markdown document links
 
-**Expect:** The `.md` and `.markdown` links should open inside Hushmark. The fragment link should open the linked document and scroll to its matching heading. Alt+Left should return to this document and restore the previous scroll position. The link outside the starting folder and the non-Markdown link should fail harmlessly.
+**Expect:** The `.md` and `.markdown` links should open inside Hushmark. The fragment link should open the linked document and scroll to its matching heading. Alt+Left should return to this document and restore the previous scroll position; Alt+Right should return to the linked document after going back. The link outside the starting folder and the non-Markdown link should fail harmlessly.
 
 **Usage:**
 
@@ -297,10 +303,10 @@ C:\Users\Jonathan Lahav\Documents\Hushmark Notes\A folder with spaces\A very lon
 - [Blocked link outside this navigation root](../CHANGELOG.md)
 - [Unsupported non-Markdown relative link](assets/hushmark-placeholder.svg)
 
-**Manual Back check:**
+**Manual Back/Forward check:**
 
-1. Click `linked-doc.md`, then press Alt+Left and confirm this document returns near this section.
-2. Click `linked-doc.md#linked-fragment-target`, confirm the linked heading is shown, then press Alt+Left and confirm this document returns near this section.
+1. Click `linked-doc.md`, press Alt+Left and confirm this document returns near this section, then press Alt+Right and confirm the linked document returns.
+2. Click `linked-doc.md#linked-fragment-target`, confirm the linked heading is shown, press Alt+Left and confirm this document returns near this section, then press Alt+Right and confirm the linked heading returns.
 
 ---
 
