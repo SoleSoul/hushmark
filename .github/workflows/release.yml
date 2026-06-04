@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows-release:
+    name: Build Windows release
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Run Rust tests
+        working-directory: src-tauri
+        run: cargo test --quiet
+
+      - name: Build Windows artifact
+        id: build-artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --no-bundle
+          uploadPlainBinary: true
+          uploadWorkflowArtifacts: true
+          uploadUpdaterJson: false
+          uploadUpdaterSignatures: false
+          workflowArtifactNamePattern: Hushmark-[version]-[platform]-[arch]-[bundle]
+          releaseAssetNamePattern: Hushmark-[version]-[platform]-[arch]-[bundle][ext]
+
+      - name: Build Windows artifact and draft release
+        id: release-artifact
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --no-bundle
+          uploadPlainBinary: true
+          uploadWorkflowArtifacts: true
+          uploadUpdaterJson: false
+          uploadUpdaterSignatures: false
+          workflowArtifactNamePattern: Hushmark-[version]-[platform]-[arch]-[bundle]
+          releaseAssetNamePattern: Hushmark-[version]-[platform]-[arch]-[bundle][ext]
+          tagName: ${{ github.ref_name }}
+          releaseName: Hushmark __VERSION__
+          releaseBody: |
+            Windows tester build for Hushmark.
+
+            These binaries are currently unsigned. Windows SmartScreen may show a warning.
+          releaseDraft: true
+          prerelease: true
+
+      - name: Summarize generated artifacts
+        if: ${{ always() }}
+        shell: pwsh
+        env:
+          MANUAL_ARTIFACT_PATHS: ${{ steps.build-artifact.outputs.artifactPaths }}
+          RELEASE_ARTIFACT_PATHS: ${{ steps.release-artifact.outputs.artifactPaths }}
+        run: |
+          $artifactPaths = @($env:MANUAL_ARTIFACT_PATHS, $env:RELEASE_ARTIFACT_PATHS) | Where-Object { $_.Trim() }
+          "### Hushmark release artifacts" >> $env:GITHUB_STEP_SUMMARY
+          "" >> $env:GITHUB_STEP_SUMMARY
+          if ($artifactPaths) {
+            $artifactPaths | ForEach-Object { $_ >> $env:GITHUB_STEP_SUMMARY }
+          } else {
+            "No Tauri artifact paths were reported. Check the build logs." >> $env:GITHUB_STEP_SUMMARY
+          }

@@ -35,6 +35,29 @@ npm run tauri -- build
 git diff --check
 ```
 
+## GitHub Actions Release Build
+
+Use GitHub Actions for Windows release binaries. The release workflow lives at `.github/workflows/release.yml` and runs on `windows-latest`.
+
+Manual tester build:
+
+1. Push the branch to GitHub.
+2. Open **Actions** -> **Release**.
+3. Click **Run workflow**.
+4. Download the produced workflow artifact from the completed run.
+5. Smoke-test the downloaded Windows executable before sharing it.
+
+Tagged draft release:
+
+1. Confirm the app version is current and committed.
+2. Create and push a matching version tag, for example `v0.1.4`.
+3. Wait for the **Release** workflow to finish.
+4. Open **Releases** and inspect the draft prerelease named `Hushmark 0.1.4`.
+5. Download and smoke-test the attached Windows artifact.
+6. Publish the draft release only after manual testing; clear the prerelease flag if this is no longer a tester-only release.
+
+Workflow artifacts are available from the run summary under **Artifacts**. Tag builds also attach the Windows artifact to the draft GitHub Release. Release artifacts use a readable `Hushmark-<version>-<platform>-<arch>-<bundle>` naming pattern.
+
 ## Smoke Tests
 
 - Run `src-tauri\target\release\hushmark.exe examples\markdown-visual-inspection.md`.
