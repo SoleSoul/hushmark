@@ -37,7 +37,7 @@ git diff --check
 
 ## GitHub Actions Release Build
 
-Use GitHub Actions for Windows release binaries. The release workflow lives at `.github/workflows/release.yml` and runs on `windows-latest`.
+Use GitHub Actions for Windows release binaries. The release workflow lives at `.github/workflows/release.yml` and runs on `windows-latest`. Pushes to `master` and manual runs produce workflow artifacts only; `v*` tag builds also create a draft prerelease.
 
 Manual tester build:
 
