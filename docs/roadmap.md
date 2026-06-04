@@ -8,7 +8,7 @@ This roadmap is not a contract. It is a short parking lot for likely next work a
 - Keep `CHANGELOG.md` current under `Unreleased` for tester-visible changes.
 - Run the release checklist before publishing any GitHub/tester binary.
 - Smoke-test `examples/markdown-visual-inspection.md`, same-document fragments, relative Markdown links, Back/Forward, Ctrl+O, local images, table alignment, external links, and setup mode.
-- Confirm docs use `--setup`; older handoff notes that mention `--install` are stale.
+- Confirm setup documentation uses `--setup`.
 - Keep the imported `project-context-handoff/` folder out of tracked project docs and commits.
 
 ## Later Ideas

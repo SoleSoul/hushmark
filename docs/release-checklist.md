@@ -13,7 +13,7 @@ Use this for tester or GitHub releases. Do not run it for ordinary docs-only cha
 - Check `git status --short --branch`.
 - Move completed tester-visible notes from `CHANGELOG.md` `Unreleased` into the new version entry.
 - Confirm no unrelated local artifacts are staged.
-- Confirm docs and setup instructions say `--setup`, not stale `--install`.
+- Confirm docs and setup instructions use `--setup`.
 
 ## Build Commands
 
