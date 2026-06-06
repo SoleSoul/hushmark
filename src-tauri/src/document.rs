@@ -164,6 +164,7 @@ fn render_markdown_with_document_path(markdown: &str, document_path: Option<&Pat
     let allowed_table_classes = table_alignments.allowed_classes();
     let allowed_heading_ids = heading_ids.allowed_ids();
     let safe_html = sanitize_rendered_html(&rendered, &allowed_table_classes, &allowed_heading_ids);
+    let safe_html = local_images.rewrite_sanitized_html_image_sources(safe_html);
     let safe_html = heading_ids.apply_replacements(safe_html);
     let safe_html = table_alignments.apply_replacements(safe_html);
     local_images.apply_replacements(safe_html)
@@ -542,6 +543,52 @@ impl LocalImageResolver {
 
         safe_html
     }
+
+    fn rewrite_sanitized_html_image_sources(&mut self, safe_html: String) -> String {
+        let mut rewritten = String::with_capacity(safe_html.len());
+        let mut remaining = safe_html.as_str();
+
+        while let Some(img_start) = remaining.find("<img") {
+            let (before, after_start) = remaining.split_at(img_start);
+            rewritten.push_str(before);
+
+            let Some(img_end) = after_start.find('>') else {
+                rewritten.push_str(after_start);
+                return rewritten;
+            };
+
+            let (tag, after_tag) = after_start.split_at(img_end + 1);
+            rewritten.push_str(&self.rewrite_sanitized_img_tag(tag));
+            remaining = after_tag;
+        }
+
+        rewritten.push_str(remaining);
+        rewritten
+    }
+
+    fn rewrite_sanitized_img_tag(&mut self, tag: &str) -> String {
+        let Some(src_start) = tag.find("src=\"") else {
+            return tag.to_string();
+        };
+
+        let value_start = src_start + "src=\"".len();
+        let Some(value_end_offset) = tag[value_start..].find('"') else {
+            return tag.to_string();
+        };
+        let value_end = value_start + value_end_offset;
+        let src = &tag[value_start..value_end];
+
+        let Some(rewritten_src) = self.rewrite_image_destination(src) else {
+            return tag.to_string();
+        };
+
+        format!(
+            "{}{}{}",
+            &tag[..value_start],
+            rewritten_src,
+            &tag[value_end..]
+        )
+    }
 }
 
 fn local_image_placeholder_prefix() -> String {
@@ -563,6 +610,10 @@ enum ImageResolution {
 }
 
 fn local_image_data_uri(base_dir: Option<&Path>, src: &str) -> ImageResolution {
+    if has_file_scheme(src) || looks_like_windows_absolute_path(src) {
+        return ImageResolution::RejectedLocal;
+    }
+
     if has_url_scheme(src) {
         return ImageResolution::NotLocal;
     }
@@ -601,6 +652,18 @@ fn local_image_data_uri(base_dir: Option<&Path>, src: &str) -> ImageResolution {
         "data:{mime_type};base64,{}",
         BASE64_STANDARD.encode(bytes)
     ))
+}
+
+fn has_file_scheme(src: &str) -> bool {
+    src.get(..5)
+        .is_some_and(|scheme| scheme.eq_ignore_ascii_case("file:"))
+}
+
+fn looks_like_windows_absolute_path(src: &str) -> bool {
+    let mut chars = src.chars();
+    matches!(chars.next(), Some(character) if character.is_ascii_alphabetic())
+        && matches!(chars.next(), Some(':'))
+        && matches!(chars.next(), Some('\\' | '/'))
 }
 
 fn canonical_document_dir(document_path: &Path) -> Option<PathBuf> {
@@ -1183,26 +1246,87 @@ mod tests {
     }
 
     #[test]
-    fn does_not_rewrite_raw_html_image_paths_against_document_directory() {
+    fn resolves_relative_raw_html_image_paths_against_document_directory() {
         let fixture = TestFixture::new("raw-html-image");
-        let image_path = fixture.path.join("assets").join("example.svg");
-        fs::create_dir_all(image_path.parent().expect("image parent")).expect("create image dir");
-        fs::write(&image_path, b"<svg></svg>").expect("write image");
+        let assets_dir = fixture.path.join("assets");
+        fs::create_dir_all(&assets_dir).expect("create image dir");
+        fs::write(assets_dir.join("example.gif"), b"fake gif").expect("write gif");
+        fs::write(assets_dir.join("example.png"), b"fake png").expect("write png");
+        fs::write(assets_dir.join("example.svg"), b"<svg></svg>").expect("write svg");
 
         let document_path = fixture.path.join("doc.md");
         fs::write(
             &document_path,
-            "<img src=\"assets/example.svg\" alt=\"Raw\">\n\n![Markdown](assets/example.svg)",
+            r#"<img src="./assets/example.gif" alt="Raw GIF">
+<img src="assets/example.png" alt="Raw PNG">
+<img src="assets/example.svg" alt="Raw SVG">
+
+![Markdown](assets/example.svg)"#,
         )
         .expect("write Markdown");
 
         let document = load_markdown_file(document_path);
         let html = document.html.expect("rendered HTML");
 
-        assert!(html.contains("src=\"assets/example.svg\""));
+        assert!(html.contains("src=\"data:image/gif;base64,"));
+        assert!(html.contains("src=\"data:image/png;base64,"));
         assert!(html.contains("src=\"data:image/svg+xml;base64,"));
-        assert!(html.contains("alt=\"Raw\""));
+        assert!(html.contains("alt=\"Raw GIF\""));
+        assert!(html.contains("alt=\"Raw PNG\""));
+        assert!(html.contains("alt=\"Raw SVG\""));
         assert!(html.contains("alt=\"Markdown\""));
+        assert!(!html.contains("./assets/example.gif"));
+        assert!(!html.contains("assets/example.png"));
+        assert!(!html.contains("assets/example.svg"));
+    }
+
+    #[test]
+    fn keeps_remote_raw_html_image_urls_unchanged() {
+        let html = render_markdown_to_safe_html(
+            r#"<img src="https://example.com/badge.svg" alt="Remote">"#,
+        );
+
+        assert!(html.contains("src=\"https://example.com/badge.svg\""));
+        assert!(html.contains("alt=\"Remote\""));
+    }
+
+    #[test]
+    fn rejects_unsafe_raw_html_image_sources_and_attributes() {
+        let fixture = TestFixture::new("unsafe-raw-html-images");
+        let assets_dir = fixture.path.join("assets");
+        fs::create_dir_all(&assets_dir).expect("create image dir");
+        fs::write(fixture.path.join("secret.png"), b"fake png").expect("write nearby image");
+        fs::write(assets_dir.join("notes.txt"), b"not an image").expect("write text");
+
+        let document_path = fixture.path.join("doc.md");
+        fs::write(
+            &document_path,
+            r#"<img src="../secret.png" alt="Traversal" onerror="alert(1)" style="width:100px">
+<img src="assets/notes.txt" alt="Text">
+<img src="file:///C:/Users/example/secret.png" alt="File">
+<img src="C:\Users\example\secret.png" alt="Absolute">
+<img src="javascript:alert(1)" alt="Script">
+<script>alert("xss")</script>"#,
+        )
+        .expect("write Markdown");
+
+        let document = load_markdown_file(document_path);
+        let html = document.html.expect("rendered HTML");
+
+        assert!(html.contains("alt=\"Traversal\""));
+        assert!(html.contains("alt=\"Text\""));
+        assert!(html.contains("alt=\"File\""));
+        assert!(html.contains("alt=\"Absolute\""));
+        assert!(html.contains("alt=\"Script\""));
+        assert!(!html.contains("../secret.png"));
+        assert!(!html.contains("assets/notes.txt"));
+        assert!(!html.contains("file:///"));
+        assert!(!html.contains("C:\\Users"));
+        assert!(!html.contains("javascript:"));
+        assert!(!html.contains("onerror"));
+        assert!(!html.contains("style="));
+        assert!(!html.contains("<script>"));
+        assert!(!html.contains("data:image/"));
     }
 
     #[test]

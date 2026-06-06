@@ -344,6 +344,36 @@ C:\Users\Jonathan Lahav\Documents\Hushmark Notes\A folder with spaces\A very lon
 
 ---
 
+## Feature: Inline badge images
+
+**Expect:** The two small badge-style images should remain inline with this sentence and with each other, not centered on separate lines.
+
+**Usage:**
+
+Inline badges: ![Node.js 18+](assets/badge-node.svg) [![npm package](assets/badge-npm.svg)](https://example.com/package) continue on the same line as ordinary text.
+
+---
+
+## Feature: Local Markdown GIF image
+
+**Expect:** The local GIF should render through Markdown image syntax and stay within the reading column.
+
+**Usage:**
+
+![Local demo GIF](assets/demo.gif)
+
+---
+
+## Feature: Raw HTML local GIF image
+
+**Expect:** The local GIF should render from a sanitized raw HTML image tag whose safe relative `src` is resolved against this file.
+
+**Usage:**
+
+<img src="./assets/demo.gif" alt="Raw HTML local demo GIF">
+
+---
+
 ## Feature: Local Markdown image with spaces
 
 **Expect:** The local image whose filename contains spaces should render.
@@ -516,7 +546,7 @@ Less-than sign: &lt;
 
 ## Feature: Unsafe raw HTML sanitization
 
-**Expect:** The script should not run and should not appear as an executable script. Event-handler attributes should be stripped.
+**Expect:** The script should not run and should not appear as an executable script. Event-handler attributes should be stripped. The safe relative raw HTML image should still render.
 
 **Usage:**
 

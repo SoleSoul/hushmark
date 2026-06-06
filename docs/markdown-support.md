@@ -30,6 +30,7 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - auto-generated heading anchors and same-document `#fragment` links
 - relative `.md` and `.markdown` document links under the starting document folder
 - images as Markdown syntax, including relative local image paths under the opened document's folder
+- safe raw HTML `<img>` tags with relative local image paths under the opened document's folder
 - horizontal rules
 - tables
 - strikethrough
@@ -42,10 +43,10 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - Heading attributes are not enabled. `# Heading {#id .class}` remains heading text instead of setting an explicit author-provided HTML `id` or class.
 - Broader GitHub-Flavored Markdown behavior is not enabled beyond tables and strikethrough.
 - Definition lists, math, metadata blocks, smart punctuation, superscript, subscript, and wikilinks are not enabled.
-- Raw HTML is parsed by `pulldown-cmark`, but Hushmark sanitizes the resulting HTML with `ammonia`. Safe tags and attributes may remain; unsafe elements, event handlers, and dangerous URL schemes should not.
+- Raw HTML is parsed by `pulldown-cmark`, but Hushmark sanitizes the resulting HTML with `ammonia`. Safe tags and attributes may remain; unsafe elements, event handlers, arbitrary style attributes, and dangerous URL schemes should not.
 - Relative Markdown document links must stay inside the navigation root, which is the folder of the first opened Markdown file. Absolute local paths, `file://` links, links outside that root, and links to non-Markdown files are not opened.
-- Relative local image paths are resolved only for Markdown image syntax. Raw HTML image tags are sanitized but are not rewritten against the Markdown file location.
-- Local image paths must stay inside the opened document's folder. Parent-directory traversal such as `../`, absolute local paths, and unsupported local file extensions are not resolved.
+- Relative local image paths are resolved for Markdown image syntax and sanitized raw HTML `<img src="...">` tags. Raw HTML image support is limited to rewriting safe relative local image `src` values; it does not provide broader raw HTML or local-file access.
+- Local image paths must stay inside the opened document's folder. Parent-directory traversal such as `../`, `file://` URLs, absolute local paths, and unsupported local file extensions are not resolved.
 - Local image files are embedded into the rendered document as `data:` image URLs after sanitization. This keeps Hushmark from exposing a broader local-file protocol to the WebView.
 
 ## Link behavior
@@ -94,6 +95,7 @@ Manual visual checklist:
 - Relative `.md` and `.markdown` links open inside Hushmark, and blocked relative links fail harmlessly.
 - External `https:` links open outside Hushmark, while unsupported schemes fail harmlessly.
 - Relative Markdown images render when the referenced file is under the document folder.
+- Relative raw HTML `<img>` images render when the referenced file is under the document folder and uses a supported image extension.
 - Images do not overflow the reading column.
 - Hebrew and mixed English/Hebrew text display correctly.
 - Raw unsafe HTML does not execute or display unsafe script/link behavior.

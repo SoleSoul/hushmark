@@ -491,8 +491,19 @@ body {
 }
 
 .document img {
-  display: block;
+  display: inline-block;
   max-width: 100%;
   height: auto;
+  vertical-align: middle;
+}
+
+.document p:has(> img:only-child),
+.document p:has(> a:only-child > img:only-child) {
+  text-align: center;
+}
+
+.document p:has(> img:only-child) > img,
+.document p:has(> a:only-child > img:only-child) > a > img {
+  display: block;
   margin: 1.5rem auto;
 }
