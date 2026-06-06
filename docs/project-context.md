@@ -1,8 +1,8 @@
 # Hushmark Project Context
 
-Hushmark is a small Windows-first Markdown reader built with Rust, Tauri 2, and a minimal vanilla TypeScript frontend. It opens Markdown files into a quiet reader view with restrained typography, limited chrome, and Windows file integration.
+Hushmark is a small Markdown reader built with Rust, Tauri 2, and a minimal vanilla TypeScript frontend. It opens Markdown files into a quiet reader view with restrained typography, limited chrome, and operating-system file integration.
 
-This repository is the canonical Windows Hushmark codebase. Do not treat it as the separate Linux/Qwen prototype.
+This repository is the canonical Hushmark codebase. The current release target and integration surface are Windows, but future Linux support is possible.
 
 ## What Hushmark Is Not
 
@@ -42,6 +42,8 @@ For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integrat
 - `src-tauri/capabilities/default.json`: Tauri permissions, including dialog access.
 
 Keep Tauri JavaScript and Rust plugin versions aligned. Dialog support is currently pinned in npm and Cargo metadata.
+
+Windows release artifacts and Windows smoke tests should be produced through GitHub Actions or a Windows machine. On Linux, local checks can still be useful, but they should not be treated as Windows release validation.
 
 ## Version And Tester Builds
 

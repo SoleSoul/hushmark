@@ -1,8 +1,8 @@
 # Agent Instructions
 
-This is the canonical Windows Hushmark codebase.
+This is the canonical Hushmark codebase. The current release target is Windows.
 
-Hushmark is a calm, minimalist Markdown reader for Windows.
+Hushmark is a calm, minimalist Markdown reader. Future Linux support is possible, but do not add platform-specific behavior or packaging unless explicitly requested.
 
 Preserve the product restraint:
 
@@ -16,6 +16,8 @@ Preserve the product restraint:
 Prefer small, behavior-preserving changes that follow the existing Rust + Tauri 2 + vanilla TypeScript structure. Do not bump the app version unless the work is an intentional tester-visible release.
 
 Before claiming success, run the relevant checks for the change. For docs-only changes, at least inspect the diff and run `git diff --check`. For code changes, prefer `npm run build`, `cargo fmt`, `cargo test --quiet`, and `npm run tauri -- build` when the touched area warrants it.
+
+On non-Windows machines, do not claim Windows release validation from local builds. Prefer lightweight docs/diff checks locally and use GitHub Actions or a Windows machine for Windows release artifacts and smoke tests.
 
 Do not store project decisions in hidden agent/tool memory. Durable context belongs in tracked repository docs.
 

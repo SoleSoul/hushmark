@@ -2,6 +2,8 @@
 
 Use this for tester or GitHub releases. Do not run it for ordinary docs-only changes unless a release is actually being prepared.
 
+The current release artifact is a Windows executable. Build and smoke-test Windows releases through GitHub Actions or on a Windows machine; a Linux development machine should not be treated as Windows release validation.
+
 ## Version Policy
 
 - Bump the patch version for tester-visible builds.
