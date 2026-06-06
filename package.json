@@ -1,6 +1,7 @@
 {
   "name": "hushmark",
   "version": "0.1.4",
+  "license": "GPL-3.0-or-later",
   "author": "Jonathan Lahav",
   "private": true,
   "type": "module",

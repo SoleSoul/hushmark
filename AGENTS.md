@@ -2,7 +2,7 @@
 
 This is the canonical Windows Hushmark codebase.
 
-Hushmark is a calm, minimalist Markdown reader for Windows. Do not confuse it with any separate Linux/Qwen Hushmark prototype or experiment.
+Hushmark is a calm, minimalist Markdown reader for Windows.
 
 Preserve the product restraint:
 

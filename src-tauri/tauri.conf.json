@@ -28,6 +28,9 @@
   "bundle": {
     "active": false,
     "targets": "all",
-    "publisher": "Jonathan Lahav"
+    "publisher": "Jonathan Lahav",
+    "copyright": "Copyright © 2026 Jonathan Lahav",
+    "license": "GPL-3.0-or-later",
+    "licenseFile": "../LICENSE"
   }
 }

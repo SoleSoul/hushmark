@@ -3,6 +3,7 @@ name = "hushmark"
 version = "0.1.4"
 description = "A small Markdown reader built with Tauri."
 authors = ["Jonathan Lahav"]
+license = "GPL-3.0-or-later"
 edition = "2021"
 
 [lib]
