@@ -4,6 +4,15 @@
 
 No changes yet.
 
+## 0.1.5
+
+Tester-visible README image compatibility update.
+
+- Keep small badge-style images inline instead of centering each image on its own line.
+- Resolve safe relative local image paths in sanitized raw HTML `<img>` tags using the same local-image safety rules as Markdown image syntax.
+- Added visual fixture coverage for inline badges, Markdown GIF images, and raw HTML local GIF images.
+- Documented the narrow raw HTML local image behavior and its security limits.
+
 ## 0.1.4
 
 Tester-visible navigation consistency update.

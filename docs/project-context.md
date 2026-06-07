@@ -47,7 +47,7 @@ Windows release artifacts and Windows smoke tests should be produced through Git
 
 ## Version And Tester Builds
 
-Current app version: `0.1.4`.
+Current app version: `0.1.5`.
 
 Use human-readable patch versions for tester-visible builds. Keep version metadata aligned across `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, `CHANGELOG.md`, and version references in docs.
 
