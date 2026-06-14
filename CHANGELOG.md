@@ -2,7 +2,9 @@
 
 ## [Unreleased]
 
-No changes yet.
+- Began Linux support preparation by making `--setup` a Windows-only startup mode and separating Windows setup behavior from non-Windows command stubs.
+- Hid the empty-state setup affordance on platforms without setup integration.
+- Documented the current Windows-first platform status and Linux preparation boundaries.
 
 ## 0.1.5
 

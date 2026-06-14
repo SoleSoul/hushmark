@@ -28,6 +28,8 @@ pub struct SetupStatus {
     pub version: &'static str,
     pub installed_version: Option<String>,
     pub developer: &'static str,
+    pub platform: &'static str,
+    pub setup_supported: bool,
     pub release_exe_name: &'static str,
     pub installed_exe_name: &'static str,
     pub prog_id: &'static str,
@@ -81,6 +83,7 @@ impl SetupMessage {
     }
 }
 
+#[cfg(windows)]
 pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String> {
     let current_exe = current_exe_path()?;
     let install_path = installed_exe_path()?;
@@ -109,6 +112,8 @@ pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String
         version: env!("CARGO_PKG_VERSION"),
         installed_version,
         developer: DEVELOPER_NAME,
+        platform: std::env::consts::OS,
+        setup_supported: true,
         release_exe_name: crate::identity::RELEASE_EXE_NAME,
         installed_exe_name: INSTALLED_EXE_NAME,
         prog_id: PROG_ID,
@@ -137,6 +142,47 @@ pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String
         default_apps_uri: DEFAULT_APPS_URI,
         message,
     })
+}
+
+#[cfg(not(windows))]
+pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String> {
+    let current_exe_path = current_exe_path()
+        .map(|path| path_to_string(&path))
+        .unwrap_or_else(|error| format!("Unavailable: {error}"));
+
+    Ok(SetupStatus {
+        app_name: DISPLAY_NAME,
+        version: env!("CARGO_PKG_VERSION"),
+        installed_version: None,
+        developer: DEVELOPER_NAME,
+        platform: std::env::consts::OS,
+        setup_supported: false,
+        release_exe_name: crate::identity::RELEASE_EXE_NAME,
+        installed_exe_name: INSTALLED_EXE_NAME,
+        prog_id: PROG_ID,
+        install_path: "Not available on this platform.".to_string(),
+        current_exe_path,
+        installed: false,
+        installed_matches_current: false,
+        app_path_registered: false,
+        application_registered: false,
+        file_handlers_registered: false,
+        open_with_md_registered: false,
+        open_with_markdown_registered: false,
+        context_menu_registered: false,
+        context_menu_md_registered: false,
+        context_menu_markdown_registered: false,
+        default_apps_uri: "",
+        message: message.or_else(|| Some(setup_not_supported_message())),
+    })
+}
+
+#[cfg(not(windows))]
+fn setup_not_supported_message() -> SetupMessage {
+    SetupMessage::warning(
+        "Setup integration is currently only available on Windows.",
+        Some("Linux desktop integration is planned, but it is not implemented yet.".to_string()),
+    )
 }
 
 fn are_file_handlers_registered(
@@ -173,6 +219,7 @@ fn installed_version_for_status(
     }
 }
 
+#[cfg(windows)]
 pub fn install_hushmark() -> Result<SetupStatus, String> {
     match install_current_exe() {
         Ok(()) => setup_status(Some(SetupMessage::success(format!(
@@ -185,6 +232,12 @@ pub fn install_hushmark() -> Result<SetupStatus, String> {
     }
 }
 
+#[cfg(not(windows))]
+pub fn install_hushmark() -> Result<SetupStatus, String> {
+    setup_status(Some(setup_not_supported_message()))
+}
+
+#[cfg(windows)]
 pub fn toggle_install() -> Result<SetupStatus, String> {
     let status = setup_status(None)?;
 
@@ -220,6 +273,12 @@ pub fn toggle_install() -> Result<SetupStatus, String> {
     }
 }
 
+#[cfg(not(windows))]
+pub fn toggle_install() -> Result<SetupStatus, String> {
+    setup_status(Some(setup_not_supported_message()))
+}
+
+#[cfg(windows)]
 pub fn toggle_open_with_support() -> Result<SetupStatus, String> {
     let status = setup_status(None)?;
 
@@ -259,6 +318,12 @@ pub fn toggle_open_with_support() -> Result<SetupStatus, String> {
     }
 }
 
+#[cfg(not(windows))]
+pub fn toggle_open_with_support() -> Result<SetupStatus, String> {
+    setup_status(Some(setup_not_supported_message()))
+}
+
+#[cfg(windows)]
 pub fn toggle_context_menu() -> Result<SetupStatus, String> {
     let status = setup_status(None)?;
 
@@ -300,6 +365,12 @@ pub fn toggle_context_menu() -> Result<SetupStatus, String> {
     }
 }
 
+#[cfg(not(windows))]
+pub fn toggle_context_menu() -> Result<SetupStatus, String> {
+    setup_status(Some(setup_not_supported_message()))
+}
+
+#[cfg(windows)]
 pub fn remove_all_integration() -> Result<SetupStatus, String> {
     let mut errors = Vec::new();
 
@@ -330,6 +401,12 @@ pub fn remove_all_integration() -> Result<SetupStatus, String> {
     )))
 }
 
+#[cfg(not(windows))]
+pub fn remove_all_integration() -> Result<SetupStatus, String> {
+    setup_status(Some(setup_not_supported_message()))
+}
+
+#[cfg(windows)]
 pub fn open_default_apps_settings() -> Result<SetupStatus, String> {
     match open_default_apps_settings_impl() {
         Ok(()) => setup_status(Some(SetupMessage::success_with_details(
@@ -343,6 +420,11 @@ pub fn open_default_apps_settings() -> Result<SetupStatus, String> {
             )),
         ))),
     }
+}
+
+#[cfg(not(windows))]
+pub fn open_default_apps_settings() -> Result<SetupStatus, String> {
+    setup_status(Some(setup_not_supported_message()))
 }
 
 fn append_message_details(message: &mut SetupMessage, details: &str) {
@@ -369,6 +451,7 @@ fn current_exe_path() -> Result<PathBuf, String> {
     env::current_exe().map_err(|error| format!("Could not determine current executable: {error}"))
 }
 
+#[cfg(windows)]
 fn installed_exe_path() -> Result<PathBuf, String> {
     let local_app_data = env::var_os("LOCALAPPDATA").ok_or_else(|| {
         "LOCALAPPDATA is not set; cannot determine per-user install path.".to_string()
@@ -548,6 +631,7 @@ fn low_word(value: u32) -> u16 {
     value as u16
 }
 
+#[cfg(windows)]
 fn same_path(left: &Path, right: &Path) -> bool {
     match (left.canonicalize(), right.canonicalize()) {
         (Ok(left), Ok(right)) => paths_equal(&left, &right),
@@ -562,11 +646,7 @@ fn paths_equal(left: &Path, right: &Path) -> bool {
         .eq_ignore_ascii_case(&right.as_os_str().to_string_lossy())
 }
 
-#[cfg(not(windows))]
-fn paths_equal(left: &Path, right: &Path) -> bool {
-    left == right
-}
-
+#[cfg(windows)]
 fn files_match(left: &Path, right: &Path) -> bool {
     if same_path(left, right) {
         return true;
@@ -586,6 +666,7 @@ fn files_match(left: &Path, right: &Path) -> bool {
             .map_or(false, |(left, right)| left == right)
 }
 
+#[cfg(windows)]
 fn install_current_exe() -> Result<(), String> {
     let current_exe = current_exe_path()?;
     let install_path = installed_exe_path()?;
@@ -631,6 +712,7 @@ fn install_current_exe() -> Result<(), String> {
     }
 }
 
+#[cfg(windows)]
 fn remove_installed_exe() -> Result<SetupMessage, String> {
     let current_exe = current_exe_path()?;
     let install_path = installed_exe_path()?;
@@ -675,6 +757,7 @@ fn remove_installed_exe() -> Result<SetupMessage, String> {
     }
 }
 
+#[cfg(windows)]
 fn remove_empty_install_dir(install_path: &Path) -> Option<String> {
     let install_dir = install_path.parent()?;
 
@@ -1075,18 +1158,6 @@ fn replace_file(source: &Path, destination: &Path) -> Result<(), String> {
     }
 
     Ok(())
-}
-
-#[cfg(not(windows))]
-fn replace_file(source: &Path, destination: &Path) -> Result<(), String> {
-    fs::rename(source, destination).map_err(|error| {
-        let _ = fs::remove_file(source);
-        format!(
-            "Could not replace {} with {}: {error}",
-            destination.display(),
-            source.display()
-        )
-    })
 }
 
 #[cfg(windows)]

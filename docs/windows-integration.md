@@ -1,6 +1,8 @@
 # Hushmark Windows integration
 
-Hushmark is designed to run as a standalone Tauri executable and can self-install for the current Windows user without admin rights.
+Hushmark's setup and desktop integration behavior is Windows-only. Hushmark is designed to run as a standalone Tauri executable and can self-install for the current Windows user without admin rights.
+
+On Linux and other non-Windows platforms, `--setup` is not a supported app mode. Linux setup is expected to be handled by packaging rather than by an in-app setup panel. Linux `.desktop`, MIME, package, and installer integration is not implemented yet.
 
 ## Product identity
 

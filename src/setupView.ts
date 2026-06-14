@@ -137,6 +137,28 @@ function createDetails(status: SetupStatus): HTMLDetailsElement {
   return details;
 }
 
+function createUnsupportedDetails(status: SetupStatus): HTMLDetailsElement {
+  const details = document.createElement("details");
+  details.className = "setup-details";
+
+  const summary = createTextElement("summary", "Details");
+  const rows = document.createElement("dl");
+  rows.className = "setup-details__rows";
+  rows.append(
+    createDetailRow("App", status.appName),
+    createDetailRow("Version", status.version),
+    createDetailRow("Platform", status.platform),
+    createDetailRow("Current executable", status.currentExePath),
+  );
+
+  if (status.message?.details) {
+    rows.append(createDetailRow("Details", status.message.details));
+  }
+
+  details.append(summary, rows);
+  return details;
+}
+
 export function renderSetup(
   app: HTMLElement,
   status: SetupStatus,
@@ -151,6 +173,20 @@ export function renderSetup(
   panel.className = "setup__panel";
 
   const heading = createTextElement("h1", status.appName);
+
+  if (!status.setupSupported) {
+    const intro = createTextElement(
+      "p",
+      status.message?.text ?? "Setup integration is currently only available on Windows.",
+      "setup__intro",
+    );
+
+    panel.append(heading, intro, createUnsupportedDetails(status));
+    section.append(panel);
+    app.replaceChildren(section);
+    return;
+  }
+
   const intro = createTextElement(
     "p",
     "Choose how Hushmark integrates with Markdown files on this Windows account.",

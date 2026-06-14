@@ -155,6 +155,10 @@ async function renderEmptySetupAffordance(section: HTMLElement): Promise<void> {
 }
 
 function emptySetupActionLabel(status: SetupStatus): string | null {
+  if (!status.setupSupported) {
+    return null;
+  }
+
   if (!status.installed) {
     return "Install";
   }

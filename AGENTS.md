@@ -1,8 +1,10 @@
 # Agent Instructions
 
-This is the canonical Hushmark codebase. The current release target is Windows.
+This is the canonical Hushmark codebase. The current release target is Windows, with Linux support being prepared as the next platform target.
 
-Hushmark is a calm, minimalist Markdown reader. Future Linux support is possible, but do not add platform-specific behavior or packaging unless explicitly requested.
+Hushmark is a calm, minimalist Markdown reader. Do not add platform-specific behavior or packaging unless explicitly requested.
+
+Keep platform-specific behavior isolated. Windows registry, ShellExecute, setup/install, Open With, right-click, and Default Apps behavior should not be mixed into core reader, Markdown rendering, or navigation logic. Linux setup should be handled through packaging rather than an in-app setup mode; Linux support should start with clear stubs or small abstractions before desktop integration is implemented.
 
 Preserve the product restraint:
 

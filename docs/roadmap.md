@@ -4,6 +4,7 @@ This roadmap is not a contract. It is a short parking lot for likely next work a
 
 ## Near-Term Release Readiness
 
+- Prepare platform boundaries for Linux support while preserving current Windows behavior.
 - Revalidate the migrated repo on the current machine before preparing the next tester build.
 - Keep `CHANGELOG.md` current under `Unreleased` for tester-visible changes.
 - Run the release checklist before publishing any GitHub/tester binary.
@@ -21,11 +22,14 @@ These are speculative unless a future request explicitly accepts them:
 - Reading width and zoom controls that preserve the minimalist reader feel.
 - More Markdown fixtures or focused tests for parser, sanitization, image, link, and navigation edge cases.
 - Optional frontend tests for link classification, document history, and setup affordance behavior.
+- Linux packaging and desktop integration, such as `.desktop` files and MIME association, after the reader can run cleanly on Linux.
+- macOS support after Windows remains stable and Linux support is better understood.
 
 ## Refactoring Ideas
 
 - Split reader rendering/link handling/navigation out of `src/main.ts` when frontend work next grows.
 - Keep setup UI in `src/setupView.ts`; avoid mixing setup concerns back into reader code.
+- Keep Windows registry, ShellExecute, and setup/install behavior isolated behind platform gates or platform-specific modules.
 - Consolidate version and identity update checks if release work becomes repetitive.
 - Extract Markdown rendering helpers only if `src-tauri/src/document.rs` becomes harder to reason about.
 

@@ -2,7 +2,7 @@
 
 Hushmark is a small Markdown reader built with Rust, Tauri 2, and a minimal vanilla TypeScript frontend. It opens Markdown files into a quiet reader view with restrained typography, limited chrome, and operating-system file integration.
 
-This repository is the canonical Hushmark codebase. The current release target and integration surface are Windows, but future Linux support is possible.
+This repository is the canonical Hushmark codebase. The current release target and integration surface are Windows. Linux support is being prepared as the next platform target, with macOS possible later.
 
 ## What Hushmark Is Not
 
@@ -14,8 +14,8 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Open `.md` and `.markdown` files with Ctrl+O through the native Tauri dialog.
 - Open top-level Markdown files by drag/drop.
 - Show a simple empty state when no document is open.
-- Show a subtle empty-state-only `Install` or `Update` setup affordance when needed.
-- Open setup mode with `--setup`.
+- Show a subtle empty-state-only `Install` or `Update` setup affordance when needed on Windows.
+- Open setup mode with `--setup` on Windows only. Linux setup is expected to be handled by packaging rather than an in-app setup mode.
 - Render Markdown in Rust with `pulldown-cmark`, then sanitize HTML with `ammonia`.
 - Support CommonMark-style Markdown plus tables and strikethrough.
 - Generate heading anchors and handle same-document `#fragment` history.
@@ -25,15 +25,16 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Preserve controlled table alignment classes.
 - Disable the internal WebView context menu.
 - Provide per-user Windows install, Open With, right-click integration, and Default Apps handoff without admin rights.
+- Keep in-app setup/integration unavailable on Linux; Linux setup belongs in packaging rather than the reader app.
 
 For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integration.md`.
 
 ## Architecture Overview
 
 - `src-tauri/src/document.rs`: Markdown loading, rendering, sanitization, local images, heading anchors, linked-document validation, and Rust tests.
-- `src-tauri/src/setup.rs`: Windows install/setup integration, registry handling, setup status, and `--setup` parsing.
-- `src-tauri/src/external_links.rs`: External link opening.
-- `src-tauri/src/identity.rs`: Product identity constants used by Windows integration.
+- `src-tauri/src/setup.rs`: Windows install/setup integration, registry handling, setup status, Windows `--setup` parsing, and non-Windows command stubs.
+- `src-tauri/src/external_links.rs`: External link opening; Windows uses `ShellExecuteW`, while non-Windows currently reports external opening as unsupported.
+- `src-tauri/src/identity.rs`: Product identity constants and Windows integration identifiers.
 - `src-tauri/src/lib.rs`: Tauri command and plugin registration.
 - `src/main.ts`: Reader startup, rendering, link handling, navigation history, Ctrl+O, drag/drop, and empty-state setup affordance.
 - `src/setupView.ts`: Setup screen rendering and setup actions.
@@ -56,7 +57,8 @@ Do not bump the version for docs-only changes, internal refactors, or other beha
 ## Design Principles
 
 - Reader-first, calm, and small.
-- Prefer native Windows and WebView behavior over custom UI machinery.
+- Prefer native platform and WebView behavior over custom UI machinery.
+- Keep platform-specific behavior isolated from the core reader, Markdown rendering, and navigation logic.
 - Keep setup useful but out of the document reading path.
 - Make security and path handling conservative.
 - Prefer current repo state over historical handoff notes when they conflict.

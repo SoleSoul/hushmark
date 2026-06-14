@@ -1,8 +1,8 @@
 # Hushmark
 
-Hushmark is a calm, minimalist Markdown reader for Windows.
+Hushmark is a calm, minimalist Markdown reader. It is Windows-first today, and Linux support is being prepared as the next platform target.
 
-This repository is the canonical Windows Hushmark codebase. Project context and implementation notes live in `docs/`.
+This repository is the canonical Hushmark codebase. Project context and implementation notes live in `docs/`.
 
 ## License
 

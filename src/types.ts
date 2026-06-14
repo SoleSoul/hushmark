@@ -17,6 +17,8 @@ export type SetupStatus = {
   version: string;
   installedVersion: string | null;
   developer: string;
+  platform: string;
+  setupSupported: boolean;
   releaseExeName: string;
   installedExeName: string;
   progId: string;
