@@ -58,10 +58,15 @@ export type LinkedDocument = {
   fragment: string | null;
 };
 
+export type PlatformCapabilities = {
+  setup: boolean;
+};
+
 export type StartupView = {
   mode: "reader" | "setup";
   document: LoadedDocument | null;
-  setup: SetupStatus | null;
+  setup?: SetupStatus | null;
+  capabilities: PlatformCapabilities;
 };
 
 export type DocumentNavigationEntry = {

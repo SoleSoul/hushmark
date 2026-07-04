@@ -15,7 +15,7 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Open top-level Markdown files by drag/drop.
 - Show a simple empty state when no document is open.
 - Show a subtle empty-state-only `Install` or `Update` setup affordance when needed on Windows.
-- Open setup mode with `--setup` on Windows only. Linux setup is expected to be handled by packaging rather than an in-app setup mode.
+- Open setup mode with `--setup` on Windows only. On Linux, it behaves like any other flag-shaped file argument.
 - Render Markdown in Rust with `pulldown-cmark`, then sanitize HTML with `ammonia`.
 - Support CommonMark-style Markdown plus tables and strikethrough.
 - Generate heading anchors and handle same-document `#fragment` history.
@@ -32,17 +32,18 @@ For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integrat
 ## Architecture Overview
 
 - `src-tauri/src/document.rs`: Markdown loading, rendering, sanitization, local images, heading anchors, linked-document validation, and Rust tests.
-- `src-tauri/src/setup.rs`: Windows install/setup integration, registry handling, setup status, Windows `--setup` parsing, and non-Windows command stubs.
-- `src-tauri/src/external_links.rs`: External link opening; Windows uses `ShellExecuteW`, while non-Windows currently reports external opening as unsupported.
-- `src-tauri/src/identity.rs`: Product identity constants and Windows integration identifiers.
-- `src-tauri/src/lib.rs`: Tauri command and plugin registration.
-- `src/main.ts`: Reader startup, rendering, link handling, navigation history, Ctrl+O, drag/drop, and empty-state setup affordance.
+- `src-tauri/src/setup.rs`: Windows-only install/setup integration, registry handling, and setup status. The module and its Tauri commands are compiled only on Windows.
+- `src-tauri/src/startup.rs`: Platform-neutral positional argument parsing. `--setup` is recognized only by the Windows startup path; elsewhere it behaves like any other flag-shaped file argument.
+- `src-tauri/src/external_links.rs`: External URL allowlisting before Tauri opens approved links with the system default application.
+- `src-tauri/src/identity.rs`: Shared display identity plus Windows-gated integration identifiers.
+- `src-tauri/src/lib.rs`: Tauri command and plugin registration plus startup platform capabilities.
+- `src/main.ts`: Reader startup, rendering, link handling, navigation history, Ctrl+O, drag/drop, and capability-gated empty-state setup affordance.
 - `src/setupView.ts`: Setup screen rendering and setup actions.
 - `src/types.ts`, `src/dom.ts`, and `src/product.ts`: Shared frontend types, DOM helper, and frontend product labels.
 - `src/styles.css`: Reader, empty/error state, and setup styles.
 - `src-tauri/capabilities/default.json`: Tauri permissions, including dialog access.
 
-Keep Tauri JavaScript and Rust plugin versions aligned. Dialog support is currently pinned in npm and Cargo metadata.
+Keep Tauri JavaScript and Rust plugin versions aligned. Dialog support is currently pinned in npm and Cargo metadata. The Rust-only opener plugin provides shared Windows/Linux external-link OS access behind Hushmark's URL allowlist.
 
 Windows release artifacts and Windows smoke tests should be produced through GitHub Actions or a Windows machine. On Linux, local checks can still be useful, but they should not be treated as Windows release validation.
 
@@ -59,7 +60,7 @@ Do not bump the version for docs-only changes, internal refactors, or other beha
 - Reader-first, calm, and small.
 - Prefer native platform and WebView behavior over custom UI machinery.
 - Keep platform-specific behavior isolated from the core reader, Markdown rendering, and navigation logic.
-- Keep setup useful but out of the document reading path.
+- Keep Windows setup useful but out of the document reading path; do not create an equivalent in-app setup/update flow on Linux.
 - Make security and path handling conservative.
 - Prefer current repo state over historical handoff notes when they conflict.
 - Keep documentation concise enough for future agents to read.
@@ -71,6 +72,7 @@ See `docs/reader-design.md` for the focused design note.
 - There is no dedicated frontend unit test harness yet; UI/navigation behavior relies on TypeScript build checks, Rust tests, and manual smoke testing.
 - Markdown support is intentionally limited; Hushmark is not full GitHub-Flavored Markdown. See `docs/markdown-support.md`.
 - Windows default-app assignment remains user-controlled; Hushmark registers itself as a candidate and opens Default Apps settings.
+- Linux packaging is not implemented yet, and the Linux runtime still needs desktop smoke testing. Linux packaging should own installation, updates, desktop integration, icons, and MIME registration. See `docs/linux-support.md`.
 - Same-document fragment history currently re-renders during popstate restoration. This is acceptable while the reader has little transient DOM-only state.
 - Release binaries are unsigned unless a signing step is added, so Windows SmartScreen may warn testers.
 
@@ -79,5 +81,6 @@ See `docs/reader-design.md` for the focused design note.
 - `docs/reader-design.md`: Product restraint and reader design boundaries.
 - `docs/markdown-support.md`: Markdown feature baseline, link behavior, anchors, fixtures, and limitations.
 - `docs/windows-integration.md`: Install path, registry keys, setup behavior, and Windows manual tests.
+- `docs/linux-support.md`: Linux runtime policy, package responsibilities, and remaining validation.
 - `docs/roadmap.md`: Active ideas and possible future work.
 - `docs/release-checklist.md`: Repeatable tester/GitHub release process.

@@ -144,47 +144,6 @@ pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String
     })
 }
 
-#[cfg(not(windows))]
-pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String> {
-    let current_exe_path = current_exe_path()
-        .map(|path| path_to_string(&path))
-        .unwrap_or_else(|error| format!("Unavailable: {error}"));
-
-    Ok(SetupStatus {
-        app_name: DISPLAY_NAME,
-        version: env!("CARGO_PKG_VERSION"),
-        installed_version: None,
-        developer: DEVELOPER_NAME,
-        platform: std::env::consts::OS,
-        setup_supported: false,
-        release_exe_name: crate::identity::RELEASE_EXE_NAME,
-        installed_exe_name: INSTALLED_EXE_NAME,
-        prog_id: PROG_ID,
-        install_path: "Not available on this platform.".to_string(),
-        current_exe_path,
-        installed: false,
-        installed_matches_current: false,
-        app_path_registered: false,
-        application_registered: false,
-        file_handlers_registered: false,
-        open_with_md_registered: false,
-        open_with_markdown_registered: false,
-        context_menu_registered: false,
-        context_menu_md_registered: false,
-        context_menu_markdown_registered: false,
-        default_apps_uri: "",
-        message: message.or_else(|| Some(setup_not_supported_message())),
-    })
-}
-
-#[cfg(not(windows))]
-fn setup_not_supported_message() -> SetupMessage {
-    SetupMessage::warning(
-        "Setup integration is currently only available on Windows.",
-        Some("Linux desktop integration is planned, but it is not implemented yet.".to_string()),
-    )
-}
-
 fn are_file_handlers_registered(
     installed: bool,
     app_path_registered: bool,
@@ -232,11 +191,6 @@ pub fn install_hushmark() -> Result<SetupStatus, String> {
     }
 }
 
-#[cfg(not(windows))]
-pub fn install_hushmark() -> Result<SetupStatus, String> {
-    setup_status(Some(setup_not_supported_message()))
-}
-
 #[cfg(windows)]
 pub fn toggle_install() -> Result<SetupStatus, String> {
     let status = setup_status(None)?;
@@ -271,11 +225,6 @@ pub fn toggle_install() -> Result<SetupStatus, String> {
     } else {
         install_hushmark()
     }
-}
-
-#[cfg(not(windows))]
-pub fn toggle_install() -> Result<SetupStatus, String> {
-    setup_status(Some(setup_not_supported_message()))
 }
 
 #[cfg(windows)]
@@ -316,11 +265,6 @@ pub fn toggle_open_with_support() -> Result<SetupStatus, String> {
             ))),
         }
     }
-}
-
-#[cfg(not(windows))]
-pub fn toggle_open_with_support() -> Result<SetupStatus, String> {
-    setup_status(Some(setup_not_supported_message()))
 }
 
 #[cfg(windows)]
@@ -365,11 +309,6 @@ pub fn toggle_context_menu() -> Result<SetupStatus, String> {
     }
 }
 
-#[cfg(not(windows))]
-pub fn toggle_context_menu() -> Result<SetupStatus, String> {
-    setup_status(Some(setup_not_supported_message()))
-}
-
 #[cfg(windows)]
 pub fn remove_all_integration() -> Result<SetupStatus, String> {
     let mut errors = Vec::new();
@@ -401,11 +340,6 @@ pub fn remove_all_integration() -> Result<SetupStatus, String> {
     )))
 }
 
-#[cfg(not(windows))]
-pub fn remove_all_integration() -> Result<SetupStatus, String> {
-    setup_status(Some(setup_not_supported_message()))
-}
-
 #[cfg(windows)]
 pub fn open_default_apps_settings() -> Result<SetupStatus, String> {
     match open_default_apps_settings_impl() {
@@ -422,11 +356,6 @@ pub fn open_default_apps_settings() -> Result<SetupStatus, String> {
     }
 }
 
-#[cfg(not(windows))]
-pub fn open_default_apps_settings() -> Result<SetupStatus, String> {
-    setup_status(Some(setup_not_supported_message()))
-}
-
 fn append_message_details(message: &mut SetupMessage, details: &str) {
     if let Some(existing_details) = &mut message.details {
         existing_details.push('\n');
@@ -434,17 +363,6 @@ fn append_message_details(message: &mut SetupMessage, details: &str) {
     } else {
         message.details = Some(details.to_string());
     }
-}
-
-pub fn is_setup_mode_arg(arg: &std::ffi::OsStr) -> bool {
-    arg == "--setup"
-}
-
-pub fn first_document_arg(
-    args: impl Iterator<Item = std::ffi::OsString>,
-) -> Option<std::ffi::OsString> {
-    args.filter(|arg| !is_setup_mode_arg(arg.as_os_str()))
-        .next()
 }
 
 fn current_exe_path() -> Result<PathBuf, String> {
@@ -1180,27 +1098,10 @@ fn wide_null(value: &str) -> Vec<u16> {
 #[cfg(test)]
 mod tests {
     use super::{
-        are_file_handlers_registered, first_document_arg, installed_version_for_status,
-        is_context_menu_registered, is_setup_mode_arg, open_command,
+        are_file_handlers_registered, installed_version_for_status, is_context_menu_registered,
+        open_command,
     };
-    use std::{ffi::OsString, path::PathBuf};
-
-    #[test]
-    fn detects_setup_mode_arg() {
-        assert!(is_setup_mode_arg("--setup".as_ref()));
-        assert!(!is_setup_mode_arg("--install".as_ref()));
-        assert!(!is_setup_mode_arg("notes.md".as_ref()));
-    }
-
-    #[test]
-    fn first_document_arg_skips_setup_flag() {
-        let args = vec![OsString::from("--setup"), OsString::from("notes.md")];
-
-        assert_eq!(
-            first_document_arg(args.into_iter()),
-            Some(OsString::from("notes.md"))
-        );
-    }
+    use std::path::PathBuf;
 
     #[test]
     fn open_command_quotes_executable_and_file_placeholder() {

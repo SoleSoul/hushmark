@@ -11,6 +11,7 @@ import type {
   LinkAction,
   LinkedDocument,
   LoadedDocument,
+  PlatformCapabilities,
   SetupStatus,
   StartupView,
 } from "./types";
@@ -26,6 +27,7 @@ const currentWindow = getCurrentWindow();
 const navigationEntries = new Map<number, DocumentNavigationEntry>();
 let currentDocument: LoadedDocument | null = null;
 let currentMode: StartupView["mode"] = "reader";
+let platformCapabilities: PlatformCapabilities = { setup: false };
 let filePickerOpen = false;
 let activeNavigationEntryId: number | null = null;
 let activeNavigationIndex = -1;
@@ -123,7 +125,9 @@ function renderDocument(
 
 function renderEmptyState(): void {
   const section = renderState("empty", PRODUCT.displayName, "Open a Markdown file to read.");
-  void renderEmptySetupAffordance(section);
+  if (platformCapabilities.setup) {
+    void renderEmptySetupAffordance(section);
+  }
 }
 
 async function renderEmptySetupAffordance(section: HTMLElement): Promise<void> {
@@ -627,10 +631,11 @@ async function start(): Promise<void> {
 
   try {
     const startupView = await invoke<StartupView>("load_initial_view");
+    platformCapabilities = startupView.capabilities;
     currentMode = startupView.mode;
 
     if (startupView.mode === "setup") {
-      if (!startupView.setup) {
+      if (!platformCapabilities.setup || !startupView.setup) {
         throw new Error("Setup status was not returned.");
       }
 

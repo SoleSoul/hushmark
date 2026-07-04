@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Hushmark
+Comment=Read Markdown files quietly
+Exec=hushmark %f
+Icon=hushmark
+Terminal=false
+Categories=Utility;
+MimeType=text/markdown;text/x-markdown;
+StartupNotify=true

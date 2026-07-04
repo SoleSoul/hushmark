@@ -2,9 +2,9 @@
 
 This is the canonical Hushmark codebase. The current release target is Windows, with Linux support being prepared as the next platform target.
 
-Hushmark is a calm, minimalist Markdown reader. Do not add platform-specific behavior or packaging unless explicitly requested.
+Hushmark is a calm, minimalist Markdown reader. Linux support is planned, but platform-specific behavior and packaging should remain behind clear platform boundaries.
 
-Keep platform-specific behavior isolated. Windows registry, ShellExecute, setup/install, Open With, right-click, and Default Apps behavior should not be mixed into core reader, Markdown rendering, or navigation logic. Linux setup should be handled through packaging rather than an in-app setup mode; Linux support should start with clear stubs or small abstractions before desktop integration is implemented.
+Keep platform-specific behavior isolated. Windows registry, setup/install, Open With, right-click, and Default Apps behavior must not be mixed into core reader, Markdown rendering, or navigation logic.
 
 Preserve the product restraint:
 
@@ -21,6 +21,8 @@ Before claiming success, run the relevant checks for the change. For docs-only c
 
 On non-Windows machines, do not claim Windows release validation from local builds. Prefer lightweight docs/diff checks locally and use GitHub Actions or a Windows machine for Windows release artifacts and smoke tests.
 
+Windows setup, self-install/update, and shell integration are Windows-only. Linux installation, updates, desktop integration, icons, and MIME registration belong to distribution packaging and must not appear as in-app setup flows.
+
 Do not store project decisions in hidden agent/tool memory. Durable context belongs in tracked repository docs.
 
 Start here:
@@ -29,5 +31,6 @@ Start here:
 - `docs/reader-design.md`
 - `docs/markdown-support.md`
 - `docs/windows-integration.md`
+- `docs/linux-support.md`
 - `docs/roadmap.md`
 - `docs/release-checklist.md`

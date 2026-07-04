@@ -2,9 +2,11 @@
 
 ## [Unreleased]
 
-- Began Linux support preparation by making `--setup` a Windows-only startup mode and separating Windows setup behavior from non-Windows command stubs.
-- Hid the empty-state setup affordance on platforms without setup integration.
-- Documented the current Windows-first platform status and Linux preparation boundaries.
+- Compile Windows setup and integration commands only on Windows, with no non-Windows setup command stubs.
+- Add startup platform capabilities so non-Windows builds do not request or display Install, Update, or setup flows.
+- Move command-line argument parsing out of the Windows setup module. `--setup` is recognized only on Windows and behaves like any other flag-shaped file argument elsewhere.
+- Use Tauri's cross-platform opener for approved external links on Windows and Linux.
+- Add the RGBA application icon and desktop-entry metadata needed for Linux packaging.
 
 ## 0.1.5
 

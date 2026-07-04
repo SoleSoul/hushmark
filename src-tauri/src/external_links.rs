@@ -28,10 +28,9 @@ pub fn normalize_allowed_external_url(url: &str) -> Option<String> {
     None
 }
 
-pub fn open_external_link(url: &str) -> Result<(), String> {
-    let url = normalize_allowed_external_url(url)
-        .ok_or_else(|| "Unsupported external link scheme.".to_string())?;
-    open_allowed_external_url(&url)
+pub fn allowed_external_url(url: &str) -> Result<String, String> {
+    normalize_allowed_external_url(url)
+        .ok_or_else(|| "Unsupported external link scheme.".to_string())
 }
 
 fn split_scheme(url: &str) -> Option<(&str, &str)> {
@@ -60,46 +59,9 @@ fn is_valid_scheme(scheme: &str) -> bool {
         })
 }
 
-#[cfg(windows)]
-fn open_allowed_external_url(url: &str) -> Result<(), String> {
-    use windows_sys::Win32::UI::Shell::ShellExecuteW;
-
-    let operation = wide_null("open");
-    let url = wide_null(url);
-    let result = unsafe {
-        ShellExecuteW(
-            std::ptr::null_mut(),
-            operation.as_ptr(),
-            url.as_ptr(),
-            std::ptr::null(),
-            std::ptr::null(),
-            1,
-        )
-    } as isize;
-
-    if result > 32 {
-        Ok(())
-    } else {
-        Err(format!(
-            "ShellExecuteW returned {result} while opening an external link. Last OS error: {}",
-            std::io::Error::last_os_error()
-        ))
-    }
-}
-
-#[cfg(not(windows))]
-fn open_allowed_external_url(_url: &str) -> Result<(), String> {
-    Err("External link opening is only available on Windows.".to_string())
-}
-
-#[cfg(windows)]
-fn wide_null(value: &str) -> Vec<u16> {
-    value.encode_utf16().chain(Some(0)).collect()
-}
-
 #[cfg(test)]
 mod tests {
-    use super::normalize_allowed_external_url;
+    use super::{allowed_external_url, normalize_allowed_external_url};
 
     #[test]
     fn allows_http_and_https_links() {
@@ -147,6 +109,14 @@ mod tests {
         assert_eq!(
             normalize_allowed_external_url("https://example.com/\nnext"),
             None
+        );
+    }
+
+    #[test]
+    fn reports_unsupported_urls_before_os_access() {
+        assert_eq!(
+            allowed_external_url("javascript:alert(1)"),
+            Err("Unsupported external link scheme.".to_string())
         );
     }
 }
