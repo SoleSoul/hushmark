@@ -4,16 +4,15 @@ This roadmap is not a contract. It is a short parking lot for likely next work a
 
 ## Near-Term Release Readiness
 
-- Prepare platform boundaries for Linux support while preserving current Windows behavior.
-- Revalidate the migrated repo on the current machine before preparing the next tester build.
+- Test the current `Unreleased` Linux-preparation and typography changes on Windows before bumping or tagging the next tester version.
 - Keep `CHANGELOG.md` current under `Unreleased` for tester-visible changes.
 - Run the release checklist before publishing any GitHub/tester binary.
-- Smoke-test `examples/markdown-visual-inspection.md`, same-document fragments, relative Markdown links, Back/Forward, Ctrl+O, local images, table alignment, external links, and setup mode.
+- Smoke-test `examples/markdown-visual-inspection.md`, same-document fragments, relative Markdown links, Back/Forward, Ctrl+O, local images, table alignment, external links, and Windows setup mode.
 - Confirm setup documentation uses `--setup`.
-- Keep the imported `project-context-handoff/` folder out of tracked project docs and commits.
 
 ## Near-Term Linux Support
 
+- Decide whether the WebKitGTK/NVIDIA DMABUF blank-window issue needs an app-level or package-level workaround before a public Linux release.
 - Integrate the checked-in desktop entry and icon into Linux packaging and verify Markdown MIME associations.
 - Validate file opening, Ctrl+O, drag/drop, document links, local images, external links, and navigation on Linux.
 - Keep install, update, and desktop-integration ownership in Linux packaging; do not add an in-app setup flow.
@@ -29,7 +28,7 @@ These are speculative unless a future request explicitly accepts them:
 - Reading width and zoom controls that preserve the minimalist reader feel.
 - More Markdown fixtures or focused tests for parser, sanitization, image, link, and navigation edge cases.
 - Optional frontend tests for link classification, document history, and setup affordance behavior.
-- Linux packaging and desktop integration, such as `.desktop` files and MIME association, after the reader can run cleanly on Linux.
+- Additional Linux package formats after a source-based package path is proven.
 - macOS support after Windows remains stable and Linux support is better understood.
 
 ## Refactoring Ideas

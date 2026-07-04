@@ -7,6 +7,7 @@
 - Move command-line argument parsing out of the Windows setup module. `--setup` is recognized only on Windows and behaves like any other flag-shaped file argument elsewhere.
 - Use Tauri's cross-platform opener for approved external links on Windows and Linux.
 - Add the RGBA application icon and desktop-entry metadata needed for Linux packaging.
+- Use local system fonts for reader typography, keep body and heading sizes stable while resizing, and soften link underlines until hover or keyboard focus.
 
 ## 0.1.5
 

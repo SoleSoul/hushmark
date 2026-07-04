@@ -1,12 +1,19 @@
 :root {
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-reader:
+    "Palatino Linotype", "Book Antiqua", Palatino, "Noto Serif",
+    "Linux Libertine", Georgia, serif;
+  --font-code:
+    "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
+    monospace;
+
   color: #24292f;
   background: #f8f7f3;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 * {
@@ -41,7 +48,6 @@ body {
   color: #30363d;
   font-size: clamp(1.5rem, 4vw, 2rem);
   font-weight: 650;
-  letter-spacing: -0.02em;
 }
 
 .state p {
@@ -99,7 +105,6 @@ body {
   margin: 0;
   color: #1f2328;
   font-size: clamp(1.75rem, 4vw, 2.3rem);
-  letter-spacing: -0.03em;
 }
 
 .setup__intro,
@@ -312,9 +317,9 @@ body {
   margin: 0 auto;
   padding: clamp(2rem, 6vw, 4.5rem) 1.5rem 5rem;
   color: #24292f;
-  font-family: Georgia, "Times New Roman", Times, serif;
-  font-size: clamp(1rem, 1.8vw, 1.125rem);
-  line-height: 1.72;
+  font-family: var(--font-reader);
+  font-size: 1rem;
+  line-height: 1.7;
 }
 
 .document > :first-child {
@@ -332,8 +337,7 @@ body {
   border-radius: 0.75rem;
   background: #fff1ed;
   color: #424a53;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 0.95rem;
   line-height: 1.45;
 }
@@ -362,25 +366,35 @@ body {
 .document h6 {
   margin: 2rem 0 0.75rem;
   color: #1f2328;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1.2;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .document h1 {
-  font-size: clamp(2rem, 5vw, 3rem);
+  font-size: 2rem;
 }
 
 .document h2 {
   padding-bottom: 0.25rem;
   border-bottom: 1px solid #d8d2c4;
-  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  font-size: 1.5rem;
 }
 
 .document h3 {
-  font-size: 1.35rem;
+  font-size: 1.25rem;
+}
+
+.document h4 {
+  font-size: 1.1rem;
+}
+
+.document h5 {
+  font-size: 1rem;
+}
+
+.document h6 {
+  font-size: 0.9rem;
 }
 
 .document p,
@@ -403,12 +417,15 @@ body {
 
 .document a {
   color: #0969da;
-  text-decoration-thickness: 0.08em;
-  text-underline-offset: 0.18em;
+  text-decoration-color: rgb(9 105 218 / 35%);
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.16em;
 }
 
-.document a:hover {
+.document a:hover,
+.document a:focus-visible {
   color: #0550ae;
+  text-decoration-color: currentColor;
 }
 
 .document blockquote {
@@ -419,9 +436,7 @@ body {
 
 .document code,
 .document pre {
-  font-family:
-    "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
-    monospace;
+  font-family: var(--font-code);
 }
 
 .document code {
@@ -470,8 +485,7 @@ body {
 
 .document th {
   background: #eee9dc;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-ui);
   text-align: left;
 }
 
