@@ -14,7 +14,7 @@ The product identity is centralized in:
 Current values:
 
 - Display name: `Hushmark`
-- Version: `0.1.5`
+- Version: `0.1.6`
 - Developer: `Jonathan Lahav`
 - Release binary: `hushmark.exe`
 - Installed executable: `Hushmark.exe`

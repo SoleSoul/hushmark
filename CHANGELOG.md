@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## 0.1.6
+
+Linux runtime preparation and reader typography update.
+
 - Compile Windows setup and integration commands only on Windows, with no non-Windows setup command stubs.
 - Add startup platform capabilities so non-Windows builds do not request or display Install, Update, or setup flows.
 - Move command-line argument parsing out of the Windows setup module. `--setup` is recognized only on Windows and behaves like any other flag-shaped file argument elsewhere.

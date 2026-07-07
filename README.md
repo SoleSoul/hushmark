@@ -22,9 +22,11 @@ Hushmark opens Markdown files in a calm, uncluttered reading view. It is meant f
 
 Download the latest Windows build from the [Releases](../../releases) page.
 
-Current builds are unsigned, so Windows may show a SmartScreen warning.
+Current Windows builds are unsigned, so Windows may show a SmartScreen warning.
 
 After opening Hushmark, you can use the setup view to add optional Windows integration for Markdown files.
+
+Linux runtime support is available from the same source release. Linux desktop integration is handled by packaging rather than by an in-app setup flow.
 
 ## Use
 
@@ -48,9 +50,7 @@ More details are in [docs/markdown-support.md](docs/markdown-support.md).
 
 ## Platform status
 
-Hushmark is currently focused on Windows.
-
-Linux support is being prepared. Linux desktop integration is expected to be handled through packaging rather than an in-app setup flow.
+Hushmark currently supports Windows and Linux. Windows has a standalone release executable and optional in-app desktop integration. Linux integration belongs to packages and desktop files rather than an in-app setup flow.
 
 macOS may come later.
 

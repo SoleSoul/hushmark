@@ -1,6 +1,6 @@
 # Hushmark Linux Support
 
-Linux support is in preparation. The reader core is platform-neutral, Windows setup code is excluded from Linux builds, and external links use Tauri's cross-platform opener.
+Linux runtime support is available from the shared Hushmark codebase. The reader core is platform-neutral, Windows setup code is excluded from Linux builds, and external links use Tauri's cross-platform opener.
 
 ## Runtime Policy
 
@@ -22,7 +22,7 @@ The supported package formats have not been decided. Any Linux package should:
 - declare Markdown MIME associations from the desktop entry;
 - let the package manager own installation and updates.
 
-Create package-specific metadata when a Linux-capable release tag is available, so it can reference a stable upstream source archive and checksum.
+Create package-specific metadata against a stable Linux-capable release tag, so it can reference a stable upstream source archive and checksum.
 
 ## Remaining Validation
 

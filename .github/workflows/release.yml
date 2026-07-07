@@ -81,11 +81,11 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: Hushmark __VERSION__
           releaseBody: |
-            Windows tester build for Hushmark.
+            Hushmark release.
 
-            These binaries are currently unsigned. Windows SmartScreen may show a warning.
+            The attached Windows binary is currently unsigned. Windows SmartScreen may show a warning.
           releaseDraft: true
-          prerelease: true
+          prerelease: false
 
       - name: Upload Windows executable artifact
         uses: actions/upload-artifact@v4
