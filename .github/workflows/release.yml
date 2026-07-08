@@ -52,7 +52,7 @@ jobs:
       - name: Build Windows artifact
         id: build-artifact
         if: ${{ github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/v') }}
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -61,13 +61,12 @@ jobs:
           uploadWorkflowArtifacts: true
           uploadUpdaterJson: false
           uploadUpdaterSignatures: false
-          workflowArtifactNamePattern: Hushmark-[version]-[platform]-[arch]-[bundle]
-          releaseAssetNamePattern: Hushmark-[version]-[platform]-[arch]-[bundle][ext]
+          workflowArtifactNamePattern: hushmark-[platform]-[arch]-[bundle]
 
       - name: Build Windows artifact and draft release
         id: release-artifact
         if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -76,12 +75,12 @@ jobs:
           uploadWorkflowArtifacts: true
           uploadUpdaterJson: false
           uploadUpdaterSignatures: false
-          workflowArtifactNamePattern: Hushmark-[version]-[platform]-[arch]-[bundle]
-          releaseAssetNamePattern: Hushmark-[version]-[platform]-[arch]-[bundle][ext]
+          workflowArtifactNamePattern: hushmark-[platform]-[arch]-[bundle]
+          releaseAssetNamePattern: hushmark[ext]
           tagName: ${{ github.ref_name }}
           releaseName: Hushmark __VERSION__
           releaseBody: |
-            Hushmark release.
+            Hushmark __VERSION__.
 
             The attached Windows binary is currently unsigned. Windows SmartScreen may show a warning.
           releaseDraft: true

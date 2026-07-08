@@ -40,6 +40,20 @@ npm run tauri -- build
 git diff --check
 ```
 
+## Release Flow
+
+Use this sequence for a public/tester release:
+
+1. Update version metadata and move `CHANGELOG.md` notes from `Unreleased` to the new version.
+2. Run the relevant checks.
+3. Commit the release change.
+4. Create and push a matching tag, for example `v0.1.7`.
+5. Wait for the GitHub **Release** workflow to finish.
+6. Inspect the draft GitHub release: title, body, attached `hushmark.exe`, and source archives.
+7. Smoke-test the downloaded Windows executable before publishing.
+8. If the release changes Linux runtime or packaging behavior, update the AUR package to the matching tag and checksum.
+9. Publish the GitHub draft release only after the Windows smoke test and package metadata checks are complete.
+
 ## GitHub Actions Release Build
 
 Use GitHub Actions for Windows release binaries. The release workflow lives at `.github/workflows/release.yml` and runs on `windows-latest`. Ordinary branch pushes do not run this workflow. Manual runs produce workflow artifacts only; pushed `v*` tags create a draft GitHub release.
@@ -58,12 +72,29 @@ Tagged draft release:
 2. Create and push a matching version tag, for example `v0.1.4`.
 3. Wait for the **Release** workflow to finish.
 4. Open **Releases** and inspect the draft release named `Hushmark 0.1.4`.
-5. Download and smoke-test the attached Windows artifact.
-6. Publish the draft release only after manual testing.
+5. Confirm the release asset is named `hushmark.exe`.
+6. Download and smoke-test the attached Windows artifact.
+7. Publish the draft release only after manual testing and any package metadata updates.
 
-Workflow artifacts are available from the run summary under **Artifacts**. The workflow uploads the standalone executable from `src-tauri/target/release/hushmark.exe` using a `Hushmark-<version>-windows-x86_64-exe` artifact name. Tag builds also attach the Windows artifact to the draft GitHub Release.
+Workflow artifacts are available from the run summary under **Artifacts**. The workflow uploads the standalone executable from `src-tauri/target/release/hushmark.exe`. Tag builds attach the Windows release asset as `hushmark.exe`.
 
 Until first-party Linux packages exist, the GitHub release's source archives are the Linux-capable release source. Linux package metadata should reference the matching release tag and checksum.
+
+## AUR Package Update
+
+The AUR package lives in a separate Git repository at `aur@aur.archlinux.org:hushmark.git`; do not commit AUR package artifacts to the Hushmark source repo.
+
+For an AUR update:
+
+1. Clone or update the AUR repo outside this repo, for example under `/tmp/hushmark-aur`.
+2. Set `pkgver` to the release version and reset `pkgrel` to `1`.
+3. Point `source` at `https://github.com/SoleSoul/hushmark/archive/refs/tags/v<pkgver>.tar.gz`.
+4. Update `sha256sums` from the downloaded tag archive.
+5. Regenerate `.SRCINFO` with `makepkg --printsrcinfo > .SRCINFO`.
+6. Run `makepkg --verifysource`.
+7. Run a clean `makepkg` build when practical.
+8. Commit only `PKGBUILD` and `.SRCINFO`, then push the AUR repo.
+9. Check `https://aur.archlinux.org/packages/hushmark` shows the new version.
 
 ## Smoke Tests
 
