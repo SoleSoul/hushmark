@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## 0.1.7
+
+Linux runtime compatibility update.
+
+- Disable WebKitGTK's DMABUF renderer by default on Linux before GTK/WebKit initialization, fixing the observed NVIDIA/X11 blank window and labwc/wlroots Wayland protocol error.
+
 ## 0.1.6
 
 Linux runtime preparation and reader typography update.

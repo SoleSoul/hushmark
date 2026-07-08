@@ -8,9 +8,11 @@ Linux builds do not provide setup, self-install, self-update, Open With, context
 
 Installation, updates, desktop integration, icons, and MIME registration belong to the package manager or distribution package.
 
-## Known Runtime Issue
+## WebKitGTK Renderer Workaround
 
-On the tested NVIDIA/X11 system, WebKitGTK's DMABUF renderer produces a blank window. Launching with `WEBKIT_DISABLE_DMABUF_RENDERER=1` avoids the upstream rendering failure. Keep this workaround explicit and retest without it as WebKitGTK and graphics drivers change.
+On tested Linux systems, WebKitGTK's DMABUF renderer produced a blank window on NVIDIA/X11 and a Wayland protocol error on labwc/wlroots. Hushmark sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` by default on Linux before GTK/WebKit initialization, unless the user has already set that variable.
+
+Retest this default as WebKitGTK and graphics drivers change.
 
 ## Packaging
 

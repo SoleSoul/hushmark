@@ -49,9 +49,7 @@ Windows release artifacts and Windows smoke tests should be produced through Git
 
 ## Version And Tester Builds
 
-Current app version: `0.1.6`.
-
-Use human-readable patch versions for tester-visible builds. Keep version metadata aligned across `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, `CHANGELOG.md`, and version references in docs.
+Use human-readable patch versions for tester-visible builds. Keep version metadata aligned across `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, and `CHANGELOG.md`.
 
 Do not bump the version for docs-only changes, internal refactors, or other behavior-preserving maintenance unless a tester build is being prepared.
 
@@ -72,7 +70,7 @@ See `docs/reader-design.md` for the focused design note.
 - There is no dedicated frontend unit test harness yet; UI/navigation behavior relies on TypeScript build checks, Rust tests, and manual smoke testing.
 - Markdown support is intentionally limited; Hushmark is not full GitHub-Flavored Markdown. See `docs/markdown-support.md`.
 - Windows default-app assignment remains user-controlled; Hushmark registers itself as a candidate and opens Default Apps settings.
-- Linux packaging is not implemented yet, and the Linux runtime still needs desktop smoke testing. Linux packaging should own installation, updates, desktop integration, icons, and MIME registration. See `docs/linux-support.md`.
+- Linux packages should own installation, updates, desktop integration, icons, and MIME registration. See `docs/linux-support.md`.
 - Same-document fragment history currently re-renders during popstate restoration. This is acceptable while the reader has little transient DOM-only state.
 - Release binaries are unsigned unless a signing step is added, so Windows SmartScreen may warn testers.
 

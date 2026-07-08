@@ -10,11 +10,11 @@ The product identity is centralized in:
 
 - Rust: `src-tauri/src/identity.rs`
 - Frontend: `src/product.ts`
+- Version metadata: `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`
 
 Current values:
 
 - Display name: `Hushmark`
-- Version: `0.1.6`
 - Developer: `Jonathan Lahav`
 - Release binary: `hushmark.exe`
 - Installed executable: `Hushmark.exe`
