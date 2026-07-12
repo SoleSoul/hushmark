@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: lts/*
           cache: npm
@@ -47,7 +47,7 @@ jobs:
 
       - name: Run Rust tests
         working-directory: src-tauri
-        run: cargo test --quiet
+        run: cargo test --release --quiet
 
       - name: Build Windows artifact
         id: build-artifact
@@ -87,7 +87,7 @@ jobs:
           prerelease: false
 
       - name: Upload Windows executable artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Hushmark-${{ steps.app-version.outputs.version }}-windows-x86_64-exe
           path: src-tauri/target/release/hushmark.exe
