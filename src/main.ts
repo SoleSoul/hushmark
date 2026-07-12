@@ -631,6 +631,7 @@ async function start(): Promise<void> {
 
   try {
     const startupView = await invoke<StartupView>("load_initial_view");
+    document.documentElement.dataset.platform = startupView.platform;
     platformCapabilities = startupView.capabilities;
     currentMode = startupView.mode;
 

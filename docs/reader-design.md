@@ -7,7 +7,8 @@ The reader should feel like opening a focused document, not a web article, IDE, 
 Design boundaries:
 
 - Keep the window focused on the current document.
-- Use local system fonts: a serif stack for document body text, system sans-serif for UI and document headings, and system monospace for code.
+- Use local system fonts: Georgia for document body text on Windows, Noto Serif or Linux Libertine where available on Linux, system sans-serif for UI and document headings, and system monospace for code.
 - Keep reader sizes stable while resizing. Bundle a reader font only if it clearly improves the experience across target platforms.
+- Keep document headings clearly distinct from body text through weight and a stable size hierarchy.
 - Prefer system and browser primitives over custom UI machinery.
 - Avoid sidebars, tabs, editor controls, source views, and settings surfaces in the reader.

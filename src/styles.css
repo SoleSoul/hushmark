@@ -16,6 +16,10 @@
   text-rendering: optimizeLegibility;
 }
 
+:root[data-platform="windows"] {
+  --font-reader: Georgia, "Times New Roman", Times, serif;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -322,6 +326,11 @@ body {
   line-height: 1.7;
 }
 
+:root[data-platform="windows"] .document {
+  font-size: 1.0625rem;
+  line-height: 1.72;
+}
+
 .document > :first-child {
   margin-top: 0;
 }
@@ -367,22 +376,22 @@ body {
   margin: 2rem 0 0.75rem;
   color: #1f2328;
   font-family: var(--font-ui);
-  font-weight: 600;
-  line-height: 1.3;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .document h1 {
-  font-size: 2rem;
+  font-size: 2.5rem;
 }
 
 .document h2 {
   padding-bottom: 0.25rem;
   border-bottom: 1px solid #d8d2c4;
-  font-size: 1.5rem;
+  font-size: 1.75rem;
 }
 
 .document h3 {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
 }
 
 .document h4 {

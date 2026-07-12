@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Restore the Windows reader's Georgia body typography at a stable 17px size while preserving the current Linux body typography, and strengthen the shared heading hierarchy.
+
 ## 0.1.7
 
 Linux runtime compatibility update.

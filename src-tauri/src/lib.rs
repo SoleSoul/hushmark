@@ -44,6 +44,7 @@ impl PlatformCapabilities {
 #[serde(rename_all = "camelCase")]
 struct StartupView {
     mode: String,
+    platform: &'static str,
     document: Option<LoadedDocument>,
     #[cfg(windows)]
     setup: Option<SetupStatus>,
@@ -62,6 +63,7 @@ fn load_initial_view(window: tauri::Window) -> Result<StartupView, String> {
 
         return Ok(StartupView {
             mode: "setup".to_string(),
+            platform: std::env::consts::OS,
             document: None,
             setup: Some(setup_status(None)?),
             capabilities: PlatformCapabilities::current(),
@@ -73,6 +75,7 @@ fn load_initial_view(window: tauri::Window) -> Result<StartupView, String> {
 
     Ok(StartupView {
         mode: "reader".to_string(),
+        platform: std::env::consts::OS,
         document: Some(document),
         #[cfg(windows)]
         setup: None,

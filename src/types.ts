@@ -64,6 +64,7 @@ export type PlatformCapabilities = {
 
 export type StartupView = {
   mode: "reader" | "setup";
+  platform: string;
   document: LoadedDocument | null;
   setup?: SetupStatus | null;
   capabilities: PlatformCapabilities;
