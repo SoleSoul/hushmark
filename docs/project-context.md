@@ -23,6 +23,7 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Open external `http`, `https`, and `mailto` links in the system app.
 - Resolve safe local Markdown image paths and embed them as `data:` URLs.
 - Preserve controlled table alignment classes.
+- Print an open document with Ctrl+P through the native WebView print dialog.
 - Disable the internal WebView context menu.
 - Provide per-user Windows install, Open With, right-click integration, and Default Apps handoff without admin rights.
 - Keep in-app setup/integration unavailable on Linux; Linux setup belongs in packaging rather than the reader app.
@@ -37,10 +38,10 @@ For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integrat
 - `src-tauri/src/external_links.rs`: External URL allowlisting before Tauri opens approved links with the system default application.
 - `src-tauri/src/identity.rs`: Shared display identity plus Windows-gated integration identifiers.
 - `src-tauri/src/lib.rs`: Tauri command and plugin registration plus startup platform capabilities.
-- `src/main.ts`: Reader startup, rendering, link handling, navigation history, Ctrl+O, drag/drop, and capability-gated empty-state setup affordance.
+- `src/main.ts`: Reader startup, rendering, link handling, navigation history, Ctrl+O, Ctrl+P, drag/drop, and capability-gated empty-state setup affordance.
 - `src/setupView.ts`: Setup screen rendering and setup actions.
 - `src/types.ts`, `src/dom.ts`, and `src/product.ts`: Shared frontend types, DOM helper, and frontend product labels.
-- `src/styles.css`: Reader, empty/error state, and setup styles.
+- `src/styles.css`: Reader, print, empty/error state, and setup styles.
 - `src-tauri/capabilities/default.json`: Tauri permissions, including dialog access.
 
 Keep Tauri JavaScript and Rust plugin versions aligned. Dialog support is currently pinned in npm and Cargo metadata. The Rust-only opener plugin provides shared Windows/Linux external-link OS access behind Hushmark's URL allowlist.
@@ -80,5 +81,6 @@ See `docs/reader-design.md` for the focused design note.
 - `docs/markdown-support.md`: Markdown feature baseline, link behavior, anchors, fixtures, and limitations.
 - `docs/windows-integration.md`: Install path, registry keys, setup behavior, and Windows manual tests.
 - `docs/linux-support.md`: Linux runtime policy, package responsibilities, and remaining validation.
+- `docs/printing.md`: Printing behavior, stylesheet policy, and manual validation.
 - `docs/roadmap.md`: Active ideas and possible future work.
 - `docs/release-checklist.md`: Repeatable tester/GitHub release process.

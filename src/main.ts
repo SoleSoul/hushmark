@@ -455,6 +455,20 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
     !event.altKey &&
     !event.metaKey &&
     !event.shiftKey &&
+    event.key.toLowerCase() === "p"
+  ) {
+    event.preventDefault();
+    if (canPrintCurrentDocument() && !event.repeat) {
+      window.print();
+    }
+    return;
+  }
+
+  if (
+    event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey &&
+    !event.shiftKey &&
     event.key.toLowerCase() === "o"
   ) {
     event.preventDefault();
@@ -483,6 +497,15 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
   ) {
     window.history.forward();
   }
+}
+
+function canPrintCurrentDocument(): boolean {
+  return (
+    currentMode === "reader" &&
+    Boolean(currentDocument?.path) &&
+    !currentDocument?.error &&
+    app.querySelector(":scope > .document") !== null
+  );
 }
 
 function navigationDirectionForEvent(event: KeyboardEvent): "back" | "forward" | null {

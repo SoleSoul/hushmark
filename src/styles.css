@@ -530,3 +530,87 @@ body {
   display: block;
   margin: 1.5rem auto;
 }
+
+@media print {
+  @page {
+    margin: 18mm 16mm;
+  }
+
+  :root,
+  body {
+    background: #fff;
+    color: #111;
+  }
+
+  body,
+  #app {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .state,
+  .setup,
+  .document-message {
+    display: none;
+  }
+
+  .document,
+  :root[data-platform="windows"] .document {
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    color: #111;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  .document a {
+    color: #174f82;
+    text-decoration-color: currentColor;
+  }
+
+  .document h1,
+  .document h2,
+  .document h3,
+  .document h4,
+  .document h5,
+  .document h6 {
+    break-after: avoid-page;
+    page-break-after: avoid;
+  }
+
+  .document pre {
+    max-width: 100%;
+    overflow: visible;
+    border: 1px solid #d8d2c4;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .document pre code {
+    white-space: inherit;
+  }
+
+  .document table {
+    display: table;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+    table-layout: auto;
+  }
+
+  .document th,
+  .document td {
+    overflow-wrap: anywhere;
+  }
+
+  .document img,
+  .document pre,
+  .document table,
+  .document tr,
+  .document blockquote {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+}

@@ -15,6 +15,7 @@ Hushmark opens Markdown files in a calm, uncluttered reading view. It is meant f
 - Generated heading anchors
 - Local and remote images
 - Tables and strikethrough
+- Native document printing with **Ctrl+P**
 - External links open outside Hushmark
 - Optional Windows Open With and right-click integration
 
@@ -39,6 +40,8 @@ Open a Markdown file by:
 - running Hushmark with a Markdown file path
 
 Hushmark remembers document navigation while it is open, including Back and Forward between linked documents.
+
+Press **Ctrl+P** to print the open document through the system print dialog.
 
 ## Markdown support
 

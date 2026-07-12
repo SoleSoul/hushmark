@@ -2,7 +2,12 @@
 
 ## [Unreleased]
 
+## 0.1.8
+
+Printing and cross-platform reader typography update.
+
 - Restore the Windows reader's Georgia body typography at a stable 17px size while preserving the current Linux body typography, and strengthen the shared heading hierarchy.
+- Add document-only Ctrl+P printing through the native WebView print dialog with print-specific layout, code, table, image, and page-break handling.
 
 ## 0.1.7
 

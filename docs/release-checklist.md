@@ -102,6 +102,7 @@ For an AUR update:
 - Open with no arguments and confirm the empty state.
 - Open setup with `src-tauri\target\release\hushmark.exe --setup`.
 - Check Ctrl+O from empty state and from an open document.
+- Open `examples/print-visual-inspection.md`, check Ctrl+P print preview and Print to PDF, and confirm Ctrl+P does nothing in empty, error, and setup views.
 - Check same-document fragments, missing fragments, Alt+Left, and Alt+Right.
 - Check relative `.md` / `.markdown` links, linked fragments, Back/Forward, and blocked unsafe links.
 - Check local images, table alignment, code overflow, Hebrew text, and unsafe HTML examples.
