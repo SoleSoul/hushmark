@@ -1,3 +1,13 @@
+---
+title: "Markdown feature fixture"
+audience: Hushmark reader QA
+topics:
+  - Markdown
+  - navigation
+  - safety
+status:
+  support: current baseline
+---
 # H1 Markdown feature fixture
 
 This document is a visual fixture for Hushmark's current Markdown rendering baseline. It should stay readable and contained without turning the app into an editor or a busy web page.

@@ -13,7 +13,10 @@ use percent_encoding::percent_decode_str;
 use pulldown_cmark::{html, Alignment, CowStr, Event, Options, Parser, Tag, TagEnd};
 use serde::Serialize;
 
-use crate::identity::DISPLAY_NAME;
+use crate::{
+    document_parts::{parse_document_parts, render_front_matter_to_safe_html},
+    identity::DISPLAY_NAME,
+};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -137,16 +140,33 @@ pub fn title_for(document: &LoadedDocument) -> String {
     }
 }
 
-fn render_markdown_file_to_safe_html(markdown: &str, document_path: &Path) -> String {
-    render_markdown_with_document_path(markdown, Some(document_path))
+fn render_markdown_file_to_safe_html(source: &str, document_path: &Path) -> String {
+    render_document_with_document_path(source, Some(document_path))
 }
 
 #[cfg(test)]
 fn render_markdown_to_safe_html(markdown: &str) -> String {
-    render_markdown_with_document_path(markdown, None)
+    render_markdown_body_to_safe_html(markdown, None)
 }
 
-fn render_markdown_with_document_path(markdown: &str, document_path: Option<&Path>) -> String {
+#[cfg(test)]
+fn render_document_to_safe_html(source: &str) -> String {
+    render_document_with_document_path(source, None)
+}
+
+fn render_document_with_document_path(source: &str, document_path: Option<&Path>) -> String {
+    let parts = parse_document_parts(source);
+    debug_assert_eq!(parts.markdown, &source[parts.markdown_start..]);
+
+    let mut safe_html = render_front_matter_to_safe_html(parts.front_matter.as_ref());
+    safe_html.push_str(&render_markdown_body_to_safe_html(
+        parts.markdown,
+        document_path,
+    ));
+    safe_html
+}
+
+fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path>) -> String {
     let mut local_images = LocalImageResolver::new(document_path);
     let mut table_alignments = TableAlignmentRewriter::new();
     let mut heading_ids = HeadingIdRewriter::new(collect_heading_ids(markdown));
@@ -895,8 +915,8 @@ mod tests {
 
     use super::{
         load_dropped_markdown_file, load_initial_document_from_arg, load_linked_markdown_file,
-        load_markdown_file, markdown_options, render_markdown_to_safe_html, title_for,
-        LoadedDocument,
+        load_markdown_file, markdown_options, render_document_to_safe_html,
+        render_markdown_to_safe_html, title_for, LoadedDocument,
     };
 
     #[test]
@@ -921,6 +941,22 @@ mod tests {
         assert!(html.contains("<th>Feature</th>"));
         assert!(html.contains("<td>Enabled</td>"));
         assert!(html.contains("<del>removed</del>"));
+    }
+
+    #[test]
+    fn valid_yaml_front_matter_renders_as_escaped_metadata() {
+        let html = render_document_to_safe_html(
+            "---\ntitle: \"AI <Guide>\"\ndraft: false\ncount: 3\n---\n# Introduction",
+        );
+
+        assert!(html.contains("<dl class=\"hushmark-front-matter\">"));
+        assert!(html.contains("<dt>title</dt><dd>AI &lt;Guide&gt;</dd>"));
+        assert!(html.contains("<dt>draft</dt><dd>false</dd>"));
+        assert!(html.contains("<dt>count</dt><dd>3</dd>"));
+        assert!(html.contains("<h1 id=\"introduction\">Introduction</h1>"));
+        assert!(!html.contains("<hr>"));
+        assert!(!html.contains("title:"));
+        assert!(!html.contains("hushmark-front-matter-token"));
     }
 
     #[test]

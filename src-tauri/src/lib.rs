@@ -1,4 +1,5 @@
 mod document;
+mod document_parts;
 mod external_links;
 mod identity;
 #[cfg(windows)]

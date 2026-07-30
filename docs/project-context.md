@@ -17,6 +17,7 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Show a subtle empty-state-only `Install` or `Update` setup affordance when needed on Windows.
 - Open setup mode with `--setup` on Windows only. On Linux, it behaves like any other flag-shaped file argument.
 - Render Markdown in Rust with `pulldown-cmark`, then sanitize HTML with `ammonia`.
+- Pre-parse valid `---`-delimited YAML front matter and render it as sanitized metadata before the untouched Markdown body.
 - Support CommonMark-style Markdown plus tables and strikethrough.
 - Generate heading anchors and handle same-document `#fragment` history.
 - Open safe relative `.md` / `.markdown` links inside Hushmark under the starting document folder.
@@ -32,7 +33,8 @@ For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integrat
 
 ## Architecture Overview
 
-- `src-tauri/src/document.rs`: Markdown loading, rendering, sanitization, local images, heading anchors, linked-document validation, and Rust tests.
+- `src-tauri/src/document_parts.rs`: Source preprocessing, YAML front matter parsing, metadata rendering and sanitization, and Markdown body offsets.
+- `src-tauri/src/document.rs`: Markdown loading, body rendering and sanitization, local images, heading anchors, linked-document validation, and Rust tests.
 - `src-tauri/src/setup.rs`: Windows-only install/setup integration, registry handling, and setup status. The module and its Tauri commands are compiled only on Windows.
 - `src-tauri/src/startup.rs`: Platform-neutral positional argument parsing. `--setup` is recognized only by the Windows startup path; elsewhere it behaves like any other flag-shaped file argument.
 - `src-tauri/src/external_links.rs`: External URL allowlisting before Tauri opens approved links with the system default application.

@@ -32,6 +32,7 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - images as Markdown syntax, including relative local image paths under the opened document's folder
 - safe raw HTML `<img>` tags with relative local image paths under the opened document's folder
 - horizontal rules
+- `---`-delimited YAML front matter at the start of a file
 - tables
 - strikethrough
 - Unicode text, including Hebrew
@@ -42,12 +43,20 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - Footnotes are not enabled. Footnote syntax is not rendered as numbered footnotes; depending on the exact text, it remains visible text or is treated as ordinary CommonMark link-reference syntax.
 - Heading attributes are not enabled. `# Heading {#id .class}` remains heading text instead of setting an explicit author-provided HTML `id` or class.
 - Broader GitHub-Flavored Markdown behavior is not enabled beyond tables and strikethrough.
-- Definition lists, math, metadata blocks, smart punctuation, superscript, subscript, and wikilinks are not enabled.
+- Definition lists, math, smart punctuation, superscript, subscript, and wikilinks are not enabled.
 - Raw HTML is parsed by `pulldown-cmark`, but Hushmark sanitizes the resulting HTML with `ammonia`. Safe tags and attributes may remain; unsafe elements, event handlers, arbitrary style attributes, and dangerous URL schemes should not.
 - Relative Markdown document links must stay inside the navigation root, which is the folder of the first opened Markdown file. Absolute local paths, `file://` links, links outside that root, and links to non-Markdown files are not opened.
 - Relative local image paths are resolved for Markdown image syntax and sanitized raw HTML `<img src="...">` tags. Raw HTML image support is limited to rewriting safe relative local image `src` values; it does not provide broader raw HTML or local-file access.
 - Local image paths must stay inside the opened document's folder. Parent-directory traversal such as `../`, `file://` URLs, absolute local paths, and unsupported local file extensions are not resolved.
 - Local image files are embedded into the rendered document as `data:` image URLs after sanitization. This keeps Hushmark from exposing a broader local-file protocol to the WebView.
+
+## YAML front matter
+
+Hushmark recognizes YAML front matter only when the first line is exactly `---` and a later line contains a matching `---` delimiter. A source pre-parser returns structured metadata and the untouched Markdown body before `pulldown-cmark` runs. Valid metadata is shown as a subdued key/value block, and the front matter lines are omitted from the Markdown body.
+
+Scalar values are displayed directly. Lists and nested values use a simple plain-text representation; values are not interpreted as Markdown or HTML. Metadata output is escaped and passes through the same HTML sanitizer as the rendered document.
+
+If the YAML is malformed or the closing delimiter is missing, Hushmark treats the entire file as ordinary Markdown so no source content is hidden. Empty front matter is accepted without showing an empty metadata block. Only `---`-delimited YAML front matter is supported initially; TOML and JSON front matter variants are not recognized.
 
 ## Link behavior
 
@@ -99,3 +108,4 @@ Manual visual checklist:
 - Images do not overflow the reading column.
 - Hebrew and mixed English/Hebrew text display correctly.
 - Raw unsafe HTML does not execute or display unsafe script/link behavior.
+- Valid YAML front matter appears as quiet metadata without raw delimiters, while malformed or unterminated front matter remains visible as Markdown.
