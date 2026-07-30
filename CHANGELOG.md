@@ -4,6 +4,7 @@
 
 - Render valid `---`-delimited YAML front matter as a quiet, sanitized metadata block while preserving malformed or unterminated blocks as ordinary Markdown.
 - Keep long unbroken prose tokens from widening the reader viewport.
+- Present front matter as a compact document colophon instead of a full-width property table.
 
 ## 0.1.8
 
