@@ -11,6 +11,7 @@ This roadmap is not a contract. It is a short parking lot for likely next work a
 
 ## Near-Term Linux Support
 
+- Upgrade to a stable Tauri release containing Tao 0.36 or later, then validate native title-bar appearance and window controls on GNOME Wayland without adding a custom title bar.
 - Decide whether the WebKitGTK/NVIDIA DMABUF blank-window issue needs an app-level or package-level workaround before a public Linux release.
 - Integrate the checked-in desktop entry and icon into Linux packaging and verify Markdown MIME associations.
 - Validate file opening, Ctrl+O, drag/drop, document links, local images, external links, and navigation on Linux.
