@@ -4,6 +4,10 @@ use ammonia::Builder;
 use serde_yaml_ng::Value;
 
 const FRONT_MATTER_CLASS: &str = "hushmark-front-matter";
+const FRONT_MATTER_MAP_CLASS: &str = "hushmark-front-matter-map";
+const FRONT_MATTER_PAIR_CLASS: &str = "hushmark-front-matter-pair";
+const FRONT_MATTER_KEY_CLASS: &str = "hushmark-front-matter-key";
+const FRONT_MATTER_SEPARATOR_CLASS: &str = "hushmark-front-matter-separator";
 
 pub(crate) struct DocumentParts<'a> {
     pub(crate) front_matter: Option<FrontMatter>,
@@ -12,7 +16,7 @@ pub(crate) struct DocumentParts<'a> {
 }
 
 pub(crate) struct FrontMatter {
-    fields: Vec<(String, String)>,
+    fields: Vec<(String, Value)>,
 }
 
 pub(crate) fn parse_document_parts(source: &str) -> DocumentParts<'_> {
@@ -43,17 +47,24 @@ pub(crate) fn render_front_matter_to_safe_html(front_matter: Option<&FrontMatter
         rendered.push_str("<dt>");
         rendered.push_str(&escape_html_text(key));
         rendered.push_str("</dt><dd>");
-        rendered.push_str(&escape_html_text(value));
+        render_yaml_value(value, &mut rendered);
         rendered.push_str("</dd>");
     }
 
     rendered.push_str("</dl>\n");
 
-    let allowed_tags = HashSet::from(["dl", "dt", "dd"]);
+    let allowed_tags = HashSet::from(["dl", "dt", "dd", "span"]);
     let allowed_classes = [FRONT_MATTER_CLASS];
+    let allowed_span_classes = [
+        FRONT_MATTER_MAP_CLASS,
+        FRONT_MATTER_PAIR_CLASS,
+        FRONT_MATTER_KEY_CLASS,
+        FRONT_MATTER_SEPARATOR_CLASS,
+    ];
     let mut builder = Builder::default();
     builder.tags(allowed_tags);
     builder.add_allowed_classes("dl", &allowed_classes);
+    builder.add_allowed_classes("span", &allowed_span_classes);
     builder.clean(&rendered).to_string()
 }
 
@@ -92,14 +103,46 @@ fn line_content(line: &str) -> &str {
     line.strip_suffix('\r').unwrap_or(line)
 }
 
-fn yaml_fields(value: Value) -> Vec<(String, String)> {
+fn yaml_fields(value: Value) -> Vec<(String, Value)> {
     match value {
         Value::Mapping(mapping) => mapping
             .into_iter()
-            .map(|(key, value)| (plain_yaml_value(&key), plain_yaml_value(&value)))
+            .map(|(key, value)| (plain_yaml_value(&key), value))
             .collect(),
         Value::Null => Vec::new(),
-        value => vec![("Value".to_string(), plain_yaml_value(&value))],
+        value => vec![("Value".to_string(), value)],
+    }
+}
+
+fn render_yaml_value(value: &Value, rendered: &mut String) {
+    match value {
+        Value::Sequence(values) => {
+            for (index, value) in values.iter().enumerate() {
+                if index > 0 {
+                    rendered.push_str(", ");
+                }
+                render_yaml_value(value, rendered);
+            }
+        }
+        Value::Mapping(mapping) => {
+            rendered.push_str("<span class=\"hushmark-front-matter-map\">");
+
+            for (index, (key, value)) in mapping.iter().enumerate() {
+                if index > 0 {
+                    rendered.push_str("<span class=\"hushmark-front-matter-separator\">; </span>");
+                }
+
+                rendered.push_str("<span class=\"hushmark-front-matter-pair\"><span class=\"hushmark-front-matter-key\">");
+                rendered.push_str(&escape_html_text(&plain_yaml_value(key)));
+                rendered.push_str("</span>: ");
+                render_yaml_value(value, rendered);
+                rendered.push_str("</span>");
+            }
+
+            rendered.push_str("</span>");
+        }
+        Value::Tagged(tagged) => render_yaml_value(&tagged.value, rendered),
+        value => rendered.push_str(&escape_html_text(&plain_yaml_value(value))),
     }
 }
 
@@ -205,16 +248,21 @@ mod tests {
     }
 
     #[test]
-    fn lists_nested_values_and_quotes_render_as_escaped_plain_text() {
-        let source = "---\ntitle: \"A quoted value\"\ndescription: \"**plain**, not Markdown\"\ntags: [ai, markdown]\nowner:\n  name: Reader <script>alert(1)</script>\n---\nBody";
+    fn lists_nested_values_and_quotes_render_as_escaped_structured_text() {
+        let source = "---\ntitle: \"A quoted value\"\ndescription: \"**plain**, not Markdown\"\ntags: [ai, markdown]\nowner:\n  name: Reader <script>alert(1)</script>\n  active: true\n---\nBody";
         let parts = parse_document_parts(source);
         let html = render_front_matter_to_safe_html(parts.front_matter.as_ref());
 
         assert!(html.contains("<dt>title</dt><dd>A quoted value</dd>"));
         assert!(html.contains("<dt>description</dt><dd>**plain**, not Markdown</dd>"));
         assert!(html.contains("<dt>tags</dt><dd>ai, markdown</dd>"));
-        assert!(html
-            .contains("<dt>owner</dt><dd>name: Reader &lt;script&gt;alert(1)&lt;/script&gt;</dd>"));
+        assert!(html.contains("<dt>owner</dt><dd><span class=\"hushmark-front-matter-map\">"));
+        assert!(html.contains(
+            "<span class=\"hushmark-front-matter-key\">name</span>: Reader &lt;script&gt;alert(1)&lt;/script&gt;"
+        ));
+        assert!(html.contains(
+            "<span class=\"hushmark-front-matter-separator\">; </span><span class=\"hushmark-front-matter-pair\"><span class=\"hushmark-front-matter-key\">active</span>: true</span>"
+        ));
         assert!(!html.contains("<script>"));
         assert!(!html.contains("<strong>"));
     }

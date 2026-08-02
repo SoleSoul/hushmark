@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Give nested YAML front matter clearer inline hierarchy while retaining compact rendering.
+
 ## 0.1.9
 
 YAML front matter rendering update.

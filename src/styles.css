@@ -369,6 +369,17 @@ body {
   overflow-wrap: anywhere;
 }
 
+.document .hushmark-front-matter-key {
+  color: #786445;
+  font-family: var(--font-ui);
+  font-size: 0.82em;
+  font-weight: 600;
+}
+
+.document .hushmark-front-matter-separator {
+  color: #aaa08e;
+}
+
 .document-message {
   margin: 0 0 1.5rem;
   padding: 0.8rem 1rem;
