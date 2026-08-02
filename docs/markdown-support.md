@@ -54,7 +54,7 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 
 Hushmark recognizes YAML front matter only when the first line is exactly `---` and a later line contains a matching `---` delimiter. A source pre-parser returns structured metadata and the untouched Markdown body before `pulldown-cmark` runs. Valid metadata is shown as a subdued key/value block, and the front matter lines are omitted from the Markdown body.
 
-Single values such as text, numbers, booleans, and `null` are displayed directly. Lists use a plain inline representation, while nested mappings retain their key/value hierarchy with restrained inline styling. Values are not interpreted as Markdown or HTML. Metadata output is escaped and passes through the same HTML sanitizer as the rendered document.
+Single values such as text, numbers, booleans, and `null` are displayed directly. Author-intended line breaks and repeated spaces within text values are preserved while long lines continue to wrap. Lists use a plain inline representation, while nested mappings retain their key/value hierarchy with restrained inline styling. Values are not interpreted as Markdown or HTML. Metadata output is escaped and passes through the same HTML sanitizer as the rendered document.
 
 If the YAML is malformed or the closing delimiter is missing, Hushmark treats the entire file as ordinary Markdown so no source content is hidden. Empty front matter is accepted without showing an empty metadata block. Only `---`-delimited YAML front matter is supported initially; TOML and JSON front matter variants are not recognized.
 

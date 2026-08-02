@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Give nested YAML front matter clearer inline hierarchy while retaining compact rendering.
+- Preserve author-intended line breaks and repeated spaces in front matter text values.
 
 ## 0.1.9
 

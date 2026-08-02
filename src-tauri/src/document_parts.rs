@@ -268,6 +268,16 @@ mod tests {
     }
 
     #[test]
+    fn text_value_line_breaks_and_repeated_spaces_reach_the_renderer() {
+        let source = "---\ndescription: |-\n  First line\n  Second line\nspacing: \"First  second\"\n---\nBody";
+        let parts = parse_document_parts(source);
+        let html = render_front_matter_to_safe_html(parts.front_matter.as_ref());
+
+        assert!(html.contains("<dt>description</dt><dd>First line\nSecond line</dd>"));
+        assert!(html.contains("<dt>spacing</dt><dd>First  second</dd>"));
+    }
+
+    #[test]
     fn markdown_start_translates_body_offsets_to_source_offsets() {
         let source = "---\ntitle: שלום\n---\n# Body\n\n[Jump](#body)";
         let parts = parse_document_parts(source);
