@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Replace the empty state with a book-contents home and keyboard-help page, reachable with Ctrl+H and included in Back/Forward history.
+
 ## 0.1.10
 
 Windows setup, self-uninstall, and front matter refinement.

@@ -55,15 +55,22 @@ export type StartupView = {
   capabilities: PlatformCapabilities;
 };
 
-export type DocumentNavigationEntry = {
+export type NavigationView =
+  | { kind: "home" }
+  | {
+      kind: "document";
+      document: LoadedDocument;
+      fragment: string | null;
+    };
+
+export type NavigationEntry = {
   id: number;
-  document: LoadedDocument;
-  fragment: string | null;
+  view: NavigationView;
   scrollY: number;
 };
 
 export type HushmarkHistoryState = {
-  kind: "hushmark-document";
+  kind: "hushmark-navigation";
   sessionId: number;
   entryId: number;
 };

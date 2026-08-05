@@ -13,7 +13,7 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Open a Markdown file from the first positional command-line argument.
 - Open `.md` and `.markdown` files with Ctrl+O through the native Tauri dialog.
 - Open top-level Markdown files by drag/drop.
-- Show a simple empty state when no document is open.
+- Show a restrained book-contents home and keyboard-help page when no document is open, and return to it with Ctrl+H through normal Back/Forward history.
 - Show an empty-state-only Windows setup affordance. Use a quiet `Setup` label when the installed copy is current, and action-specific Install, Update, Downgrade, or Reinstall labels when attention is useful.
 - Render Markdown in Rust with `pulldown-cmark`, then sanitize HTML with `ammonia`.
 - Pre-parse valid `---`-delimited YAML front matter and render it as sanitized metadata before the untouched Markdown body.
@@ -39,7 +39,8 @@ For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integrat
 - `src-tauri/src/external_links.rs`: External URL allowlisting before Tauri opens approved links with the system default application.
 - `src-tauri/src/identity.rs`: Shared display identity plus Windows-gated integration identifiers.
 - `src-tauri/src/lib.rs`: Tauri command and plugin registration plus startup platform capabilities.
-- `src/main.ts`: Reader startup, rendering, link handling, navigation history, Ctrl+O, Ctrl+P, drag/drop, and capability-gated empty-state setup affordance.
+- `src/main.ts`: Reader startup, rendering, link handling, document/home navigation history, Ctrl+O, Ctrl+P, Ctrl+H, drag/drop, and capability-gated home setup affordance.
+- `src/homeView.ts`: Platform-neutral home and keyboard-contents page rendering.
 - `src/setupView.ts`: Setup screen rendering and setup actions.
 - `src/types.ts`, `src/dom.ts`, and `src/product.ts`: Shared frontend types, DOM helper, and frontend product labels.
 - `src/styles.css`: Reader, print, empty/error state, and setup styles.

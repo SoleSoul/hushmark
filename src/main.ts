@@ -2,15 +2,18 @@ import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createTextElement } from "./dom";
+import { createHomeView } from "./homeView";
 import { PRODUCT } from "./product";
 import { renderSetup, WINDOWS_SETUP_TITLE } from "./setupView";
+import { isControlShortcut, SHORTCUTS } from "./shortcuts";
 import "./styles.css";
 import type {
-  DocumentNavigationEntry,
   HushmarkHistoryState,
   LinkAction,
   LinkedDocument,
   LoadedDocument,
+  NavigationEntry,
+  NavigationView,
   PlatformCapabilities,
   SetupStatus,
   StartupView,
@@ -26,7 +29,7 @@ if (!appElement) {
 
 const app = appElement;
 const currentWindow = getCurrentWindow();
-const navigationEntries = new Map<number, DocumentNavigationEntry>();
+const navigationEntries = new Map<number, NavigationEntry>();
 let currentDocument: LoadedDocument | null = null;
 let currentMode: AppMode = "reader";
 let platformCapabilities: PlatformCapabilities = { setup: false };
@@ -96,6 +99,7 @@ function renderDocument(
   documentView: LoadedDocument,
   options: { fragment?: string | null; scrollY?: number | null } = {},
 ): void {
+  currentMode = "reader";
   currentDocument = documentView;
   document.title = titleFor(documentView);
 
@@ -105,7 +109,7 @@ function renderDocument(
   }
 
   if (!documentView.path && !documentView.html) {
-    renderEmptyState();
+    renderHome();
     return;
   }
 
@@ -125,11 +129,18 @@ function renderDocument(
   }
 }
 
-function renderEmptyState(): void {
-  const section = renderState("empty", PRODUCT.displayName, "Open a Markdown file to read.");
+function renderHome(scrollY = 0): void {
+  currentMode = "reader";
+  currentDocument = null;
+  document.title = PRODUCT.displayName;
+
+  const section = createHomeView();
+  app.replaceChildren(section);
   if (platformCapabilities.setup) {
     void renderEmptySetupAffordance(section);
   }
+
+  restoreScrollAfterRender(scrollY);
 }
 
 async function renderEmptySetupAffordance(section: HTMLElement): Promise<void> {
@@ -318,25 +329,51 @@ function pushSameDocumentFragmentNavigation(fragment: string): void {
   pushDocumentNavigation(documentView, fragment);
 }
 
-function resetDocumentNavigation(documentView: LoadedDocument): void {
+function resetNavigation(documentView: LoadedDocument): void {
   navigationSessionId += 1;
   navigationEntries.clear();
   navigationOrder = [];
 
-  const entry = createNavigationEntry(documentView, null, 0);
+  const view: NavigationView =
+    !documentView.path && !documentView.html && !documentView.error
+      ? { kind: "home" }
+      : { kind: "document", document: documentView, fragment: null };
+  const entry = createNavigationEntry(view, 0);
   navigationEntries.set(entry.id, entry);
   navigationOrder.push(entry.id);
   activeNavigationEntryId = entry.id;
   activeNavigationIndex = 0;
 
   window.history.replaceState(historyStateFor(entry.id), "");
-  renderDocument(documentView, { scrollY: 0 });
+  renderNavigationEntry(entry);
 }
 
 function pushDocumentNavigation(
   documentView: LoadedDocument,
   fragment: string | null,
 ): void {
+  pushNavigationView({ kind: "document", document: documentView, fragment });
+}
+
+function pushHomeNavigation(): void {
+  const activeEntry = getActiveNavigationEntry();
+
+  if (activeEntry?.view.kind === "home") {
+    renderNavigationEntry(activeEntry, { scrollY: 0 });
+    return;
+  }
+
+  saveActiveScrollPosition();
+  pushNavigationView({ kind: "home" });
+}
+
+function getActiveNavigationEntry(): NavigationEntry | null {
+  return activeNavigationEntryId === null
+    ? null
+    : navigationEntries.get(activeNavigationEntryId) ?? null;
+}
+
+function pushNavigationView(view: NavigationView): void {
   if (activeNavigationIndex < navigationOrder.length - 1) {
     for (const staleEntryId of navigationOrder.slice(activeNavigationIndex + 1)) {
       navigationEntries.delete(staleEntryId);
@@ -344,38 +381,49 @@ function pushDocumentNavigation(
     navigationOrder = navigationOrder.slice(0, activeNavigationIndex + 1);
   }
 
-  const entry = createNavigationEntry(documentView, fragment, 0);
+  const entry = createNavigationEntry(view, 0);
   navigationEntries.set(entry.id, entry);
   navigationOrder.push(entry.id);
   activeNavigationEntryId = entry.id;
   activeNavigationIndex = navigationOrder.length - 1;
 
   window.history.pushState(historyStateFor(entry.id), "");
-  renderDocument(documentView, {
-    fragment,
-    scrollY: fragment ? null : 0,
-  });
+  renderNavigationEntry(entry);
 }
 
 function createNavigationEntry(
-  documentView: LoadedDocument,
-  fragment: string | null,
+  view: NavigationView,
   scrollY: number,
-): DocumentNavigationEntry {
+): NavigationEntry {
   const id = nextNavigationEntryId;
   nextNavigationEntryId += 1;
 
   return {
     id,
-    document: documentView,
-    fragment,
+    view,
     scrollY,
   };
 }
 
+function renderNavigationEntry(
+  entry: NavigationEntry,
+  options: { scrollY?: number | null } = {},
+): void {
+  if (entry.view.kind === "home") {
+    renderHome(options.scrollY ?? entry.scrollY);
+    return;
+  }
+
+  const { document: documentView, fragment } = entry.view;
+  renderDocument(documentView, {
+    fragment,
+    scrollY: fragment ? null : (options.scrollY ?? entry.scrollY),
+  });
+}
+
 function historyStateFor(entryId: number): HushmarkHistoryState {
   return {
-    kind: "hushmark-document",
+    kind: "hushmark-navigation",
     sessionId: navigationSessionId,
     entryId,
   };
@@ -414,10 +462,7 @@ function handleHistoryPopState(event: PopStateEvent): void {
   saveActiveScrollPosition();
   activeNavigationEntryId = state.entryId;
   activeNavigationIndex = entryIndex;
-  renderDocument(entry.document, {
-    fragment: entry.fragment,
-    scrollY: entry.fragment ? null : entry.scrollY,
-  });
+  renderNavigationEntry(entry);
 }
 
 function keepCurrentHistoryEntry(): void {
@@ -433,7 +478,7 @@ function parseHistoryState(state: unknown): HushmarkHistoryState | null {
 
   const candidate = state as Partial<HushmarkHistoryState>;
   if (
-    candidate.kind !== "hushmark-document" ||
+    candidate.kind !== "hushmark-navigation" ||
     typeof candidate.sessionId !== "number" ||
     typeof candidate.entryId !== "number"
   ) {
@@ -448,13 +493,15 @@ function parseHistoryState(state: unknown): HushmarkHistoryState | null {
 }
 
 function handleNavigationKeydown(event: KeyboardEvent): void {
-  if (
-    event.ctrlKey &&
-    !event.altKey &&
-    !event.metaKey &&
-    !event.shiftKey &&
-    event.key.toLowerCase() === "p"
-  ) {
+  if (isControlShortcut(event, SHORTCUTS.home)) {
+    event.preventDefault();
+    if (!event.repeat) {
+      pushHomeNavigation();
+    }
+    return;
+  }
+
+  if (isControlShortcut(event, SHORTCUTS.print)) {
     event.preventDefault();
     if (canPrintCurrentDocument() && !event.repeat) {
       window.print();
@@ -462,13 +509,7 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (
-    event.ctrlKey &&
-    !event.altKey &&
-    !event.metaKey &&
-    !event.shiftKey &&
-    event.key.toLowerCase() === "o"
-  ) {
+  if (isControlShortcut(event, SHORTCUTS.open)) {
     event.preventDefault();
     if (currentMode === "reader") {
       void openDocumentFromPicker();
@@ -507,11 +548,17 @@ function canPrintCurrentDocument(): boolean {
 }
 
 function navigationDirectionForEvent(event: KeyboardEvent): "back" | "forward" | null {
-  if ((event.altKey && event.key === "ArrowLeft") || event.key === "BrowserBack") {
+  if (
+    (event.altKey && event.key === SHORTCUTS.back.key) ||
+    event.key === SHORTCUTS.back.alternateKey
+  ) {
     return "back";
   }
 
-  if ((event.altKey && event.key === "ArrowRight") || event.key === "BrowserForward") {
+  if (
+    (event.altKey && event.key === SHORTCUTS.forward.key) ||
+    event.key === SHORTCUTS.forward.alternateKey
+  ) {
     return "forward";
   }
 
@@ -612,6 +659,8 @@ function findFragmentTarget(fragment: string): HTMLElement | null {
 }
 
 async function openTopLevelDocument(path: string): Promise<void> {
+  const openedFromHome = getActiveNavigationEntry()?.view.kind === "home";
+  saveActiveScrollPosition();
   renderState("loading", "Opening Markdown file...");
 
   try {
@@ -619,7 +668,11 @@ async function openTopLevelDocument(path: string): Promise<void> {
       path,
     });
     currentMode = "reader";
-    resetDocumentNavigation(documentView);
+    if (openedFromHome && getActiveNavigationEntry()?.view.kind === "home") {
+      pushDocumentNavigation(documentView, null);
+    } else {
+      resetNavigation(documentView);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     document.title = `Error - ${PRODUCT.displayName}`;
@@ -660,7 +713,7 @@ async function start(): Promise<void> {
       throw new Error("Initial document state was not returned.");
     }
 
-    resetDocumentNavigation(startupView.document);
+    resetNavigation(startupView.document);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     document.title = `Error - ${PRODUCT.displayName}`;

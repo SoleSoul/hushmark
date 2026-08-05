@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createTextElement } from "./dom";
 import { PRODUCT } from "./product";
+import { SHORTCUTS } from "./shortcuts";
 import type { SetupActionId, SetupCommand, SetupMessage, SetupStatus } from "./types";
 
 export const WINDOWS_SETUP_TITLE = "Hushmark Setup";
@@ -291,7 +292,7 @@ function createSelfUninstallConfirmation(
   actions.append(cancel, uninstall);
   confirmation.append(heading, explanation, actions);
   confirmation.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
+    if (event.key === SHORTCUTS.cancel.key) {
       event.preventDefault();
       renderSetup(app, status);
     }
