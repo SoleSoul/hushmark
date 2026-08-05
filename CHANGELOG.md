@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## 0.1.11
+
+Home, document layout, and zoom update.
+
 - Replace the empty state with a book-contents home and keyboard-help page, reachable with Ctrl+H and included in Back/Forward history.
 - Add 50%-200% document zoom, Page and Full Width layouts, and reflow-resistant reading-position bookmarks without adding persistent UI chrome.
 
