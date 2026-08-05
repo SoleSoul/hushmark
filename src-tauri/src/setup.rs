@@ -1158,14 +1158,29 @@ fn replace_file(source: &Path, destination: &Path) -> Result<(), String> {
     if result == 0 {
         let error = std::io::Error::last_os_error();
         let _ = fs::remove_file(source);
-        return Err(format!(
-            "Could not replace {} with {}: {error}",
-            destination.display(),
-            source.display()
-        ));
+        return Err(replacement_error_details(source, destination, &error));
     }
 
     Ok(())
+}
+
+#[cfg(windows)]
+fn replacement_error_details(source: &Path, destination: &Path, error: &std::io::Error) -> String {
+    const ERROR_ACCESS_DENIED: i32 = 5;
+    const ERROR_SHARING_VIOLATION: i32 = 32;
+
+    let technical_details = format!(
+        "Could not replace {} with {}: {error}",
+        destination.display(),
+        source.display()
+    );
+
+    match error.raw_os_error() {
+        Some(ERROR_ACCESS_DENIED) | Some(ERROR_SHARING_VIOLATION) => format!(
+            "Close every Hushmark window, then try again. If it still fails, end any Hushmark.exe process in Task Manager and retry. Security software may also be preventing the replacement.\n\nTechnical details: {technical_details}"
+        ),
+        _ => technical_details,
+    }
 }
 
 #[cfg(windows)]
@@ -1190,7 +1205,8 @@ mod tests {
     use super::{
         are_file_handlers_registered, compare_numeric_versions, deferred_cleanup_script,
         install_action_for_status, install_temp_path, installed_version_for_status,
-        is_context_menu_registered, open_command, remove_empty_install_dir, InstallAction,
+        is_context_menu_registered, open_command, remove_empty_install_dir,
+        replacement_error_details, InstallAction,
     };
     use std::cmp::Ordering;
     use std::fs;
@@ -1297,6 +1313,40 @@ mod tests {
             super::executable_version(&PathBuf::from(r"C:\definitely\missing\Hushmark.exe")),
             None
         );
+    }
+
+    #[test]
+    fn locked_replacement_errors_explain_how_to_retry() {
+        let source = PathBuf::from(r"C:\Downloads\hushmark.exe.tmp");
+        let destination = PathBuf::from(r"C:\Programs\Hushmark\Hushmark.exe");
+
+        for code in [5, 32] {
+            let details = replacement_error_details(
+                &source,
+                &destination,
+                &std::io::Error::from_raw_os_error(code),
+            );
+
+            assert!(details.contains("Close every Hushmark window"));
+            assert!(details.contains("Task Manager"));
+            assert!(details.contains("Security software"));
+            assert!(details.contains(&format!("os error {code}")));
+            assert!(details.contains(destination.to_string_lossy().as_ref()));
+            assert!(details.contains(source.to_string_lossy().as_ref()));
+        }
+    }
+
+    #[test]
+    fn unrelated_replacement_errors_keep_focused_technical_details() {
+        let details = replacement_error_details(
+            &PathBuf::from(r"C:\Downloads\hushmark.exe.tmp"),
+            &PathBuf::from(r"C:\Programs\Hushmark\Hushmark.exe"),
+            &std::io::Error::from_raw_os_error(2),
+        );
+
+        assert!(details.starts_with("Could not replace"));
+        assert!(details.contains("os error 2"));
+        assert!(!details.contains("Task Manager"));
     }
 
     #[test]

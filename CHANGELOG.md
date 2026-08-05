@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Explain how to recover when Windows cannot replace an installed Hushmark executable because another process or security software is holding it.
+
 ## 0.1.11
 
 Home, document layout, and zoom update.
