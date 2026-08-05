@@ -20,6 +20,18 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
     ],
   },
   {
+    title: "View",
+    shortcuts: [
+      { action: "Zoom in", keys: SHORTCUTS.zoomIn.displayKeys },
+      { action: "Zoom out", keys: SHORTCUTS.zoomOut.displayKeys },
+      { action: "Reset zoom", keys: SHORTCUTS.resetZoom.displayKeys },
+      {
+        action: "Toggle Page / Full Width",
+        keys: SHORTCUTS.toggleLayout.displayKeys,
+      },
+    ],
+  },
+  {
     title: "Navigation",
     shortcuts: [
       { action: "Go back", keys: SHORTCUTS.back.displayKeys },

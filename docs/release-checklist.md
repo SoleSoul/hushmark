@@ -99,9 +99,14 @@ For an AUR update:
 ## Smoke Tests
 
 - Run `src-tauri\target\release\hushmark.exe examples\markdown-visual-inspection.md`.
-- Open with no arguments and confirm the empty state.
-- From the empty state, open setup using the top-right action. Confirm it reads **Setup** and stays visually quiet when the installed copy is current.
-- Check Ctrl+O from empty state and from an open document.
+- Open with no arguments and confirm the Home/Help contents page.
+- From Home, open setup using the top-right action. Confirm it reads **Setup** and stays visually quiet when the installed copy is current.
+- Check Ctrl+O from Home and from an open document.
+- Check Ctrl+H enters Home history and Alt+Left/Alt+Right move between Home and the document.
+- Check Ctrl++/Ctrl+=, Ctrl+-, Ctrl+0, and Ctrl+MouseWheel across the 50%-200% zoom range.
+- Check Ctrl+L toggles Page and Full Width at non-default zoom without changing apparent text size or reading position.
+- Resize wide and narrow windows in both layouts and confirm resizing does not change zoom.
+- Check Back/Forward reading positions after zoom and layout changes with prose, headings, front matter, images, tables, and long code.
 - Open `examples/print-visual-inspection.md`, check Ctrl+P print preview and Print to PDF, and confirm Ctrl+P does nothing in empty, error, and setup views.
 - Check same-document fragments, missing fragments, Alt+Left, and Alt+Right.
 - Check relative `.md` / `.markdown` links, linked fragments, Back/Forward, and blocked unsafe links.

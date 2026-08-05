@@ -6,7 +6,7 @@ This roadmap is not a contract. It is a short parking lot for likely next work a
 
 - Keep `CHANGELOG.md` current under `Unreleased` for tester-visible changes.
 - Run the release checklist before publishing any GitHub release or tester binary.
-- Smoke-test `examples/markdown-visual-inspection.md`, same-document fragments, relative Markdown links, Home/Back/Forward, Ctrl+O, Ctrl+P, Ctrl+H, local images, table alignment, external links, and Windows setup mode.
+- Smoke-test `examples/markdown-visual-inspection.md`, same-document fragments, relative Markdown links, Home/Back/Forward, document zoom/layout, Ctrl+O, Ctrl+P, Ctrl+H, local images, table alignment, external links, and Windows setup mode.
 - Smoke-test the quiet Windows setup entry point and install-version action labels.
 
 ## Near-Term Linux Support
@@ -25,7 +25,6 @@ These are speculative unless a future request explicitly accepts them:
 - Overlay controls that appear only when needed and do not become a persistent toolbar.
 - Table-of-contents overlay generated from document headings.
 - Source/render toggle for inspection only, with no editing workflow.
-- Reading width and zoom controls that preserve the minimalist reader feel.
 - More Markdown fixtures or focused tests for parser, sanitization, image, link, and navigation edge cases.
 - Optional frontend tests for link classification, document history, and setup affordance behavior.
 - Additional Linux package formats after a source-based package path is proven.

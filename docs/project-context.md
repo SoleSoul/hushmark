@@ -24,6 +24,8 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Resolve safe local Markdown image paths and embed them as `data:` URLs.
 - Preserve controlled table alignment classes.
 - Print an open document with Ctrl+P through the native WebView print dialog.
+- Zoom open documents from 50% to 200% and switch between the default Page layout and an uncapped Full Width layout without adding reader chrome.
+- Preserve semantic reading positions across document reflow, layout changes, zoom changes, and Back/Forward navigation.
 - Disable the internal WebView context menu.
 - Provide per-user Windows install, Open With, right-click integration, and complete Hushmark-owned uninstall behavior without admin rights.
 - Keep in-app setup/integration unavailable on Linux; Linux setup belongs in packaging rather than the reader app.
@@ -39,7 +41,8 @@ For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integrat
 - `src-tauri/src/external_links.rs`: External URL allowlisting before Tauri opens approved links with the system default application.
 - `src-tauri/src/identity.rs`: Shared display identity plus Windows-gated integration identifiers.
 - `src-tauri/src/lib.rs`: Tauri command and plugin registration plus startup platform capabilities.
-- `src/main.ts`: Reader startup, rendering, link handling, document/home navigation history, Ctrl+O, Ctrl+P, Ctrl+H, drag/drop, and capability-gated home setup affordance.
+- `src/main.ts`: Reader startup, rendering, link handling, document/home navigation history, keyboard commands, drag/drop, and capability-gated home setup affordance.
+- `src/documentView.ts`: Platform-neutral document zoom/layout calculations and rendered-structure reading-position capture/restore.
 - `src/homeView.ts`: Platform-neutral home and keyboard-contents page rendering.
 - `src/setupView.ts`: Setup screen rendering and setup actions.
 - `src/types.ts`, `src/dom.ts`, and `src/product.ts`: Shared frontend types, DOM helper, and frontend product labels.
@@ -75,6 +78,7 @@ See `docs/reader-design.md` for the focused design note.
 - Windows default-app assignment remains user-controlled. Hushmark registers itself as a candidate for Open With, but the setup page does not try to guide or automate default-app selection.
 - Linux packages should own installation, updates, desktop integration, icons, and MIME registration. See `docs/linux-support.md`.
 - Same-document fragment history currently re-renders during popstate restoration. This is acceptable while the reader has little transient DOM-only state.
+- Document zoom and layout intentionally reset to Page at 100% on every launch so Hushmark always opens with its paper-like reading baseline.
 - Release binaries are unsigned unless a signing step is added, so Windows SmartScreen may warn testers.
 
 ## Focused Docs
@@ -84,5 +88,6 @@ See `docs/reader-design.md` for the focused design note.
 - `docs/windows-integration.md`: Install path, registry keys, setup behavior, and Windows manual tests.
 - `docs/linux-support.md`: Linux runtime policy, package responsibilities, and remaining validation.
 - `docs/printing.md`: Printing behavior, stylesheet policy, and manual validation.
+- `docs/document-view.md`: Document layout, zoom, reading-position, and launch-default behavior.
 - `docs/roadmap.md`: Active ideas and possible future work.
 - `docs/release-checklist.md`: Repeatable tester/GitHub release process.

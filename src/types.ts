@@ -63,10 +63,20 @@ export type NavigationView =
       fragment: string | null;
     };
 
+export type DocumentReadingPosition = {
+  anchorId: string | null;
+  anchorIndex: number;
+  anchorFraction: number;
+  viewportFraction: number;
+  scrollProgress: number;
+  atStart: boolean;
+};
+
 export type NavigationEntry = {
   id: number;
   view: NavigationView;
   scrollY: number;
+  readingPosition: DocumentReadingPosition | null;
 };
 
 export type HushmarkHistoryState = {

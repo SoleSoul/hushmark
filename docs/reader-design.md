@@ -13,6 +13,8 @@ Design boundaries:
 - Prefer system and browser primitives over custom UI machinery.
 - Avoid sidebars, tabs, editor controls, source views, and settings surfaces in the reader.
 
+The default Page layout keeps the established 760px preferred document width and surrounding whitespace. Zoom scales text and that preferred page width together, allowing the viewport to constrain it naturally. Full Width removes the artificial measure cap while retaining stable side padding; zoom changes text size but not the available content width. Both are keyboard-only document presentation controls and must not affect Home, Setup, error states, or print output. Page at 100% is restored on every launch so the paper-like reading view remains Hushmark's deliberate default.
+
 The no-document home view may carry more information than the reader itself. Treat it as a restrained book contents page: keep the Hushmark title and short identity line prominent, group keyboard commands by purpose, and use dotted leaders to connect actions to their keys. It belongs in the same navigation history as documents so Home, Back, and Forward feel like movement between pages rather than application chrome.
 
 Windows setup should feel like an interactive Hushmark document rather than a separate themed control panel. Use the reader's unframed warm canvas, content width, spacing, sans-serif heading hierarchy, serif explanatory copy, restrained rules, and square or lightly rounded controls. Avoid nested cards, a second paper surface inside the window, pills, or large areas of status color.

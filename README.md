@@ -12,6 +12,7 @@ Hushmark opens Markdown files in a calm, uncluttered reading view. It is meant f
 - Local `.md` / `.markdown` files
 - Relative Markdown document links
 - Back and Forward navigation
+- Page and Full Width document layouts with keyboard zoom
 - Generated heading anchors
 - Local and remote images
 - Tables and strikethrough
@@ -42,6 +43,8 @@ Open a Markdown file by:
 Hushmark remembers document navigation while it is open, including Back and Forward between linked documents.
 
 Press **Ctrl+P** to print the open document through the system print dialog.
+
+Press **Ctrl+H** for Hushmark's keyboard reference. Document view commands include **Ctrl+L** for Page or Full Width layout, **Ctrl++** / **Ctrl+-** for zoom, and **Ctrl+0** to reset zoom.
 
 ## Markdown support
 

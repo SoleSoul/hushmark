@@ -1,5 +1,7 @@
 export type ShortcutDefinition = {
   key: string;
+  alternateKey?: string;
+  allowShift?: boolean;
   displayKeys: readonly string[];
 };
 
@@ -17,6 +19,15 @@ export const SHORTCUTS = {
     alternateKey: "BrowserForward",
     displayKeys: ["Alt", "Right"],
   },
+  zoomIn: {
+    key: "=",
+    alternateKey: "+",
+    allowShift: true,
+    displayKeys: ["Ctrl", "+ / ="],
+  },
+  zoomOut: { key: "-", displayKeys: ["Ctrl", "-"] },
+  resetZoom: { key: "0", displayKeys: ["Ctrl", "0"] },
+  toggleLayout: { key: "l", displayKeys: ["Ctrl", "L"] },
   cancel: { key: "Escape", displayKeys: ["Esc"] },
 } as const;
 
@@ -28,7 +39,8 @@ export function isControlShortcut(
     event.ctrlKey &&
     !event.altKey &&
     !event.metaKey &&
-    !event.shiftKey &&
-    event.key.toLowerCase() === shortcut.key.toLowerCase()
+    (!event.shiftKey || shortcut.allowShift === true) &&
+    (event.key.toLowerCase() === shortcut.key.toLowerCase() ||
+      event.key.toLowerCase() === shortcut.alternateKey?.toLowerCase())
   );
 }

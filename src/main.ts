@@ -2,6 +2,17 @@ import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createTextElement } from "./dom";
+import {
+  applyDocumentViewPreferences,
+  captureDocumentReadingPosition,
+  DEFAULT_DOCUMENT_VIEW,
+  DOCUMENT_ZOOM_STEP,
+  resetDocumentZoom,
+  restoreDocumentReadingPosition,
+  toggledDocumentLayout,
+  zoomedDocumentView,
+} from "./documentView";
+import type { DocumentViewPreferences } from "./documentView";
 import { createHomeView } from "./homeView";
 import { PRODUCT } from "./product";
 import { renderSetup, WINDOWS_SETUP_TITLE } from "./setupView";
@@ -9,6 +20,7 @@ import { isControlShortcut, SHORTCUTS } from "./shortcuts";
 import "./styles.css";
 import type {
   HushmarkHistoryState,
+  DocumentReadingPosition,
   LinkAction,
   LinkedDocument,
   LoadedDocument,
@@ -39,12 +51,20 @@ let activeNavigationIndex = -1;
 let navigationOrder: number[] = [];
 let navigationSessionId = 0;
 let nextNavigationEntryId = 1;
+let documentViewPreferences: DocumentViewPreferences = {
+  ...DEFAULT_DOCUMENT_VIEW,
+};
+let wheelZoomAccumulator = 0;
 
 document.addEventListener("contextmenu", preventInternalContextMenu, {
   capture: true,
 });
 document.addEventListener("keydown", handleNavigationKeydown, {
   capture: true,
+});
+document.addEventListener("wheel", handleDocumentWheel, {
+  capture: true,
+  passive: false,
 });
 window.addEventListener("popstate", handleHistoryPopState);
 
@@ -97,7 +117,11 @@ function renderState(
 
 function renderDocument(
   documentView: LoadedDocument,
-  options: { fragment?: string | null; scrollY?: number | null } = {},
+  options: {
+    fragment?: string | null;
+    readingPosition?: DocumentReadingPosition | null;
+    scrollY?: number | null;
+  } = {},
 ): void {
   currentMode = "reader";
   currentDocument = documentView;
@@ -122,7 +146,9 @@ function renderDocument(
 
   app.replaceChildren(article);
 
-  if (options.fragment) {
+  if (options.readingPosition) {
+    restoreReadingPositionAfterRender(article, options.readingPosition);
+  } else if (options.fragment) {
     scrollToFragmentAfterRender(options.fragment);
   } else if (options.scrollY !== undefined && options.scrollY !== null) {
     restoreScrollAfterRender(options.scrollY);
@@ -290,7 +316,7 @@ async function openLinkedDocument(href: string): Promise<void> {
     return;
   }
 
-  saveActiveScrollPosition();
+  saveActiveReadingPosition();
 
   try {
     const linkedDocument = await invoke<LinkedDocument>("load_linked_document", {
@@ -325,7 +351,7 @@ function pushSameDocumentFragmentNavigation(fragment: string): void {
     return;
   }
 
-  saveActiveScrollPosition();
+  saveActiveReadingPosition();
   pushDocumentNavigation(documentView, fragment);
 }
 
@@ -363,7 +389,7 @@ function pushHomeNavigation(): void {
     return;
   }
 
-  saveActiveScrollPosition();
+  saveActiveReadingPosition();
   pushNavigationView({ kind: "home" });
 }
 
@@ -402,6 +428,7 @@ function createNavigationEntry(
     id,
     view,
     scrollY,
+    readingPosition: null,
   };
 }
 
@@ -415,9 +442,12 @@ function renderNavigationEntry(
   }
 
   const { document: documentView, fragment } = entry.view;
+  const readingPosition = entry.readingPosition;
   renderDocument(documentView, {
-    fragment,
-    scrollY: fragment ? null : (options.scrollY ?? entry.scrollY),
+    fragment: readingPosition ? null : fragment,
+    readingPosition,
+    scrollY:
+      readingPosition || fragment ? null : (options.scrollY ?? entry.scrollY),
   });
 }
 
@@ -429,14 +459,20 @@ function historyStateFor(entryId: number): HushmarkHistoryState {
   };
 }
 
-function saveActiveScrollPosition(): void {
-  if (activeNavigationEntryId === null) {
+function saveActiveReadingPosition(): void {
+  const entry = getActiveNavigationEntry();
+  if (!entry) {
     return;
   }
 
-  const entry = navigationEntries.get(activeNavigationEntryId);
-  if (entry) {
+  if (entry.view.kind === "home") {
     entry.scrollY = window.scrollY;
+    return;
+  }
+
+  const article = app.querySelector<HTMLElement>(":scope > .document");
+  if (article) {
+    entry.readingPosition = captureDocumentReadingPosition(article);
   }
 }
 
@@ -459,7 +495,7 @@ function handleHistoryPopState(event: PopStateEvent): void {
     return;
   }
 
-  saveActiveScrollPosition();
+  saveActiveReadingPosition();
   activeNavigationEntryId = state.entryId;
   activeNavigationIndex = entryIndex;
   renderNavigationEntry(entry);
@@ -493,6 +529,38 @@ function parseHistoryState(state: unknown): HushmarkHistoryState | null {
 }
 
 function handleNavigationKeydown(event: KeyboardEvent): void {
+  if (isControlShortcut(event, SHORTCUTS.zoomIn)) {
+    event.preventDefault();
+    if (!event.repeat) {
+      changeDocumentZoom(DOCUMENT_ZOOM_STEP);
+    }
+    return;
+  }
+
+  if (isControlShortcut(event, SHORTCUTS.zoomOut)) {
+    event.preventDefault();
+    if (!event.repeat) {
+      changeDocumentZoom(-DOCUMENT_ZOOM_STEP);
+    }
+    return;
+  }
+
+  if (isControlShortcut(event, SHORTCUTS.resetZoom)) {
+    event.preventDefault();
+    if (!event.repeat && canAdjustDocumentView()) {
+      updateDocumentView(resetDocumentZoom(documentViewPreferences));
+    }
+    return;
+  }
+
+  if (isControlShortcut(event, SHORTCUTS.toggleLayout)) {
+    event.preventDefault();
+    if (!event.repeat && canAdjustDocumentView()) {
+      updateDocumentView(toggledDocumentLayout(documentViewPreferences));
+    }
+    return;
+  }
+
   if (isControlShortcut(event, SHORTCUTS.home)) {
     event.preventDefault();
     if (!event.repeat) {
@@ -538,7 +606,86 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
   }
 }
 
+function handleDocumentWheel(event: WheelEvent): void {
+  if (!event.ctrlKey || event.altKey || event.metaKey) {
+    wheelZoomAccumulator = 0;
+    return;
+  }
+
+  event.preventDefault();
+  if (!canAdjustDocumentView() || event.deltaY === 0) {
+    wheelZoomAccumulator = 0;
+    return;
+  }
+
+  const delta = normalizedWheelDelta(event);
+  if (Math.sign(delta) !== Math.sign(wheelZoomAccumulator)) {
+    wheelZoomAccumulator = 0;
+  }
+  wheelZoomAccumulator += delta;
+
+  if (Math.abs(wheelZoomAccumulator) < 50) {
+    return;
+  }
+
+  changeDocumentZoom(
+    wheelZoomAccumulator < 0 ? DOCUMENT_ZOOM_STEP : -DOCUMENT_ZOOM_STEP,
+  );
+  wheelZoomAccumulator = 0;
+}
+
+function normalizedWheelDelta(event: WheelEvent): number {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    return event.deltaY * 16;
+  }
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    return event.deltaY * window.innerHeight;
+  }
+  return event.deltaY;
+}
+
+function changeDocumentZoom(delta: number): void {
+  if (!canAdjustDocumentView()) {
+    return;
+  }
+  updateDocumentView(zoomedDocumentView(documentViewPreferences, delta));
+}
+
+function updateDocumentView(nextPreferences: DocumentViewPreferences): void {
+  if (
+    nextPreferences.zoom === documentViewPreferences.zoom &&
+    nextPreferences.layout === documentViewPreferences.layout
+  ) {
+    return;
+  }
+
+  const article = app.querySelector<HTMLElement>(":scope > .document");
+  const readingPosition = article
+    ? captureDocumentReadingPosition(article)
+    : null;
+  const activeEntry = getActiveNavigationEntry();
+  if (readingPosition && activeEntry?.view.kind === "document") {
+    activeEntry.readingPosition = readingPosition;
+  }
+
+  documentViewPreferences = nextPreferences;
+  applyDocumentViewPreferences(document.documentElement, documentViewPreferences);
+
+  if (article && readingPosition) {
+    restoreDocumentReadingPosition(article, readingPosition);
+  }
+}
+
 function canPrintCurrentDocument(): boolean {
+  return (
+    currentMode === "reader" &&
+    Boolean(currentDocument?.path) &&
+    !currentDocument?.error &&
+    app.querySelector(":scope > .document") !== null
+  );
+}
+
+function canAdjustDocumentView(): boolean {
   return (
     currentMode === "reader" &&
     Boolean(currentDocument?.path) &&
@@ -631,6 +778,17 @@ function restoreScrollAfterRender(scrollY: number): void {
   });
 }
 
+function restoreReadingPositionAfterRender(
+  article: HTMLElement,
+  position: DocumentReadingPosition,
+): void {
+  window.requestAnimationFrame(() => {
+    if (article.isConnected) {
+      restoreDocumentReadingPosition(article, position);
+    }
+  });
+}
+
 function fragmentIdCandidates(fragment: string): string[] {
   const cleanFragment = fragment.startsWith("#") ? fragment.slice(1) : fragment;
   const candidates = [cleanFragment];
@@ -660,7 +818,7 @@ function findFragmentTarget(fragment: string): HTMLElement | null {
 
 async function openTopLevelDocument(path: string): Promise<void> {
   const openedFromHome = getActiveNavigationEntry()?.view.kind === "home";
-  saveActiveScrollPosition();
+  saveActiveReadingPosition();
   renderState("loading", "Opening Markdown file...");
 
   try {
@@ -707,6 +865,7 @@ async function start(): Promise<void> {
     const startupView = await invoke<StartupView>("load_initial_view");
     document.documentElement.dataset.platform = startupView.platform;
     platformCapabilities = startupView.capabilities;
+    applyDocumentViewPreferences(document.documentElement, documentViewPreferences);
     currentMode = "reader";
 
     if (!startupView.document) {

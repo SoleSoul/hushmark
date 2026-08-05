@@ -8,6 +8,19 @@
   --font-code:
     "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
     monospace;
+  --document-page-width-base: 760px;
+  --document-body-font-size-base: 16px;
+  --document-front-matter-font-size-base: 14px;
+  --document-front-matter-term-font-size-base: 12.48px;
+  --document-message-font-size-base: 15.2px;
+  --document-message-heading-font-size-base: 16px;
+  --document-heading-1-font-size-base: 40px;
+  --document-heading-2-font-size-base: 28px;
+  --document-heading-3-font-size-base: 21.6px;
+  --document-heading-4-font-size-base: 17.6px;
+  --document-heading-5-font-size-base: 16px;
+  --document-heading-6-font-size-base: 14.4px;
+  --document-pre-font-size-base: 14.72px;
 
   color: #24292f;
   background: #f8f7f3;
@@ -18,6 +31,7 @@
 
 :root[data-platform="windows"] {
   --font-reader: Georgia, "Times New Roman", Times, serif;
+  --document-body-font-size-base: 17px;
 }
 
 * {
@@ -106,7 +120,7 @@ body {
 .home__page {
   width: min(100%, 760px);
   margin: 0 auto;
-  padding: 4rem 1.5rem 5rem;
+  padding: 3rem 1.5rem 3.5rem;
 }
 
 .home__header h1 {
@@ -126,15 +140,15 @@ body {
 }
 
 .home__contents {
-  margin-top: 2.5rem;
+  margin-top: 2rem;
 }
 
 .home__section + .home__section {
-  margin-top: 2.6rem;
+  margin-top: 2.1rem;
 }
 
 .home__section h2 {
-  margin: 0 0 1rem;
+  margin: 0 0 0.8rem;
   color: #4e463a;
   font-size: 0.82rem;
   font-weight: 700;
@@ -144,7 +158,7 @@ body {
 
 .home__shortcuts {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.7rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -448,19 +462,30 @@ body {
 }
 
 .document {
-  width: min(100%, 760px);
+  width: min(
+    100%,
+    var(--document-page-width, var(--document-page-width-base))
+  );
   margin: 0 auto;
   padding: clamp(2rem, 6vw, 4.5rem) 1.5rem 5rem;
   overflow-wrap: anywhere;
   color: #24292f;
   font-family: var(--font-reader);
-  font-size: 1rem;
+  font-size: var(
+    --document-body-font-size,
+    var(--document-body-font-size-base)
+  );
   line-height: 1.7;
 }
 
 :root[data-platform="windows"] .document {
-  font-size: 1.0625rem;
   line-height: 1.72;
+}
+
+:root[data-document-layout="full-width"] .document {
+  width: 100%;
+  max-width: none;
+  padding-inline: clamp(2rem, 5vw, 5rem);
 }
 
 .document > :first-child {
@@ -482,14 +507,20 @@ body {
   border-inline-start: 2px solid #cdbf9f;
   color: #4f555c;
   font-family: var(--font-reader);
-  font-size: 0.875rem;
+  font-size: var(
+    --document-front-matter-font-size,
+    var(--document-front-matter-font-size-base)
+  );
   line-height: 1.5;
 }
 
 .document .hushmark-front-matter dt {
   color: #786445;
   font-family: var(--font-ui);
-  font-size: 0.78rem;
+  font-size: var(
+    --document-front-matter-term-font-size,
+    var(--document-front-matter-term-font-size-base)
+  );
   font-weight: 600;
   text-transform: capitalize;
 }
@@ -520,7 +551,10 @@ body {
   background: #fff1ed;
   color: #424a53;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(
+    --document-message-font-size,
+    var(--document-message-font-size-base)
+  );
   line-height: 1.45;
 }
 
@@ -531,7 +565,10 @@ body {
 
 .document-message h2 {
   color: #9a3412;
-  font-size: 1rem;
+  font-size: var(
+    --document-message-heading-font-size,
+    var(--document-message-heading-font-size-base)
+  );
   font-weight: 750;
 }
 
@@ -554,29 +591,47 @@ body {
 }
 
 .document h1 {
-  font-size: 2.5rem;
+  font-size: var(
+    --document-heading-1-font-size,
+    var(--document-heading-1-font-size-base)
+  );
 }
 
 .document h2 {
   padding-bottom: 0.25rem;
   border-bottom: 1px solid #d8d2c4;
-  font-size: 1.75rem;
+  font-size: var(
+    --document-heading-2-font-size,
+    var(--document-heading-2-font-size-base)
+  );
 }
 
 .document h3 {
-  font-size: 1.35rem;
+  font-size: var(
+    --document-heading-3-font-size,
+    var(--document-heading-3-font-size-base)
+  );
 }
 
 .document h4 {
-  font-size: 1.1rem;
+  font-size: var(
+    --document-heading-4-font-size,
+    var(--document-heading-4-font-size-base)
+  );
 }
 
 .document h5 {
-  font-size: 1rem;
+  font-size: var(
+    --document-heading-5-font-size,
+    var(--document-heading-5-font-size-base)
+  );
 }
 
 .document h6 {
-  font-size: 0.9rem;
+  font-size: var(
+    --document-heading-6-font-size,
+    var(--document-heading-6-font-size-base)
+  );
 }
 
 .document p,
@@ -634,7 +689,7 @@ body {
   padding: 1rem;
   border-radius: 0.75rem;
   background: #ebe7dc;
-  font-size: 0.92rem;
+  font-size: var(--document-pre-font-size, var(--document-pre-font-size-base));
   line-height: 1.55;
 }
 
@@ -729,7 +784,17 @@ body {
   }
 
   .document,
-  :root[data-platform="windows"] .document {
+  :root[data-platform="windows"] .document,
+  :root[data-document-layout] .document {
+    --document-front-matter-font-size: 0.875rem;
+    --document-front-matter-term-font-size: 0.78rem;
+    --document-heading-1-font-size: 2.5rem;
+    --document-heading-2-font-size: 1.75rem;
+    --document-heading-3-font-size: 1.35rem;
+    --document-heading-4-font-size: 1.1rem;
+    --document-heading-5-font-size: 1rem;
+    --document-heading-6-font-size: 0.9rem;
+    --document-pre-font-size: 0.92rem;
     width: auto;
     max-width: none;
     margin: 0;
