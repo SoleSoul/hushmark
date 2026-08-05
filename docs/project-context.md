@@ -89,5 +89,6 @@ See `docs/reader-design.md` for the focused design note.
 - `docs/linux-support.md`: Linux runtime policy, package responsibilities, and remaining validation.
 - `docs/printing.md`: Printing behavior, stylesheet policy, and manual validation.
 - `docs/document-view.md`: Document layout, zoom, reading-position, and launch-default behavior.
+- `docs/table-layout-optimization.md`: Research note on possible minimum-height table sizing beyond the current browser algorithm.
 - `docs/roadmap.md`: Active ideas and possible future work.
 - `docs/release-checklist.md`: Repeatable tester/GitHub release process.

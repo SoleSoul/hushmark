@@ -56,6 +56,8 @@ Tables use the browser's automatic, content-sensitive column sizing. Ordinary sh
 
 Do not impose equal-width or position-based column rules on general Markdown tables. Markdown does not identify columns as labels, numbers, or prose, so fixed widths and first-column assumptions create surprising results across real documents.
 
+Possible future minimum-height optimization approaches are recorded in `docs/table-layout-optimization.md`. Current Hushmark behavior intentionally remains browser-driven.
+
 ## YAML front matter
 
 Hushmark recognizes YAML front matter only when the first line is exactly `---` and a later line contains a matching `---` delimiter. A source pre-parser returns structured metadata and the untouched Markdown body before `pulldown-cmark` runs. Valid metadata is shown as a subdued key/value block, and the front matter lines are omitted from the Markdown body.
