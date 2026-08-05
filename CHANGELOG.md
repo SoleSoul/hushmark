@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## 0.1.12
+
+Windows update recovery and Markdown table sizing update.
+
 - Explain how to recover when Windows cannot replace an installed Hushmark executable because another process or security software is holding it.
 - Keep compact Markdown table columns readable while giving prose-heavy columns the remaining width and reserving within-word breaks for genuine overflow.
 
