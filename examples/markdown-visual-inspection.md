@@ -438,6 +438,14 @@ This text appears after the horizontal rule.
 | Strikethrough | Supported | Enabled in pulldown-cmark |
 | Task lists | Not supported yet | Should render as ordinary list text |
 
+**Expect:** In the table below, the compact Status and Type columns should keep ordinary short words intact while the Explanation column receives the remaining width and wraps at spaces. The long unbroken token may break only when necessary. On a genuinely narrow viewport, local table scrolling is preferable to splitting compact labels character by character.
+
+| Status | Type | Explanation |
+| --- | --- | --- |
+| Ready | API | This deliberately long explanation should receive most of the available width while leaving enough room for the compact columns to remain comfortable. |
+| Waiting | CLI | A second prose-heavy row confirms that automatic sizing considers the content across the entire column rather than only the heading. |
+| Failed | URL | hushmark-table-token-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+
 ---
 
 ## Feature: Table alignment

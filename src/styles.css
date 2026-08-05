@@ -718,6 +718,8 @@ body {
 .document td {
   padding: 0.45rem 0.65rem;
   border: 1px solid #d8d2c4;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .document th {
@@ -841,7 +843,8 @@ body {
 
   .document th,
   .document td {
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
   }
 
   .document img,

@@ -50,6 +50,12 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - Local image paths must stay inside the opened document's folder. Parent-directory traversal such as `../`, `file://` URLs, absolute local paths, and unsupported local file extensions are not resolved.
 - Local image files are embedded into the rendered document as `data:` image URLs after sanitization. This keeps Hushmark from exposing a broader local-file protocol to the WebView.
 
+## Table layout
+
+Tables use the browser's automatic, content-sensitive column sizing. Ordinary short words contribute their natural minimum width, prose wraps at normal opportunities, and exceptionally long unbroken content can break as an emergency. When reasonable column minimums exceed the reader width, overflow should remain local to the table rather than forcing compact columns into character-by-character wrapping or widening the whole document.
+
+Do not impose equal-width or position-based column rules on general Markdown tables. Markdown does not identify columns as labels, numbers, or prose, so fixed widths and first-column assumptions create surprising results across real documents.
+
 ## YAML front matter
 
 Hushmark recognizes YAML front matter only when the first line is exactly `---` and a later line contains a matching `---` delimiter. A source pre-parser returns structured metadata and the untouched Markdown body before `pulldown-cmark` runs. Valid metadata is shown as a subdued key/value block, and the front matter lines are omitted from the Markdown body.
