@@ -3,29 +3,75 @@ import { createTextElement } from "./dom";
 import { PRODUCT } from "./product";
 import type { SetupActionId, SetupCommand, SetupMessage, SetupStatus } from "./types";
 
-function boolText(value: boolean): string {
-  return value ? "Yes" : "No";
-}
+export const WINDOWS_SETUP_TITLE = "Hushmark Setup";
 
-function createDetailRow(label: string, value: string): HTMLDivElement {
-  const row = document.createElement("div");
-  row.className = "setup-detail-row";
-  row.append(createTextElement("dt", label), createTextElement("dd", value));
-  return row;
-}
+const WINDOWS_SETUP_COPY = {
+  installRowLabel: "Install Hushmark",
+  installedRowLabel: "Installed copy",
+  updateRowLabel: "Update Hushmark",
+  downgradeRowLabel: "Downgrade Hushmark",
+  reinstallRowLabel: "Reinstall Hushmark",
+  openWithRowLabel: "Show Hushmark in Open With",
+  openWithRowDescription: "Offer Hushmark for .md and .markdown files.",
+  contextMenuRowLabel: "Add right-click menu entry",
+  contextMenuRowDescription: "Add 'Open with Hushmark' to Markdown file context menus.",
+  removeInstalledCopyButtonLabel: "Remove installed copy",
+  removeIntegrationButtonLabel: "Remove Hushmark integration",
+} as const;
 
 function installRowLabel(status: SetupStatus): string {
-  return status.installed && !status.installedMatchesCurrent
-    ? PRODUCT.updateRowLabel
-    : PRODUCT.installRowLabel;
+  switch (status.installAction) {
+    case "current":
+      return WINDOWS_SETUP_COPY.installedRowLabel;
+    case "update":
+      return WINDOWS_SETUP_COPY.updateRowLabel;
+    case "downgrade":
+      return WINDOWS_SETUP_COPY.downgradeRowLabel;
+    case "reinstall":
+      return WINDOWS_SETUP_COPY.reinstallRowLabel;
+    default:
+      return WINDOWS_SETUP_COPY.installRowLabel;
+  }
+}
+
+function installRowDescription(status: SetupStatus): string {
+  const installedVersion = status.installedVersion ?? "an unknown version";
+
+  switch (status.installAction) {
+    case "current":
+      return status.runningInstalledCopy
+        ? "This is the copy in your local Programs folder."
+        : `Version ${status.version} is installed in your local Programs folder.`;
+    case "update":
+    case "downgrade":
+      return `Replace installed version ${installedVersion} with version ${status.version}.`;
+    case "reinstall":
+      return "Replace the installed build with this copy.";
+    default:
+      return "Keep Hushmark in your local Programs folder.";
+  }
 }
 
 function installRowStateText(status: SetupStatus): string {
-  if (status.installedMatchesCurrent) {
-    return "Installed";
+  switch (status.installAction) {
+    case "current":
+      return `Version ${status.version}`;
+    case "update":
+      return "Update available";
+    case "downgrade":
+      return "Newer version installed";
+    case "reinstall":
+      return "Different build installed";
+    default:
+      return "Not installed";
   }
+}
 
-  return status.installed ? "Update available" : "Not installed";
+function showSeparateRemovalAction(status: SetupStatus): boolean {
+  return (
+    (status.installed && !status.installedMatchesCurrent) ||
+    (!status.installed && status.hasRegisteredIntegration)
+  );
 }
 
 function createIntegrationRow(
@@ -50,7 +96,7 @@ function createIntegrationRow(
     void runSetupAction(app, command, status, id);
   });
 
-  const check = createTextElement("span", checked ? "✓" : "", "integration-row__check");
+  const check = createTextElement("span", checked ? "\u2713" : "", "integration-row__check");
   check.setAttribute("aria-hidden", "true");
 
   const copy = document.createElement("span");
@@ -90,81 +136,25 @@ function createSecondaryButton(
   return button;
 }
 
-function createMessage(message: SetupMessage): HTMLParagraphElement {
-  const element = createTextElement("p", message.text, `setup-message setup-message--${message.kind}`);
+function createMessage(message: SetupMessage): HTMLDivElement {
+  const element = document.createElement("div");
+  element.className = `setup-message setup-message--${message.kind}`;
+  element.append(createTextElement("p", message.text));
+
+  if (message.kind !== "success" && message.details) {
+    element.append(createTextElement("pre", message.details, "setup-message__details"));
+  }
+
   return element;
-}
-
-function createDetails(status: SetupStatus): HTMLDetailsElement {
-  const details = document.createElement("details");
-  details.className = "setup-details";
-
-  const summary = createTextElement("summary", "Details");
-  const rows = document.createElement("dl");
-  rows.className = "setup-details__rows";
-  const detailRows = [
-    createDetailRow("App", status.appName),
-    createDetailRow("Version", status.version),
-    createDetailRow("Developer", status.developer),
-  ];
-
-  if (status.installedVersion) {
-    detailRows.push(createDetailRow("Installed version", status.installedVersion));
-  }
-
-  detailRows.push(
-    createDetailRow("Release binary", status.releaseExeName),
-    createDetailRow("Installed executable", status.installedExeName),
-    createDetailRow("Current executable", status.currentExePath),
-    createDetailRow("ProgID", status.progId),
-    createDetailRow("Installed copy exists", boolText(status.installed)),
-    createDetailRow("Installed copy current", boolText(status.installedMatchesCurrent)),
-    createDetailRow("App Paths status", boolText(status.appPathRegistered)),
-    createDetailRow("Application registration", boolText(status.applicationRegistered)),
-    createDetailRow("Open With .md", boolText(status.openWithMdRegistered)),
-    createDetailRow("Open With .markdown", boolText(status.openWithMarkdownRegistered)),
-    createDetailRow("Right-click .md", boolText(status.contextMenuMdRegistered)),
-    createDetailRow("Right-click .markdown", boolText(status.contextMenuMarkdownRegistered)),
-    createDetailRow("Install path", status.installPath),
-  );
-  rows.append(...detailRows);
-
-  if (status.message?.details) {
-    rows.append(createDetailRow("Last message details", status.message.details));
-  }
-
-  details.append(summary, rows);
-  return details;
-}
-
-function createUnsupportedDetails(status: SetupStatus): HTMLDetailsElement {
-  const details = document.createElement("details");
-  details.className = "setup-details";
-
-  const summary = createTextElement("summary", "Details");
-  const rows = document.createElement("dl");
-  rows.className = "setup-details__rows";
-  rows.append(
-    createDetailRow("App", status.appName),
-    createDetailRow("Version", status.version),
-    createDetailRow("Platform", status.platform),
-    createDetailRow("Current executable", status.currentExePath),
-  );
-
-  if (status.message?.details) {
-    rows.append(createDetailRow("Details", status.message.details));
-  }
-
-  details.append(summary, rows);
-  return details;
 }
 
 export function renderSetup(
   app: HTMLElement,
   status: SetupStatus,
   workingAction: SetupActionId | null = null,
+  confirmingAction: SetupActionId | null = null,
 ): void {
-  document.title = PRODUCT.setupTitle;
+  document.title = WINDOWS_SETUP_TITLE;
 
   const section = document.createElement("section");
   section.className = "setup";
@@ -172,48 +162,49 @@ export function renderSetup(
   const panel = document.createElement("div");
   panel.className = "setup__panel";
 
-  const heading = createTextElement("h1", status.appName);
+  const heading = createTextElement("h1", "Setup");
 
-  if (!status.setupSupported) {
-    const intro = createTextElement(
-      "p",
-      status.message?.text ?? "Setup integration is currently only available on Windows.",
-      "setup__intro",
-    );
-
-    panel.append(heading, intro, createUnsupportedDetails(status));
-    section.append(panel);
-    app.replaceChildren(section);
-    return;
-  }
-
+  const source = createTextElement(
+    "p",
+    status.runningInstalledCopy
+      ? `${status.appName} ${status.version}, running from the installed copy.`
+      : `${status.appName} ${status.version}, running as a standalone copy.`,
+    "setup__source",
+  );
   const intro = createTextElement(
     "p",
-    "Choose how Hushmark integrates with Markdown files on this Windows account.",
+    "Choose how Hushmark opens Markdown files on this Windows account.",
     "setup__intro",
   );
 
   const rows = document.createElement("div");
   rows.className = "integration-rows";
+  const installRow = createIntegrationRow(
+    app,
+    "install",
+    installRowLabel(status),
+    installRowDescription(status),
+    status.installedMatchesCurrent,
+    installRowStateText(status),
+    "toggle_install",
+    status,
+    workingAction,
+  );
+  installRow.setAttribute("aria-expanded", String(confirmingAction === "install"));
+  rows.append(installRow);
+
+  if (confirmingAction === "install") {
+    rows.append(createSelfUninstallConfirmation(app, status));
+  }
+
   rows.append(
     createIntegrationRow(
       app,
-      "install",
-      installRowLabel(status),
-      PRODUCT.installRowDescription,
-      status.installedMatchesCurrent,
-      installRowStateText(status),
-      "toggle_install",
-      status,
-      workingAction,
-    ),
-    createIntegrationRow(
-      app,
       "openWith",
-      PRODUCT.openWithRowLabel,
-      PRODUCT.openWithRowDescription,
+      WINDOWS_SETUP_COPY.openWithRowLabel,
+      WINDOWS_SETUP_COPY.openWithRowDescription,
       status.fileHandlersRegistered,
-      null,
+      status.fileHandlersRegistered ? "Shown" : "Not shown",
       "toggle_open_with_support",
       status,
       workingAction,
@@ -221,45 +212,39 @@ export function renderSetup(
     createIntegrationRow(
       app,
       "contextMenu",
-      PRODUCT.contextMenuRowLabel,
-      PRODUCT.contextMenuRowDescription,
+      WINDOWS_SETUP_COPY.contextMenuRowLabel,
+      WINDOWS_SETUP_COPY.contextMenuRowDescription,
       status.contextMenuRegistered,
-      null,
+      status.contextMenuRegistered ? "Added" : "Not added",
       "toggle_context_menu",
       status,
       workingAction,
     ),
   );
 
-  const defaultAppsNote = createTextElement(
-    "p",
-    `${status.appName} will not take over ${PRODUCT.markdownExtensions} defaults automatically. Choose it in Windows Default Apps if you want it as the default handler.`,
-    "setup__note",
-  );
-
   const actions = document.createElement("div");
   actions.className = "setup-actions";
-  actions.append(
-    createSecondaryButton(
-      app,
-      PRODUCT.chooseDefaultButtonLabel,
-      "open_default_apps_settings",
-      status,
-      "defaultApps",
-      workingAction,
-    ),
-    createSecondaryButton(
-      app,
-      PRODUCT.removeAllButtonLabel,
-      "remove_all_integration",
-      status,
-      "removeAll",
-      workingAction,
-      true,
-    ),
-  );
+  if (showSeparateRemovalAction(status)) {
+    actions.append(
+      createSecondaryButton(
+        app,
+        status.installed
+          ? WINDOWS_SETUP_COPY.removeInstalledCopyButtonLabel
+          : WINDOWS_SETUP_COPY.removeIntegrationButtonLabel,
+        "remove_all_integration",
+        status,
+        "removeAll",
+        workingAction,
+        true,
+      ),
+    );
+  }
 
-  panel.append(heading, intro, rows, defaultAppsNote, actions);
+  panel.append(heading, source, intro, rows);
+
+  if (actions.childElementCount > 0) {
+    panel.append(actions);
+  }
 
   if (workingAction) {
     panel.append(createTextElement("p", "Working...", "setup-message setup-message--working"));
@@ -267,13 +252,70 @@ export function renderSetup(
     panel.append(createMessage(status.message));
   }
 
-  panel.append(createDetails(status));
-
   section.append(panel);
   app.replaceChildren(section);
 }
 
+function createSelfUninstallConfirmation(
+  app: HTMLElement,
+  status: SetupStatus,
+): HTMLElement {
+  const confirmation = document.createElement("section");
+  confirmation.className = "setup-confirmation";
+  confirmation.setAttribute("role", "group");
+  confirmation.setAttribute("aria-labelledby", "setup-confirmation-title");
+
+  const heading = createTextElement(
+    "h2",
+    "Uninstall this copy?",
+    "setup-confirmation__title",
+  );
+  heading.id = "setup-confirmation-title";
+  const explanation = createTextElement(
+    "p",
+    "This is the installed copy. Hushmark will remove its Windows integration and executable, then close.",
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "setup-confirmation__actions";
+  const cancel = createTextElement("button", "Cancel", "button button--secondary");
+  cancel.type = "button";
+  cancel.addEventListener("click", () => {
+    renderSetup(app, status);
+  });
+  const uninstall = createTextElement("button", "Uninstall", "button button--danger");
+  uninstall.type = "button";
+  uninstall.addEventListener("click", () => {
+    void executeSetupAction(app, "toggle_install", status, "install");
+  });
+  actions.append(cancel, uninstall);
+  confirmation.append(heading, explanation, actions);
+  confirmation.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      renderSetup(app, status);
+    }
+  });
+  window.requestAnimationFrame(() => cancel.focus());
+
+  return confirmation;
+}
+
 async function runSetupAction(
+  app: HTMLElement,
+  command: SetupCommand,
+  previousStatus: SetupStatus,
+  workingAction: SetupActionId,
+): Promise<void> {
+  if (requiresSelfUninstallConfirmation(command, previousStatus)) {
+    renderSetup(app, previousStatus, null, workingAction);
+    return;
+  }
+
+  await executeSetupAction(app, command, previousStatus, workingAction);
+}
+
+async function executeSetupAction(
   app: HTMLElement,
   command: SetupCommand,
   previousStatus: SetupStatus,
@@ -288,6 +330,18 @@ async function runSetupAction(
     const details = error instanceof Error ? error.message : String(error);
     await renderSetupError(app, previousStatus, "That change could not be completed.", details);
   }
+}
+
+function requiresSelfUninstallConfirmation(
+  command: SetupCommand,
+  status: SetupStatus,
+): boolean {
+  if (!status.runningInstalledCopy) {
+    return false;
+  }
+
+  return command === "remove_all_integration" ||
+    (command === "toggle_install" && status.installedMatchesCurrent);
 }
 
 async function renderSetupError(

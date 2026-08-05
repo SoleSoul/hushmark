@@ -3,7 +3,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createTextElement } from "./dom";
 import { PRODUCT } from "./product";
-import { renderSetup } from "./setupView";
+import { renderSetup, WINDOWS_SETUP_TITLE } from "./setupView";
 import "./styles.css";
 import type {
   DocumentNavigationEntry,
@@ -16,6 +16,8 @@ import type {
   StartupView,
 } from "./types";
 
+type AppMode = "reader" | "setup";
+
 const appElement = document.querySelector<HTMLElement>("#app");
 
 if (!appElement) {
@@ -26,7 +28,7 @@ const app = appElement;
 const currentWindow = getCurrentWindow();
 const navigationEntries = new Map<number, DocumentNavigationEntry>();
 let currentDocument: LoadedDocument | null = null;
-let currentMode: StartupView["mode"] = "reader";
+let currentMode: AppMode = "reader";
 let platformCapabilities: PlatformCapabilities = { setup: false };
 let filePickerOpen = false;
 let activeNavigationEntryId: number | null = null;
@@ -145,11 +147,8 @@ async function renderEmptySetupAffordance(section: HTMLElement): Promise<void> {
   }
 
   const label = emptySetupActionLabel(status);
-  if (!label) {
-    return;
-  }
-
-  const button = createTextElement("button", label, "state__setup-action");
+  const className = `state__setup-action${label === "Setup" ? " state__setup-action--quiet" : ""}`;
+  const button = createTextElement("button", label, className);
   button.type = "button";
   button.addEventListener("click", () => {
     openSetupFromEmptyState(status);
@@ -158,26 +157,25 @@ async function renderEmptySetupAffordance(section: HTMLElement): Promise<void> {
   section.append(button);
 }
 
-function emptySetupActionLabel(status: SetupStatus): string | null {
-  if (!status.setupSupported) {
-    return null;
+function emptySetupActionLabel(status: SetupStatus): string {
+  switch (status.installAction) {
+    case "install":
+      return "Install";
+    case "update":
+      return "Update";
+    case "downgrade":
+      return "Downgrade";
+    case "reinstall":
+      return "Reinstall";
+    default:
+      return "Setup";
   }
-
-  if (!status.installed) {
-    return "Install";
-  }
-
-  if (!status.installedMatchesCurrent) {
-    return "Update";
-  }
-
-  return null;
 }
 
 function openSetupFromEmptyState(status: SetupStatus): void {
   currentMode = "setup";
-  document.title = PRODUCT.setupTitle;
-  void currentWindow.setTitle(PRODUCT.setupTitle).catch((error) => {
+  document.title = WINDOWS_SETUP_TITLE;
+  void currentWindow.setTitle(WINDOWS_SETUP_TITLE).catch((error) => {
     console.warn("failed to set setup window title", error);
   });
   renderSetup(app, status);
@@ -656,21 +654,13 @@ async function start(): Promise<void> {
     const startupView = await invoke<StartupView>("load_initial_view");
     document.documentElement.dataset.platform = startupView.platform;
     platformCapabilities = startupView.capabilities;
-    currentMode = startupView.mode;
+    currentMode = "reader";
 
-    if (startupView.mode === "setup") {
-      if (!platformCapabilities.setup || !startupView.setup) {
-        throw new Error("Setup status was not returned.");
-      }
-
-      renderSetup(app, startupView.setup);
-    } else {
-      if (!startupView.document) {
-        throw new Error("Initial document state was not returned.");
-      }
-
-      resetDocumentNavigation(startupView.document);
+    if (!startupView.document) {
+      throw new Error("Initial document state was not returned.");
     }
+
+    resetDocumentNavigation(startupView.document);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     document.title = `Error - ${PRODUCT.displayName}`;

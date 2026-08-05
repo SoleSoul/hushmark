@@ -4,6 +4,12 @@
 
 - Give nested YAML front matter clearer inline hierarchy while retaining compact rendering.
 - Preserve author-intended line breaks and repeated spaces in front matter text values.
+- Keep a quiet **Setup** affordance in the Windows empty state, with action-specific Install, Update, Downgrade, and Reinstall labels when the installed copy differs.
+- Remove the setup command-line mode and the confusing Default Apps shortcut from the setup page.
+- Allow the installed Windows executable to remove its own Hushmark registry integration and files after the app exits, without a downloaded uninstaller.
+- Restyle Windows setup as an unframed, reader-aligned surface with restrained rules and less rounded UI.
+- Replace expandable setup diagnostics with visible version/copy status and direct integration rows, using an inline confirmation only when the running installed copy removes itself.
+- Reliably remove Hushmark's temporary update file and empty install directory during uninstall.
 
 ## 0.1.9
 

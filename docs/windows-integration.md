@@ -2,7 +2,7 @@
 
 Hushmark's setup and desktop integration behavior is Windows-only. Hushmark is designed to run as a standalone Tauri executable and can self-install for the current Windows user without admin rights.
 
-On Linux and other non-Windows platforms, `--setup` is not a supported app mode. Linux setup is expected to be handled by packaging rather than by an in-app setup panel. Linux `.desktop`, MIME, package, and installer integration is not implemented yet.
+Hushmark has no setup command-line mode. On Windows, setup is reached from the empty-state action. Linux setup is handled by packaging rather than by an in-app panel.
 
 ## Product identity
 
@@ -24,7 +24,7 @@ Current values:
 
 ## Install path
 
-Setup mode copies the running executable to:
+The setup page copies the running executable to:
 
 ```text
 %LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe
@@ -67,23 +67,25 @@ After install/remove, Hushmark calls `SHChangeNotify(SHCNE_ASSOCCHANGED, ...)` s
 
 ## Setup control panel behavior
 
-Setup mode is an immediate integration control panel. There is no Apply button. Version, developer, executable, and registry status information lives in the collapsed **Details** section so the main UI stays compact. When an installed executable exists but differs from the running build, Details also shows the installed executable's Windows file version if it can be read.
+Setup is an immediate integration page reached from the Windows empty state. There is no Apply button or expandable diagnostics section. The current version and whether the running executable is installed or standalone are visible beneath the heading. The empty-state action reads **Setup** in quiet text when the installed copy is current, and changes to Install, Update, Downgrade, or Reinstall when the running copy calls for an action. When an installed executable differs from the running build, its version appears directly in the installation row if it can be read.
 
 Rows:
 
-1. **Install Hushmark** copies, updates, or removes `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe`. If an installed copy exists but does not match the running build, setup labels this row **Update Hushmark** and shows an update available state. Turning off a current install also removes Hushmark Open With and right-click entries so Windows is not left pointing at a missing executable.
+1. **Install Hushmark** copies or replaces `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe`. If the installed version is older than the running version, the row reads **Update Hushmark**. If it is newer, the row reads **Downgrade Hushmark**. A same-version executable with different bytes reads **Reinstall Hushmark**. Turning off a current install performs the same complete removal as the uninstall action, so Windows is not left pointing at a missing executable.
 2. **Show Hushmark in Open With** installs/updates Hushmark first if needed, then adds or removes only Hushmark Open With registration. If Open With already points at an older installed copy that still exists, the row remains checked while the install row offers the update.
 3. **Add right-click menu entry** installs/updates Hushmark first if needed, then adds or removes only Hushmark context-menu entries. If the right-click command points at an older installed copy that still exists, the row remains checked while the install row offers the update.
 
-Each row refreshes from actual file/registry state after the operation. The **Remove all Hushmark integration** action removes Hushmark Open With registration, right-click entries, App Paths/application registration, and the installed executable when safe. It removes `%LOCALAPPDATA%\Programs\Hushmark` only if the directory is empty.
+Each row is the direct control for the state it displays and refreshes from actual file/registry state after the operation. Clicking a current installation row removes the installed copy and its integration; doing this from a separate standalone executable is immediate because that executable remains available. Doing it from the running installed copy expands an inline confirmation before Hushmark removes itself and closes. A separate **Remove installed copy** action appears only when a different installed build must remain distinct from the Update, Downgrade, or Reinstall action. **Remove Hushmark integration** appears only for orphaned registration without an installed executable.
+
+Uninstall removes Hushmark's Open With registration, right-click entries, App Paths/application registration, installed executable, and fixed `Hushmark.exe.tmp` update file. If the installed executable is the currently running process, Hushmark starts a hidden, fixed PowerShell cleanup command from the Windows system directory, with a working directory outside the Hushmark install folder, then exits. It does not download or retain a helper executable or script. `%LOCALAPPDATA%\Programs\Hushmark` is removed only when empty; unrelated files are never removed recursively.
+
+This is a complete removal of files and registry values owned by Hushmark. Windows may independently retain operating-system history or caches, such as event records or Prefetch data; the app does not attempt to erase those system-owned records.
 
 ## Default-app behavior
 
 Hushmark does not automatically set itself as the default Markdown app.
 
-Windows 10/11 default-app selection is intentionally user-controlled and stored in protected `UserChoice` entries. Hushmark registers itself as a candidate handler and tries to open Windows Default Apps settings with the Windows shell so the user can explicitly choose it.
-
-If Windows refuses to open Settings automatically, setup shows calm fallback instructions and keeps the technical OS error in the collapsed Details section.
+Windows 10/11 default-app selection is intentionally user-controlled and stored in protected `UserChoice` entries. Hushmark registers itself as a candidate handler for Open With, but the setup page does not include a Default Apps shortcut or attempt to change the default handler.
 
 ## Manual test steps
 
@@ -110,22 +112,16 @@ Copy-Item .\src-tauri\target\release\hushmark.exe "$temp\Hushmark.exe"
 & "$temp\Hushmark.exe" .\examples\example.md
 ```
 
-Open setup:
-
-```powershell
-.\src-tauri\target\release\hushmark.exe --setup
-```
-
 In setup:
 
-1. Click **Install Hushmark** and confirm `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe` exists.
-2. Click **Install Hushmark** again and confirm the installed executable is removed when safe.
-3. From a fresh state, click **Show Hushmark in Open With** and confirm setup auto-installs Hushmark before adding Open With registration.
-4. Click **Show Hushmark in Open With** again and confirm only Open With registration is removed.
-5. From a fresh state, click **Add right-click menu entry** and confirm setup auto-installs Hushmark before adding context-menu entries.
-6. Right-click a `.md` / `.markdown` file and check that **Open with Hushmark** appears.
-7. Open Windows Default Apps from setup and choose Hushmark manually for `.md` / `.markdown` if desired.
-8. Double-click a Markdown file after choosing Hushmark as default.
-9. Click **Remove all Hushmark integration** and confirm Hushmark registry entries and the installed executable are removed when safe.
-
-If setup is running from the installed executable, or another Hushmark window is holding the installed executable open, Hushmark removes registry integration but leaves the executable in place. Close Hushmark, then manually delete `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe` if needed.
+1. Run Hushmark without a document and open setup from the top-right action.
+2. Click **Install Hushmark** and confirm `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe` exists.
+3. Confirm the empty-state action reads a quiet **Setup** when the installed copy is current.
+4. Run a newer standalone build and confirm **Update Hushmark**. Run an older standalone build and confirm **Downgrade Hushmark**.
+5. Confirm setup identifies whether the current process is the installed copy or a standalone copy.
+6. From a fresh state, click **Show Hushmark in Open With** and confirm setup auto-installs Hushmark before adding Open With registration.
+7. Click **Show Hushmark in Open With** again and confirm only Open With registration is removed.
+8. From a fresh state, click **Add right-click menu entry** and confirm setup auto-installs Hushmark before adding context-menu entries.
+9. Right-click a `.md` / `.markdown` file and check that **Open with Hushmark** appears.
+10. Confirm there is no Default Apps control in setup.
+11. Run the installed executable, click **Installed copy**, and confirm the inline uninstall prompt can be cancelled without changes. Open it again, choose **Uninstall**, and confirm the app exits, its owned registry entries are gone, and the empty `%LOCALAPPDATA%\Programs\Hushmark` directory is removed shortly afterward.

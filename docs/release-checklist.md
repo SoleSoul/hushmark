@@ -17,7 +17,7 @@ Build and smoke-test Windows releases through GitHub Actions or on a Windows mac
 - Check `git status --short --branch`.
 - Move completed tester-visible notes from `CHANGELOG.md` `Unreleased` into the new version entry.
 - Confirm no unrelated local artifacts are staged.
-- Confirm Windows docs and setup instructions use `--setup`.
+- Confirm Windows setup is reachable from the empty-state action and has no command-line mode.
 - Confirm Linux docs do not describe an in-app setup flow.
 
 ## Build Commands
@@ -100,7 +100,7 @@ For an AUR update:
 
 - Run `src-tauri\target\release\hushmark.exe examples\markdown-visual-inspection.md`.
 - Open with no arguments and confirm the empty state.
-- Open setup with `src-tauri\target\release\hushmark.exe --setup`.
+- From the empty state, open setup using the top-right action. Confirm it reads **Setup** and stays visually quiet when the installed copy is current.
 - Check Ctrl+O from empty state and from an open document.
 - Open `examples/print-visual-inspection.md`, check Ctrl+P print preview and Print to PDF, and confirm Ctrl+P does nothing in empty, error, and setup views.
 - Check same-document fragments, missing fragments, Alt+Left, and Alt+Right.
@@ -108,7 +108,7 @@ For an AUR update:
 - Check local images, table alignment, code overflow, Hebrew text, and unsafe HTML examples.
 - Check external `https:` and `mailto:` links open outside Hushmark.
 - Confirm the internal WebView context menu remains disabled.
-- If setup changed, smoke install/update, Open With, right-click entry, Default Apps handoff, and remove-all behavior on Windows.
+- If setup changed, smoke install/update/downgrade labels, Open With, right-click entry, and complete uninstall behavior on Windows.
 
 ## Local Release History
 

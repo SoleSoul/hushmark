@@ -12,3 +12,5 @@ Design boundaries:
 - Keep document headings clearly distinct from body text through weight and a stable size hierarchy.
 - Prefer system and browser primitives over custom UI machinery.
 - Avoid sidebars, tabs, editor controls, source views, and settings surfaces in the reader.
+
+Windows setup should feel like an interactive Hushmark document rather than a separate themed control panel. Use the reader's unframed warm canvas, content width, spacing, sans-serif heading hierarchy, serif explanatory copy, restrained rules, and square or lightly rounded controls. Avoid nested cards, a second paper surface inside the window, pills, or large areas of status color.

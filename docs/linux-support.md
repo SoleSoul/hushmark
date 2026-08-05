@@ -4,7 +4,7 @@ Linux runtime support is available from the shared Hushmark codebase. The reader
 
 ## Runtime Policy
 
-Linux builds do not provide setup, self-install, self-update, Open With, context-menu, or default-app controls. `--setup` is not recognized on Linux and behaves like any other flag-shaped file argument.
+Linux builds do not provide setup, self-install, self-update, Open With, context-menu, or default-app controls. Hushmark has no setup command-line mode on any platform.
 
 Installation, updates, desktop integration, icons, and MIME registration belong to the package manager or distribution package.
 

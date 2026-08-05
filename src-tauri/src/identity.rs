@@ -4,8 +4,6 @@ pub const DISPLAY_NAME: &str = "Hushmark";
 mod windows {
     use super::DISPLAY_NAME;
 
-    pub const DEVELOPER_NAME: &str = "Jonathan Lahav";
-    pub const RELEASE_EXE_NAME: &str = "hushmark.exe";
     pub const INSTALLED_EXE_NAME: &str = "Hushmark.exe";
     pub const INSTALL_DIR_NAME: &str = "Hushmark";
     pub const PROG_ID: &str = "Hushmark.md";
@@ -15,12 +13,7 @@ mod windows {
     pub const CONTEXT_MENU_LABEL: &str = "Open with Hushmark";
     pub const REGISTERED_APPLICATIONS_VALUE: &str = DISPLAY_NAME;
     pub const REGISTERED_APPLICATIONS_KEY: &str = r"Software\RegisteredApplications";
-    pub const DEFAULT_APPS_URI: &str = "ms-settings:defaultapps";
     pub const MARKDOWN_EXTENSIONS: [&str; 2] = [".md", ".markdown"];
-
-    pub fn setup_window_title() -> String {
-        format!("{DISPLAY_NAME} Setup")
-    }
 
     pub fn app_paths_key() -> String {
         format!(r"Software\Microsoft\Windows\CurrentVersion\App Paths\{INSTALLED_EXE_NAME}")

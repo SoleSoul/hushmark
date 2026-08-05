@@ -1,24 +1,44 @@
 use std::{
+    cmp::Ordering,
     env, fs,
     path::{Path, PathBuf},
+    process::{self, Command},
 };
 
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::Serialize;
 
 use crate::identity::{
     app_paths_key, application_capabilities_file_associations_key, application_capabilities_key,
     application_key, context_menu_key, open_with_progids_key, prog_id_key, APPLICATION_DESCRIPTION,
-    CONTEXT_MENU_LABEL, DEFAULT_APPS_URI, DEVELOPER_NAME, DISPLAY_NAME, DOCUMENT_FRIENDLY_NAME,
-    INSTALLED_EXE_NAME, INSTALL_DIR_NAME, MARKDOWN_EXTENSIONS, PROG_ID,
-    REGISTERED_APPLICATIONS_KEY, REGISTERED_APPLICATIONS_VALUE,
+    CONTEXT_MENU_LABEL, DISPLAY_NAME, DOCUMENT_FRIENDLY_NAME, INSTALLED_EXE_NAME, INSTALL_DIR_NAME,
+    MARKDOWN_EXTENSIONS, PROG_ID, REGISTERED_APPLICATIONS_KEY, REGISTERED_APPLICATIONS_VALUE,
 };
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SetupMessage {
-    pub kind: &'static str,
+    pub kind: SetupMessageKind,
     pub text: String,
     pub details: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SetupMessageKind {
+    Success,
+    Warning,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum InstallAction {
+    Install,
+    Current,
+    Update,
+    Downgrade,
+    Reinstall,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -27,48 +47,42 @@ pub struct SetupStatus {
     pub app_name: &'static str,
     pub version: &'static str,
     pub installed_version: Option<String>,
-    pub developer: &'static str,
-    pub platform: &'static str,
-    pub setup_supported: bool,
-    pub release_exe_name: &'static str,
-    pub installed_exe_name: &'static str,
-    pub prog_id: &'static str,
-    pub install_path: String,
-    pub current_exe_path: String,
     pub installed: bool,
+    pub running_installed_copy: bool,
     pub installed_matches_current: bool,
-    pub app_path_registered: bool,
-    pub application_registered: bool,
+    pub install_action: InstallAction,
+    pub has_registered_integration: bool,
     pub file_handlers_registered: bool,
-    pub open_with_md_registered: bool,
-    pub open_with_markdown_registered: bool,
     pub context_menu_registered: bool,
-    pub context_menu_md_registered: bool,
-    pub context_menu_markdown_registered: bool,
-    pub default_apps_uri: &'static str,
     pub message: Option<SetupMessage>,
+}
+
+pub struct SetupActionResult {
+    pub status: SetupStatus,
+    pub exit_required: bool,
+}
+
+impl SetupActionResult {
+    fn stay_open(status: SetupStatus) -> Self {
+        Self {
+            status,
+            exit_required: false,
+        }
+    }
 }
 
 impl SetupMessage {
     fn success(text: impl Into<String>) -> Self {
         Self {
-            kind: "success",
+            kind: SetupMessageKind::Success,
             text: text.into(),
             details: None,
         }
     }
 
-    fn success_with_details(text: impl Into<String>, details: impl Into<String>) -> Self {
-        Self {
-            kind: "success",
-            text: text.into(),
-            details: Some(details.into()),
-        }
-    }
-
     fn warning(text: impl Into<String>, details: Option<String>) -> Self {
         Self {
-            kind: "warning",
+            kind: SetupMessageKind::Warning,
             text: text.into(),
             details,
         }
@@ -76,7 +90,7 @@ impl SetupMessage {
 
     fn error(text: impl Into<String>, details: impl Into<String>) -> Self {
         Self {
-            kind: "error",
+            kind: SetupMessageKind::Error,
             text: text.into(),
             details: Some(details.into()),
         }
@@ -88,6 +102,7 @@ pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String
     let current_exe = current_exe_path()?;
     let install_path = installed_exe_path()?;
     let installed = install_path.exists();
+    let running_installed_copy = installed && same_path(&current_exe, &install_path);
     let installed_matches_current = installed && files_match(&current_exe, &install_path);
     let installed_version = if installed && !installed_matches_current {
         installed_version_for_status(
@@ -98,6 +113,12 @@ pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String
     } else {
         None
     };
+    let install_action = install_action_for_status(
+        installed,
+        installed_matches_current,
+        installed_version.as_deref(),
+        env!("CARGO_PKG_VERSION"),
+    );
     let app_path_registered = is_app_path_registered(&install_path);
     let application_registered = is_application_registered(&install_path);
     let open_with_md_registered = is_open_with_extension_registered(MARKDOWN_EXTENSIONS[0]);
@@ -111,18 +132,16 @@ pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String
         app_name: DISPLAY_NAME,
         version: env!("CARGO_PKG_VERSION"),
         installed_version,
-        developer: DEVELOPER_NAME,
-        platform: std::env::consts::OS,
-        setup_supported: true,
-        release_exe_name: crate::identity::RELEASE_EXE_NAME,
-        installed_exe_name: INSTALLED_EXE_NAME,
-        prog_id: PROG_ID,
-        install_path: path_to_string(&install_path),
-        current_exe_path: path_to_string(&current_exe),
         installed,
+        running_installed_copy,
         installed_matches_current,
-        app_path_registered,
-        application_registered,
+        install_action,
+        has_registered_integration: app_path_registered
+            || application_registered
+            || open_with_md_registered
+            || open_with_markdown_registered
+            || context_menu_md_registered
+            || context_menu_markdown_registered,
         file_handlers_registered: are_file_handlers_registered(
             installed,
             app_path_registered,
@@ -130,16 +149,11 @@ pub fn setup_status(message: Option<SetupMessage>) -> Result<SetupStatus, String
             open_with_md_registered,
             open_with_markdown_registered,
         ),
-        open_with_md_registered,
-        open_with_markdown_registered,
         context_menu_registered: is_context_menu_registered(
             installed,
             context_menu_md_registered,
             context_menu_markdown_registered,
         ),
-        context_menu_md_registered,
-        context_menu_markdown_registered,
-        default_apps_uri: DEFAULT_APPS_URI,
         message,
     })
 }
@@ -178,6 +192,44 @@ fn installed_version_for_status(
     }
 }
 
+fn install_action_for_status(
+    installed: bool,
+    installed_matches_current: bool,
+    installed_version: Option<&str>,
+    current_version: &str,
+) -> InstallAction {
+    if !installed {
+        return InstallAction::Install;
+    }
+
+    if installed_matches_current {
+        return InstallAction::Current;
+    }
+
+    match installed_version.and_then(|version| compare_numeric_versions(version, current_version)) {
+        Some(Ordering::Less) => InstallAction::Update,
+        Some(Ordering::Greater) => InstallAction::Downgrade,
+        Some(Ordering::Equal) | None => InstallAction::Reinstall,
+    }
+}
+
+fn compare_numeric_versions(left: &str, right: &str) -> Option<Ordering> {
+    let mut left = parse_numeric_version(left)?;
+    let mut right = parse_numeric_version(right)?;
+    let width = left.len().max(right.len());
+    left.resize(width, 0);
+    right.resize(width, 0);
+    Some(left.cmp(&right))
+}
+
+fn parse_numeric_version(version: &str) -> Option<Vec<u64>> {
+    if version.is_empty() {
+        return None;
+    }
+
+    version.split('.').map(|part| part.parse().ok()).collect()
+}
+
 #[cfg(windows)]
 pub fn install_hushmark() -> Result<SetupStatus, String> {
     match install_current_exe() {
@@ -192,38 +244,13 @@ pub fn install_hushmark() -> Result<SetupStatus, String> {
 }
 
 #[cfg(windows)]
-pub fn toggle_install() -> Result<SetupStatus, String> {
+pub fn toggle_install() -> Result<SetupActionResult, String> {
     let status = setup_status(None)?;
 
     if status.installed_matches_current {
-        let mut errors = Vec::new();
-        if let Err(error) = unregister_open_with_integration() {
-            errors.push(error);
-        }
-        if let Err(error) = unregister_context_menu_integration() {
-            errors.push(error);
-        }
-
-        let mut message = remove_installed_exe()?;
-        notify_shell_associations_changed();
-
-        if !errors.is_empty() {
-            return setup_status(Some(SetupMessage::error(
-                "Some Hushmark integration could not be removed.",
-                errors.join("\n"),
-            )));
-        }
-
-        if message.kind == "success" {
-            append_message_details(
-                &mut message,
-                "Open With support and right-click entries were removed because they need the installed copy.",
-            );
-        }
-
-        setup_status(Some(message))
+        remove_all_integration()
     } else {
-        install_hushmark()
+        install_hushmark().map(SetupActionResult::stay_open)
     }
 }
 
@@ -310,7 +337,7 @@ pub fn toggle_context_menu() -> Result<SetupStatus, String> {
 }
 
 #[cfg(windows)]
-pub fn remove_all_integration() -> Result<SetupStatus, String> {
+pub fn remove_all_integration() -> Result<SetupActionResult, String> {
     let mut errors = Vec::new();
 
     if let Err(error) = unregister_open_with_integration() {
@@ -321,48 +348,47 @@ pub fn remove_all_integration() -> Result<SetupStatus, String> {
         errors.push(error);
     }
 
-    let install_message = remove_installed_exe()?;
+    if !errors.is_empty() {
+        return Ok(SetupActionResult {
+            status: setup_status(Some(SetupMessage::error(
+                "Some Hushmark integration could not be removed.",
+                errors.join("\n"),
+            )))?,
+            exit_required: false,
+        });
+    }
+
+    let current_exe = current_exe_path()?;
+    let install_path = installed_exe_path()?;
+    let had_installed_copy = install_path.exists();
+    let exit_required = had_installed_copy && same_path(&current_exe, &install_path);
+    let install_message = if exit_required {
+        schedule_deferred_install_cleanup(&install_path, process::id())?;
+        SetupMessage::success("Hushmark will finish uninstalling after this window closes.")
+    } else {
+        remove_installed_exe()?
+    };
     notify_shell_associations_changed();
 
-    if !errors.is_empty() {
-        return setup_status(Some(SetupMessage::error(
-            "Some Hushmark integration could not be removed.",
-            errors.join("\n"),
-        )));
+    if install_message.kind == SetupMessageKind::Warning {
+        return Ok(SetupActionResult {
+            status: setup_status(Some(install_message))?,
+            exit_required: false,
+        });
     }
 
-    if install_message.kind == "warning" {
-        return setup_status(Some(install_message));
-    }
-
-    setup_status(Some(SetupMessage::success(
-        "All Hushmark integration was removed.",
-    )))
-}
-
-#[cfg(windows)]
-pub fn open_default_apps_settings() -> Result<SetupStatus, String> {
-    match open_default_apps_settings_impl() {
-        Ok(()) => setup_status(Some(SetupMessage::success_with_details(
-            "Windows Default Apps settings opened.",
-            "Choose Hushmark manually if you want it as the default for Markdown files.",
-        ))),
-        Err(error) => setup_status(Some(SetupMessage::warning(
-            "Windows did not open Default Apps automatically.",
-            Some(format!(
-                "You can still choose Hushmark manually in Windows Settings > Apps > Default apps.\n\nTechnical error: {error}"
-            )),
-        ))),
-    }
-}
-
-fn append_message_details(message: &mut SetupMessage, details: &str) {
-    if let Some(existing_details) = &mut message.details {
-        existing_details.push('\n');
-        existing_details.push_str(details);
+    let message = if exit_required {
+        install_message
+    } else if had_installed_copy {
+        SetupMessage::success("Hushmark was uninstalled.")
     } else {
-        message.details = Some(details.to_string());
-    }
+        SetupMessage::success("Hushmark integration was removed.")
+    };
+
+    Ok(SetupActionResult {
+        status: setup_status(Some(message))?,
+        exit_required,
+    })
 }
 
 fn current_exe_path() -> Result<PathBuf, String> {
@@ -581,7 +607,7 @@ fn files_match(left: &Path, right: &Path) -> bool {
         && fs::read(left)
             .ok()
             .zip(fs::read(right).ok())
-            .map_or(false, |(left, right)| left == right)
+            .is_some_and(|(left, right)| left == right)
 }
 
 #[cfg(windows)]
@@ -606,7 +632,7 @@ fn install_current_exe() -> Result<(), String> {
         return Ok(());
     }
 
-    let temp_path = install_path.with_extension("exe.tmp");
+    let temp_path = install_temp_path(&install_path);
     let _ = fs::remove_file(&temp_path);
     fs::copy(&current_exe, &temp_path).map_err(|error| {
         format!(
@@ -636,9 +662,10 @@ fn remove_installed_exe() -> Result<SetupMessage, String> {
     let install_path = installed_exe_path()?;
 
     if !install_path.exists() {
-        return Ok(SetupMessage::success(format!(
-            "{DISPLAY_NAME} is not installed."
-        )));
+        return finish_install_file_cleanup(
+            &install_path,
+            format!("{DISPLAY_NAME} is not installed."),
+        );
     }
 
     if same_path(&current_exe, &install_path) {
@@ -654,16 +681,7 @@ fn remove_installed_exe() -> Result<SetupMessage, String> {
 
     match fs::remove_file(&install_path) {
         Ok(()) => {
-            if let Some(note) = remove_empty_install_dir(&install_path) {
-                Ok(SetupMessage::success_with_details(
-                    format!("{DISPLAY_NAME} was uninstalled."),
-                    note,
-                ))
-            } else {
-                Ok(SetupMessage::success(format!(
-                    "{DISPLAY_NAME} was uninstalled."
-                )))
-            }
+            finish_install_file_cleanup(&install_path, format!("{DISPLAY_NAME} was uninstalled."))
         }
         Err(error) => Ok(SetupMessage::warning(
             "The installed executable could not be removed because it is currently running.",
@@ -676,11 +694,40 @@ fn remove_installed_exe() -> Result<SetupMessage, String> {
 }
 
 #[cfg(windows)]
+fn finish_install_file_cleanup(
+    install_path: &Path,
+    success_text: String,
+) -> Result<SetupMessage, String> {
+    let temp_path = install_temp_path(install_path);
+    if let Err(error) = fs::remove_file(&temp_path) {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            return Ok(SetupMessage::warning(
+                "Hushmark cleanup was incomplete.",
+                Some(format!("Could not delete {}: {error}", temp_path.display())),
+            ));
+        }
+    }
+
+    if let Some(details) = remove_empty_install_dir(install_path) {
+        return Ok(SetupMessage::warning(
+            "The Hushmark install folder could not be removed.",
+            Some(details),
+        ));
+    }
+
+    Ok(SetupMessage::success(success_text))
+}
+
+fn install_temp_path(install_path: &Path) -> PathBuf {
+    install_path.with_extension("exe.tmp")
+}
+
+#[cfg(windows)]
 fn remove_empty_install_dir(install_path: &Path) -> Option<String> {
     let install_dir = install_path.parent()?;
 
     match fs::remove_dir(install_dir) {
-        Ok(()) => Some("The empty install directory was removed.".to_string()),
+        Ok(()) => None,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) if error.kind() == std::io::ErrorKind::DirectoryNotEmpty => Some(format!(
             "The install directory {} contains other files and was left in place.",
@@ -691,6 +738,81 @@ fn remove_empty_install_dir(install_path: &Path) -> Option<String> {
             install_dir.display()
         )),
     }
+}
+
+#[cfg(windows)]
+fn schedule_deferred_install_cleanup(install_path: &Path, process_id: u32) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    let system_root = env::var_os("SystemRoot")
+        .ok_or_else(|| "SystemRoot is not set; cannot start the uninstall cleanup.".to_string())?;
+    let system_root = PathBuf::from(system_root);
+    let powershell = system_root
+        .join("System32")
+        .join("WindowsPowerShell")
+        .join("v1.0")
+        .join("powershell.exe");
+    let script = deferred_cleanup_script(install_path, process_id)?;
+    let encoded_script = BASE64_STANDARD.encode(
+        script
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>(),
+    );
+
+    Command::new(&powershell)
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-WindowStyle",
+            "Hidden",
+            "-EncodedCommand",
+            &encoded_script,
+        ])
+        .current_dir(&system_root)
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| {
+            format!(
+                "Could not start the uninstall cleanup with {}: {error}",
+                powershell.display()
+            )
+        })
+}
+
+fn deferred_cleanup_script(install_path: &Path, process_id: u32) -> Result<String, String> {
+    let install_dir = install_path.parent().ok_or_else(|| {
+        format!(
+            "Could not determine install directory for {}",
+            install_path.display()
+        )
+    })?;
+    let temp_path = install_temp_path(install_path);
+    let install_path = powershell_literal(install_path);
+    let temp_path = powershell_literal(&temp_path);
+    let install_dir = powershell_literal(install_dir);
+
+    Ok(format!(
+        "$ErrorActionPreference = 'SilentlyContinue'\n\
+         Wait-Process -Id {process_id}\n\
+         for ($attempt = 0; $attempt -lt 240; $attempt++) {{\n\
+           Remove-Item -LiteralPath {install_path} -Force\n\
+           Remove-Item -LiteralPath {temp_path} -Force\n\
+           if ((-not (Test-Path -LiteralPath {install_path})) -and (-not (Test-Path -LiteralPath {temp_path}))) {{ break }}\n\
+           Start-Sleep -Milliseconds 500\n\
+         }}\n\
+         Remove-Item -LiteralPath {install_dir} -Force"
+    ))
+}
+
+fn powershell_literal(path: &Path) -> String {
+    format!("'{}'", path.to_string_lossy().replace('\'', "''"))
 }
 
 #[cfg(windows)]
@@ -1008,38 +1130,6 @@ fn notify_shell_associations_changed() {
 fn notify_shell_associations_changed() {}
 
 #[cfg(windows)]
-fn open_default_apps_settings_impl() -> Result<(), String> {
-    use windows_sys::Win32::UI::Shell::ShellExecuteW;
-
-    let operation = wide_null("open");
-    let uri = wide_null(DEFAULT_APPS_URI);
-    let result = unsafe {
-        ShellExecuteW(
-            std::ptr::null_mut(),
-            operation.as_ptr(),
-            uri.as_ptr(),
-            std::ptr::null(),
-            std::ptr::null(),
-            1,
-        )
-    } as isize;
-
-    if result > 32 {
-        Ok(())
-    } else {
-        Err(format!(
-            "ShellExecuteW returned {result} for {DEFAULT_APPS_URI}. Last OS error: {}",
-            std::io::Error::last_os_error()
-        ))
-    }
-}
-
-#[cfg(not(windows))]
-fn open_default_apps_settings_impl() -> Result<(), String> {
-    Err("Windows Default Apps settings are only available on Windows.".to_string())
-}
-
-#[cfg(windows)]
 fn registry_error(error: std::io::Error) -> String {
     format!("Could not update the current-user registry: {error}")
 }
@@ -1098,10 +1188,14 @@ fn wide_null(value: &str) -> Vec<u16> {
 #[cfg(test)]
 mod tests {
     use super::{
-        are_file_handlers_registered, installed_version_for_status, is_context_menu_registered,
-        open_command,
+        are_file_handlers_registered, compare_numeric_versions, deferred_cleanup_script,
+        install_action_for_status, install_temp_path, installed_version_for_status,
+        is_context_menu_registered, open_command, remove_empty_install_dir, InstallAction,
     };
+    use std::cmp::Ordering;
+    use std::fs;
     use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn open_command_quotes_executable_and_file_placeholder() {
@@ -1153,10 +1247,118 @@ mod tests {
     }
 
     #[test]
+    fn install_action_describes_version_direction_without_guessing() {
+        assert_eq!(
+            install_action_for_status(false, false, None, "0.1.8"),
+            InstallAction::Install
+        );
+        assert_eq!(
+            install_action_for_status(true, true, None, "0.1.8"),
+            InstallAction::Current
+        );
+        assert_eq!(
+            install_action_for_status(true, false, Some("0.1.7"), "0.1.8"),
+            InstallAction::Update
+        );
+        assert_eq!(
+            install_action_for_status(true, false, Some("0.1.9"), "0.1.8"),
+            InstallAction::Downgrade
+        );
+        assert_eq!(
+            install_action_for_status(true, false, Some("0.1.8"), "0.1.8"),
+            InstallAction::Reinstall
+        );
+        assert_eq!(
+            install_action_for_status(true, false, Some("Unknown"), "0.1.8"),
+            InstallAction::Reinstall
+        );
+    }
+
+    #[test]
+    fn numeric_versions_compare_with_missing_zero_components() {
+        assert_eq!(
+            compare_numeric_versions("0.1.7", "0.1.8"),
+            Some(Ordering::Less)
+        );
+        assert_eq!(
+            compare_numeric_versions("0.2.0", "0.1.8"),
+            Some(Ordering::Greater)
+        );
+        assert_eq!(
+            compare_numeric_versions("1.2", "1.2.0"),
+            Some(Ordering::Equal)
+        );
+        assert_eq!(compare_numeric_versions("Unknown", "0.1.8"), None);
+    }
+
+    #[test]
     fn executable_version_is_missing_for_a_missing_file() {
         assert_eq!(
             super::executable_version(&PathBuf::from(r"C:\definitely\missing\Hushmark.exe")),
             None
         );
+    }
+
+    #[test]
+    fn deferred_cleanup_uses_literal_paths_and_waits_for_the_running_process() {
+        let script = deferred_cleanup_script(
+            &PathBuf::from(r"C:\Users\O'Brien\Programs\Hushmark\Hushmark.exe"),
+            42,
+        )
+        .expect("cleanup script");
+
+        assert!(script.contains("Wait-Process -Id 42"));
+        assert!(
+            script.contains("-LiteralPath 'C:\\Users\\O''Brien\\Programs\\Hushmark\\Hushmark.exe'")
+        );
+        assert!(script
+            .contains("-LiteralPath 'C:\\Users\\O''Brien\\Programs\\Hushmark\\Hushmark.exe.tmp'"));
+        assert!(script.contains("-LiteralPath 'C:\\Users\\O''Brien\\Programs\\Hushmark'"));
+        assert!(!script.contains("-Recurse"));
+        assert!(!script.contains("O'Brien"));
+    }
+
+    #[test]
+    fn empty_install_directory_is_removed() {
+        let install_dir = unique_test_install_dir("empty");
+        let install_path = install_dir.join("Hushmark.exe");
+        fs::create_dir_all(&install_dir).expect("create test install directory");
+
+        let note = remove_empty_install_dir(&install_path);
+
+        assert_eq!(note, None);
+        assert!(!install_dir.exists());
+        assert_eq!(
+            install_temp_path(&install_path),
+            install_dir.join("Hushmark.exe.tmp")
+        );
+    }
+
+    #[test]
+    fn nonempty_install_directory_is_preserved() {
+        let install_dir = unique_test_install_dir("nonempty");
+        let install_path = install_dir.join("Hushmark.exe");
+        let unrelated_path = install_dir.join("keep.txt");
+        fs::create_dir_all(&install_dir).expect("create test install directory");
+        fs::write(&unrelated_path, "keep").expect("create unrelated test file");
+
+        let details = remove_empty_install_dir(&install_path).expect("directory retained details");
+
+        assert!(details.contains("contains other files and was left in place"));
+        assert!(unrelated_path.exists());
+
+        fs::remove_file(&unrelated_path).expect("remove unrelated test file");
+        fs::remove_dir(&install_dir).expect("remove test install directory");
+    }
+
+    fn unique_test_install_dir(case: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time after epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "hushmark-remove-{case}-dir-{}-{unique}",
+            std::process::id()
+        ))
     }
 }

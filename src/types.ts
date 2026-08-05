@@ -16,35 +16,22 @@ export type SetupStatus = {
   appName: string;
   version: string;
   installedVersion: string | null;
-  developer: string;
-  platform: string;
-  setupSupported: boolean;
-  releaseExeName: string;
-  installedExeName: string;
-  progId: string;
-  installPath: string;
-  currentExePath: string;
   installed: boolean;
+  runningInstalledCopy: boolean;
   installedMatchesCurrent: boolean;
-  appPathRegistered: boolean;
-  applicationRegistered: boolean;
+  installAction: "install" | "current" | "update" | "downgrade" | "reinstall";
+  hasRegisteredIntegration: boolean;
   fileHandlersRegistered: boolean;
-  openWithMdRegistered: boolean;
-  openWithMarkdownRegistered: boolean;
   contextMenuRegistered: boolean;
-  contextMenuMdRegistered: boolean;
-  contextMenuMarkdownRegistered: boolean;
-  defaultAppsUri: string;
   message: SetupMessage | null;
 };
 
-export type SetupActionId = "install" | "openWith" | "contextMenu" | "defaultApps" | "removeAll";
+export type SetupActionId = "install" | "openWith" | "contextMenu" | "removeAll";
 
 export type SetupCommand =
   | "toggle_install"
   | "toggle_open_with_support"
   | "toggle_context_menu"
-  | "open_default_apps_settings"
   | "remove_all_integration";
 
 export type LinkAction =
@@ -63,10 +50,8 @@ export type PlatformCapabilities = {
 };
 
 export type StartupView = {
-  mode: "reader" | "setup";
   platform: string;
   document: LoadedDocument | null;
-  setup?: SetupStatus | null;
   capabilities: PlatformCapabilities;
 };
 

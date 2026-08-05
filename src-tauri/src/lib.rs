@@ -12,19 +12,14 @@ use document::{
     load_dropped_markdown_file, load_initial_document_from_arg, load_linked_markdown_file,
     title_for, LinkedDocument, LoadedDocument,
 };
-#[cfg(windows)]
-use identity::setup_window_title;
 use serde::Serialize;
 #[cfg(windows)]
 use setup::{
-    open_default_apps_settings as open_windows_default_apps_settings,
     remove_all_integration as remove_all_app_integration, setup_status,
     toggle_context_menu as toggle_app_context_menu, toggle_install as toggle_app_install,
-    toggle_open_with_support as toggle_app_open_with_support, SetupStatus,
+    toggle_open_with_support as toggle_app_open_with_support, SetupActionResult, SetupStatus,
 };
 use startup::first_document_arg;
-#[cfg(windows)]
-use startup::is_setup_mode_arg;
 use tauri_plugin_opener::OpenerExt;
 
 #[derive(Debug, Clone, Serialize)]
@@ -44,42 +39,19 @@ impl PlatformCapabilities {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct StartupView {
-    mode: String,
     platform: &'static str,
     document: Option<LoadedDocument>,
-    #[cfg(windows)]
-    setup: Option<SetupStatus>,
     capabilities: PlatformCapabilities,
 }
 
 #[tauri::command]
 fn load_initial_view(window: tauri::Window) -> Result<StartupView, String> {
-    let args: Vec<_> = std::env::args_os().skip(1).collect();
-
-    #[cfg(windows)]
-    if args.iter().any(|arg| is_setup_mode_arg(arg)) {
-        window
-            .set_title(&setup_window_title())
-            .map_err(|error| format!("Could not set setup window title: {error}"))?;
-
-        return Ok(StartupView {
-            mode: "setup".to_string(),
-            platform: std::env::consts::OS,
-            document: None,
-            setup: Some(setup_status(None)?),
-            capabilities: PlatformCapabilities::current(),
-        });
-    }
-
-    let document = load_initial_document_from_arg(first_document_arg(args.into_iter()));
+    let document = load_initial_document_from_arg(first_document_arg(std::env::args_os().skip(1)));
     set_window_title(&window, &document);
 
     Ok(StartupView {
-        mode: "reader".to_string(),
         platform: std::env::consts::OS,
         document: Some(document),
-        #[cfg(windows)]
-        setup: None,
         capabilities: PlatformCapabilities::current(),
     })
 }
@@ -120,8 +92,8 @@ fn get_setup_status() -> Result<SetupStatus, String> {
 
 #[cfg(windows)]
 #[tauri::command]
-fn toggle_install() -> Result<SetupStatus, String> {
-    toggle_app_install()
+fn toggle_install(app: tauri::AppHandle) -> Result<SetupStatus, String> {
+    finish_setup_action(toggle_app_install()?, app)
 }
 
 #[cfg(windows)]
@@ -138,14 +110,23 @@ fn toggle_context_menu() -> Result<SetupStatus, String> {
 
 #[cfg(windows)]
 #[tauri::command]
-fn remove_all_integration() -> Result<SetupStatus, String> {
-    remove_all_app_integration()
+fn remove_all_integration(app: tauri::AppHandle) -> Result<SetupStatus, String> {
+    finish_setup_action(remove_all_app_integration()?, app)
 }
 
 #[cfg(windows)]
-#[tauri::command]
-fn open_default_apps_settings() -> Result<SetupStatus, String> {
-    open_windows_default_apps_settings()
+fn finish_setup_action(
+    result: SetupActionResult,
+    app: tauri::AppHandle,
+) -> Result<SetupStatus, String> {
+    if result.exit_required {
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(150));
+            app.exit(0);
+        });
+    }
+
+    Ok(result.status)
 }
 
 #[tauri::command]
@@ -178,7 +159,6 @@ pub fn run() {
         toggle_open_with_support,
         toggle_context_menu,
         remove_all_integration,
-        open_default_apps_settings,
         open_external_link
     ]);
 

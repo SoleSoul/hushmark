@@ -14,8 +14,7 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Open `.md` and `.markdown` files with Ctrl+O through the native Tauri dialog.
 - Open top-level Markdown files by drag/drop.
 - Show a simple empty state when no document is open.
-- Show a subtle empty-state-only `Install` or `Update` setup affordance when needed on Windows.
-- Open setup mode with `--setup` on Windows only. On Linux, it behaves like any other flag-shaped file argument.
+- Show an empty-state-only Windows setup affordance. Use a quiet `Setup` label when the installed copy is current, and action-specific Install, Update, Downgrade, or Reinstall labels when attention is useful.
 - Render Markdown in Rust with `pulldown-cmark`, then sanitize HTML with `ammonia`.
 - Pre-parse valid `---`-delimited YAML front matter and render it as sanitized metadata before the untouched Markdown body.
 - Support CommonMark-style Markdown plus tables and strikethrough.
@@ -26,7 +25,7 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Preserve controlled table alignment classes.
 - Print an open document with Ctrl+P through the native WebView print dialog.
 - Disable the internal WebView context menu.
-- Provide per-user Windows install, Open With, right-click integration, and Default Apps handoff without admin rights.
+- Provide per-user Windows install, Open With, right-click integration, and complete Hushmark-owned uninstall behavior without admin rights.
 - Keep in-app setup/integration unavailable on Linux; Linux setup belongs in packaging rather than the reader app.
 
 For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integration.md`.
@@ -35,8 +34,8 @@ For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integrat
 
 - `src-tauri/src/document_parts.rs`: Source preprocessing, YAML front matter parsing, metadata rendering and sanitization, and Markdown body offsets.
 - `src-tauri/src/document.rs`: Markdown loading, body rendering and sanitization, local images, heading anchors, linked-document validation, and Rust tests.
-- `src-tauri/src/setup.rs`: Windows-only install/setup integration, registry handling, and setup status. The module and its Tauri commands are compiled only on Windows.
-- `src-tauri/src/startup.rs`: Platform-neutral positional argument parsing. `--setup` is recognized only by the Windows startup path; elsewhere it behaves like any other flag-shaped file argument.
+- `src-tauri/src/setup.rs`: Windows-only install/setup integration, registry handling, setup status, and deferred self-uninstall cleanup. The module and its Tauri commands are compiled only on Windows.
+- `src-tauri/src/startup.rs`: Platform-neutral first-positional-argument parsing. There is no setup command-line mode.
 - `src-tauri/src/external_links.rs`: External URL allowlisting before Tauri opens approved links with the system default application.
 - `src-tauri/src/identity.rs`: Shared display identity plus Windows-gated integration identifiers.
 - `src-tauri/src/lib.rs`: Tauri command and plugin registration plus startup platform capabilities.
@@ -72,7 +71,7 @@ See `docs/reader-design.md` for the focused design note.
 
 - There is no dedicated frontend unit test harness yet; UI/navigation behavior relies on TypeScript build checks, Rust tests, and manual smoke testing.
 - Markdown support is intentionally limited; Hushmark is not full GitHub-Flavored Markdown. See `docs/markdown-support.md`.
-- Windows default-app assignment remains user-controlled; Hushmark registers itself as a candidate and opens Default Apps settings.
+- Windows default-app assignment remains user-controlled. Hushmark registers itself as a candidate for Open With, but the setup page does not try to guide or automate default-app selection.
 - Linux packages should own installation, updates, desktop integration, icons, and MIME registration. See `docs/linux-support.md`.
 - Same-document fragment history currently re-renders during popstate restoration. This is acceptable while the reader has little transient DOM-only state.
 - Release binaries are unsigned unless a signing step is added, so Windows SmartScreen may warn testers.
