@@ -1,6 +1,6 @@
 # Hushmark Linux Support
 
-Linux runtime support is available from the shared Hushmark codebase. The reader core is platform-neutral, Windows setup code is excluded from Linux builds, and external links use Tauri's cross-platform opener.
+Linux runtime support is available from the shared Hushmark codebase. The reader core is platform-neutral, Windows setup code is excluded from Linux builds, and external links use Tauri's cross-platform opener. GitHub Releases currently publish only the standalone Windows executable; the AUR package is maintained as downstream packaging in a separate repository.
 
 ## Runtime Policy
 
@@ -22,7 +22,9 @@ Retest this default as WebKitGTK and graphics drivers change.
 
 ## Packaging
 
-The supported package formats have not been decided. Any Linux package should:
+An AUR package currently provides the established downstream source-package path. Its release procedure and external repository are documented in `docs/release-checklist.md`. Other supported or first-party Linux package formats have not been decided.
+
+Any Linux package should:
 
 - install the `hushmark` executable in the normal executable path;
 - install `packaging/linux/hushmark.desktop` as the desktop entry;

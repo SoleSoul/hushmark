@@ -28,7 +28,7 @@ Current Windows builds are unsigned, so Windows may show a SmartScreen warning.
 
 After opening Hushmark, you can use the setup view to add optional Windows integration for Markdown files.
 
-Linux runtime support is available from the same source release. Linux desktop integration is handled by packaging rather than by an in-app setup flow.
+Linux runtime support is available from the same source release, and an [AUR package](https://aur.archlinux.org/packages/hushmark) provides downstream Arch Linux packaging. Linux desktop integration is handled by packaging rather than by an in-app setup flow.
 
 ## Use
 
@@ -56,7 +56,7 @@ More details are in [docs/markdown-support.md](docs/markdown-support.md).
 
 ## Platform status
 
-Hushmark currently supports Windows and Linux. Windows has a standalone release executable and optional in-app desktop integration. Linux integration belongs to packages and desktop files rather than an in-app setup flow.
+The Hushmark reader runtime supports Windows and Linux. GitHub Releases currently provide a standalone Windows executable with optional in-app desktop integration. An AUR package is maintained separately; other first-party Linux package formats have not been selected. Linux integration belongs to packages and desktop files rather than an in-app setup flow.
 
 macOS may come later.
 
@@ -64,12 +64,22 @@ macOS may come later.
 
 Hushmark is built with Rust, Tauri 2, TypeScript, HTML, and CSS.
 
+Install Node.js with npm, the stable Rust toolchain, and the native prerequisites required by Tauri 2 for your operating system. Windows development requires the Microsoft C++ Build Tools and WebView2; Linux development requires the appropriate WebKitGTK and system build packages for the distribution.
+
+Install the locked JavaScript dependencies before the first build:
+
+```sh
+npm ci
+```
+
 Useful commands:
 
 ```sh
 npm run build
+cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run tauri -- build
+git diff --check
 ```
 
 Project notes for contributors and coding agents are in [AGENTS.md](AGENTS.md) and [docs/project-context.md](docs/project-context.md).

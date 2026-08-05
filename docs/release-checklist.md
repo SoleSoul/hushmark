@@ -47,12 +47,29 @@ Use this sequence for a public/tester release:
 1. Update version metadata and move `CHANGELOG.md` notes from `Unreleased` to the new version.
 2. Run the relevant checks.
 3. Commit the release change.
-4. Create and push a matching tag, for example `v0.1.7`.
-5. Wait for the GitHub **Release** workflow to finish.
-6. Inspect the draft GitHub release: title, body, attached `hushmark.exe`, and source archives.
-7. Smoke-test the downloaded Windows executable before publishing.
-8. If the release changes Linux runtime or packaging behavior, update the AUR package to the matching tag and checksum.
-9. Publish the GitHub draft release only after the Windows smoke test and package metadata checks are complete.
+4. Push the release commit to `master` and confirm `origin/master` points to it.
+5. Create and push a matching annotated tag, for example `v0.1.7`.
+6. Wait for the GitHub **Release** workflow to finish.
+7. Inspect the draft GitHub release: title, generated body, attached `hushmark.exe`, and source archives. Replace the generic generated body with release notes based on `CHANGELOG.md`.
+8. Smoke-test the downloaded Windows executable before publishing.
+9. If the release changes Linux runtime or packaging behavior, update the AUR package to the matching tag and checksum.
+10. Publish the GitHub draft release only after the Windows smoke test and package metadata checks are complete, then confirm GitHub identifies it as the latest release.
+
+The corresponding Git commands are shown below using `0.1.12` as an example; replace it with the version being released:
+
+```sh
+git push origin master
+git tag -a v0.1.12 -m "Hushmark 0.1.12"
+git push origin v0.1.12
+```
+
+After the draft has passed inspection and smoke testing, it can be published and verified through the GitHub UI or with GitHub CLI:
+
+```sh
+gh release edit v0.1.12 --draft=false --latest
+gh release view v0.1.12
+gh api repos/SoleSoul/hushmark/releases/latest --jq .tag_name
+```
 
 ## GitHub Actions Release Build
 
@@ -69,12 +86,13 @@ Manual tester build:
 Tagged draft release:
 
 1. Confirm the app version is current and committed.
-2. Create and push a matching version tag, for example `v0.1.4`.
-3. Wait for the **Release** workflow to finish.
-4. Open **Releases** and inspect the draft release named `Hushmark 0.1.4`.
-5. Confirm the release asset is named `hushmark.exe`.
-6. Download and smoke-test the attached Windows artifact.
-7. Publish the draft release only after manual testing and any package metadata updates.
+2. Confirm the release commit has been pushed to `master`.
+3. Create and push a matching annotated version tag, for example `v0.1.4`.
+4. Wait for the **Release** workflow to finish.
+5. Open **Releases** and inspect the draft release named `Hushmark 0.1.4`.
+6. Confirm the release asset is named `hushmark.exe`.
+7. Download and smoke-test the attached Windows artifact.
+8. Publish the draft release only after manual testing and any package metadata updates.
 
 Workflow artifacts are available from the run summary under **Artifacts**. The workflow uploads the standalone executable from `src-tauri/target/release/hushmark.exe`. Tag builds attach the Windows release asset as `hushmark.exe`.
 
