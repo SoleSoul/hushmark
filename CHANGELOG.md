@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## 0.1.10
+
+Windows setup, self-uninstall, and front matter refinement.
+
 - Give nested YAML front matter clearer inline hierarchy while retaining compact rendering.
 - Preserve author-intended line breaks and repeated spaces in front matter text values.
 - Keep a quiet **Setup** affordance in the Windows empty state, with action-specific Install, Update, Downgrade, and Reinstall labels when the installed copy differs.
