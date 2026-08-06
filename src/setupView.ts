@@ -6,6 +6,12 @@ import type { SetupActionId, SetupCommand, SetupMessage, SetupStatus } from "./t
 
 export const WINDOWS_SETUP_TITLE = "Hushmark Setup";
 
+type SetupViewOptions = {
+  onBackToHome: () => void;
+  workingAction?: SetupActionId | null;
+  confirmingAction?: SetupActionId | null;
+};
+
 const WINDOWS_SETUP_COPY = {
   installRowLabel: "Install Hushmark",
   installedRowLabel: "Installed copy",
@@ -85,6 +91,7 @@ function createIntegrationRow(
   command: SetupCommand,
   status: SetupStatus,
   workingAction: SetupActionId | null,
+  onBackToHome: () => void,
 ): HTMLButtonElement {
   const row = document.createElement("button");
   row.type = "button";
@@ -94,7 +101,7 @@ function createIntegrationRow(
   row.disabled = workingAction !== null;
   row.setAttribute("aria-pressed", String(checked));
   row.addEventListener("click", () => {
-    void runSetupAction(app, command, status, id);
+    void runSetupAction(app, command, status, id, onBackToHome);
   });
 
   const check = createTextElement("span", checked ? "\u2713" : "", "integration-row__check");
@@ -122,6 +129,7 @@ function createSecondaryButton(
   status: SetupStatus,
   id: SetupActionId,
   workingAction: SetupActionId | null,
+  onBackToHome: () => void,
   destructive = false,
 ): HTMLButtonElement {
   const button = createTextElement(
@@ -132,7 +140,7 @@ function createSecondaryButton(
   button.type = "button";
   button.disabled = workingAction !== null;
   button.addEventListener("click", () => {
-    void runSetupAction(app, command, status, id);
+    void runSetupAction(app, command, status, id, onBackToHome);
   });
   return button;
 }
@@ -152,9 +160,13 @@ function createMessage(message: SetupMessage): HTMLDivElement {
 export function renderSetup(
   app: HTMLElement,
   status: SetupStatus,
-  workingAction: SetupActionId | null = null,
-  confirmingAction: SetupActionId | null = null,
+  options: SetupViewOptions,
 ): void {
+  const {
+    onBackToHome,
+    workingAction = null,
+    confirmingAction = null,
+  } = options;
   document.title = WINDOWS_SETUP_TITLE;
 
   const section = document.createElement("section");
@@ -190,12 +202,13 @@ export function renderSetup(
     "toggle_install",
     status,
     workingAction,
+    onBackToHome,
   );
   installRow.setAttribute("aria-expanded", String(confirmingAction === "install"));
   rows.append(installRow);
 
   if (confirmingAction === "install") {
-    rows.append(createSelfUninstallConfirmation(app, status));
+    rows.append(createSelfUninstallConfirmation(app, status, onBackToHome));
   }
 
   rows.append(
@@ -209,6 +222,7 @@ export function renderSetup(
       "toggle_open_with_support",
       status,
       workingAction,
+      onBackToHome,
     ),
     createIntegrationRow(
       app,
@@ -220,6 +234,7 @@ export function renderSetup(
       "toggle_context_menu",
       status,
       workingAction,
+      onBackToHome,
     ),
   );
 
@@ -236,6 +251,7 @@ export function renderSetup(
         status,
         "removeAll",
         workingAction,
+        onBackToHome,
         true,
       ),
     );
@@ -253,13 +269,19 @@ export function renderSetup(
     panel.append(createMessage(status.message));
   }
 
-  section.append(panel);
+  const back = createTextElement("button", "Back", "view-corner-action");
+  back.type = "button";
+  back.disabled = workingAction !== null;
+  back.addEventListener("click", onBackToHome);
+
+  section.append(panel, back);
   app.replaceChildren(section);
 }
 
 function createSelfUninstallConfirmation(
   app: HTMLElement,
   status: SetupStatus,
+  onBackToHome: () => void,
 ): HTMLElement {
   const confirmation = document.createElement("section");
   confirmation.className = "setup-confirmation";
@@ -282,19 +304,25 @@ function createSelfUninstallConfirmation(
   const cancel = createTextElement("button", "Cancel", "button button--secondary");
   cancel.type = "button";
   cancel.addEventListener("click", () => {
-    renderSetup(app, status);
+    renderSetup(app, status, { onBackToHome });
   });
   const uninstall = createTextElement("button", "Uninstall", "button button--danger");
   uninstall.type = "button";
   uninstall.addEventListener("click", () => {
-    void executeSetupAction(app, "toggle_install", status, "install");
+    void executeSetupAction(
+      app,
+      "toggle_install",
+      status,
+      "install",
+      onBackToHome,
+    );
   });
   actions.append(cancel, uninstall);
   confirmation.append(heading, explanation, actions);
   confirmation.addEventListener("keydown", (event) => {
     if (event.key === SHORTCUTS.cancel.key) {
       event.preventDefault();
-      renderSetup(app, status);
+      renderSetup(app, status, { onBackToHome });
     }
   });
   window.requestAnimationFrame(() => cancel.focus());
@@ -307,13 +335,23 @@ async function runSetupAction(
   command: SetupCommand,
   previousStatus: SetupStatus,
   workingAction: SetupActionId,
+  onBackToHome: () => void,
 ): Promise<void> {
   if (requiresSelfUninstallConfirmation(command, previousStatus)) {
-    renderSetup(app, previousStatus, null, workingAction);
+    renderSetup(app, previousStatus, {
+      onBackToHome,
+      confirmingAction: workingAction,
+    });
     return;
   }
 
-  await executeSetupAction(app, command, previousStatus, workingAction);
+  await executeSetupAction(
+    app,
+    command,
+    previousStatus,
+    workingAction,
+    onBackToHome,
+  );
 }
 
 async function executeSetupAction(
@@ -321,15 +359,28 @@ async function executeSetupAction(
   command: SetupCommand,
   previousStatus: SetupStatus,
   workingAction: SetupActionId,
+  onBackToHome: () => void,
 ): Promise<void> {
-  renderSetup(app, previousStatus, workingAction);
+  renderSetup(app, previousStatus, { onBackToHome, workingAction });
 
   try {
     const status = await invoke<SetupStatus>(command);
-    renderSetup(app, status);
+    if (!isSetupRendered(app)) {
+      return;
+    }
+    renderSetup(app, status, { onBackToHome });
   } catch (error) {
+    if (!isSetupRendered(app)) {
+      return;
+    }
     const details = error instanceof Error ? error.message : String(error);
-    await renderSetupError(app, previousStatus, "That change could not be completed.", details);
+    await renderSetupError(
+      app,
+      previousStatus,
+      "That change could not be completed.",
+      details,
+      onBackToHome,
+    );
   }
 }
 
@@ -345,18 +396,27 @@ function requiresSelfUninstallConfirmation(
     (command === "toggle_install" && status.installedMatchesCurrent);
 }
 
+function isSetupRendered(app: HTMLElement): boolean {
+  return app.querySelector(":scope > .setup") !== null;
+}
+
 async function renderSetupError(
   app: HTMLElement,
   previousStatus: SetupStatus,
   text: string,
   details: string,
+  onBackToHome: () => void,
 ): Promise<void> {
   const message: SetupMessage = { kind: "error", text, details };
 
   try {
     const status = await invoke<SetupStatus>("get_setup_status");
-    renderSetup(app, { ...status, message });
+    if (isSetupRendered(app)) {
+      renderSetup(app, { ...status, message }, { onBackToHome });
+    }
   } catch {
-    renderSetup(app, { ...previousStatus, message });
+    if (isSetupRendered(app)) {
+      renderSetup(app, { ...previousStatus, message }, { onBackToHome });
+    }
   }
 }

@@ -75,11 +75,15 @@ body {
   line-height: 1.6;
 }
 
-.state__setup-action {
+.view-corner-action {
+  display: grid;
   position: fixed;
   inset-block-start: 1rem;
   inset-inline-end: 1rem;
-  padding: 0.35rem 0.45rem;
+  width: 6rem;
+  height: 2rem;
+  padding: 0 0.45rem;
+  place-items: center;
   border: 0;
   border-radius: 0.45rem;
   background: transparent;
@@ -89,19 +93,24 @@ body {
   cursor: pointer;
 }
 
-.state__setup-action:hover,
-.state__setup-action:focus-visible {
+.view-corner-action:hover:not(:disabled),
+.view-corner-action:focus-visible {
   background: #eee9dc;
   color: #424a53;
 }
 
-.state__setup-action--quiet {
+.view-corner-action:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+.view-corner-action--quiet {
   color: #aaa49a;
   font-size: 0.78rem;
 }
 
-.state__setup-action--quiet:hover,
-.state__setup-action--quiet:focus-visible {
+.view-corner-action--quiet:hover,
+.view-corner-action--quiet:focus-visible {
   color: #6e6250;
 }
 

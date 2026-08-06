@@ -184,7 +184,7 @@ async function renderEmptySetupAffordance(section: HTMLElement): Promise<void> {
   }
 
   const label = emptySetupActionLabel(status);
-  const className = `state__setup-action${label === "Setup" ? " state__setup-action--quiet" : ""}`;
+  const className = `view-corner-action${label === "Setup" ? " view-corner-action--quiet" : ""}`;
   const button = createTextElement("button", label, className);
   button.type = "button";
   button.addEventListener("click", () => {
@@ -215,7 +215,15 @@ function openSetupFromEmptyState(status: SetupStatus): void {
   void currentWindow.setTitle(WINDOWS_SETUP_TITLE).catch((error) => {
     console.warn("failed to set setup window title", error);
   });
-  renderSetup(app, status);
+  renderSetup(app, status, { onBackToHome: returnToHomeFromSetup });
+}
+
+function returnToHomeFromSetup(): void {
+  currentMode = "reader";
+  void currentWindow.setTitle(PRODUCT.displayName).catch((error) => {
+    console.warn("failed to restore window title", error);
+  });
+  pushHomeNavigation();
 }
 
 function handleDocumentLinkClick(event: MouseEvent): void {
@@ -564,7 +572,11 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
   if (isControlShortcut(event, SHORTCUTS.home)) {
     event.preventDefault();
     if (!event.repeat) {
-      pushHomeNavigation();
+      if (currentMode === "setup") {
+        returnToHomeFromSetup();
+      } else {
+        pushHomeNavigation();
+      }
     }
     return;
   }

@@ -67,7 +67,7 @@ After install/remove, Hushmark calls `SHChangeNotify(SHCNE_ASSOCCHANGED, ...)` s
 
 ## Setup control panel behavior
 
-Setup is an immediate integration page reached from the Windows empty state. There is no Apply button or expandable diagnostics section. The current version and whether the running executable is installed or standalone are visible beneath the heading. The empty-state action reads **Setup** in quiet text when the installed copy is current, and changes to Install, Update, Downgrade, or Reinstall when the running copy calls for an action. When an installed executable differs from the running build, its version appears directly in the installation row if it can be read.
+Setup is an immediate integration page reached from the Windows Help page. There is no Apply button or expandable diagnostics section. The current version and whether the running executable is installed or standalone are visible beneath the heading. The Help action reads **Setup** in quiet text when the installed copy is current, and changes to Install, Update, Downgrade, or Reinstall when the running copy calls for an action. Setup places a **Back** action in the same top-right position and target size so the user can return directly to Help. When an installed executable differs from the running build, its version appears directly in the installation row if it can be read.
 
 Rows:
 
@@ -114,7 +114,7 @@ Copy-Item .\src-tauri\target\release\hushmark.exe "$temp\Hushmark.exe"
 
 In setup:
 
-1. Run Hushmark without a document and open setup from the top-right action.
+1. Run Hushmark without a document, open setup from the top-right action, and confirm **Back** returns to Help from the same target position. Confirm Ctrl+H also returns to Help.
 2. Click **Install Hushmark** and confirm `%LOCALAPPDATA%\Programs\Hushmark\Hushmark.exe` exists.
 3. Confirm the empty-state action reads a quiet **Setup** when the installed copy is current.
 4. Run a newer standalone build and confirm **Update Hushmark**. Run an older standalone build and confirm **Downgrade Hushmark**.

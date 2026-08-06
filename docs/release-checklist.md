@@ -118,7 +118,7 @@ For an AUR update:
 
 - Run `src-tauri\target\release\hushmark.exe examples\markdown-visual-inspection.md`.
 - Open with no arguments and confirm the Home/Help contents page.
-- From Home, open setup using the top-right action. Confirm it reads **Setup** and stays visually quiet when the installed copy is current.
+- From Home, open setup using the top-right action. Confirm it reads **Setup** and stays visually quiet when the installed copy is current, then confirm the same-position **Back** action and Ctrl+H return to Home.
 - Check Ctrl+O from Home and from an open document.
 - Check Ctrl+H enters Home history and Alt+Left/Alt+Right move between Home and the document.
 - Check Ctrl++/Ctrl+=, Ctrl+-, Ctrl+0, and Ctrl+MouseWheel across the 50%-200% zoom range.

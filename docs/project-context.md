@@ -14,7 +14,7 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Open `.md` and `.markdown` files with Ctrl+O through the native Tauri dialog.
 - Open top-level Markdown files by drag/drop.
 - Show a restrained book-contents home and keyboard-help page when no document is open, and return to it with Ctrl+H through normal Back/Forward history.
-- Show an empty-state-only Windows setup affordance. Use a quiet `Setup` label when the installed copy is current, and action-specific Install, Update, Downgrade, or Reinstall labels when attention is useful.
+- Show a Windows setup affordance on Help with a same-position Back action from Setup. Use a quiet `Setup` label when the installed copy is current, and action-specific Install, Update, Downgrade, or Reinstall labels when attention is useful.
 - Render Markdown in Rust with `pulldown-cmark`, then sanitize HTML with `ammonia`.
 - Pre-parse valid `---`-delimited YAML front matter and render it as sanitized metadata before the untouched Markdown body.
 - Support CommonMark-style Markdown plus tables and strikethrough.
