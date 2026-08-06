@@ -21,27 +21,6 @@ const READING_ANCHOR_SELECTOR =
 const REFERENCE_VIEWPORT_FRACTION = 0.3;
 const SCROLL_START_TOLERANCE = 1;
 
-const SCALED_LENGTH_PROPERTIES = [
-  ["--document-body-font-size-base", "--document-body-font-size"],
-  ["--document-front-matter-font-size-base", "--document-front-matter-font-size"],
-  [
-    "--document-front-matter-term-font-size-base",
-    "--document-front-matter-term-font-size",
-  ],
-  ["--document-message-font-size-base", "--document-message-font-size"],
-  [
-    "--document-message-heading-font-size-base",
-    "--document-message-heading-font-size",
-  ],
-  ["--document-heading-1-font-size-base", "--document-heading-1-font-size"],
-  ["--document-heading-2-font-size-base", "--document-heading-2-font-size"],
-  ["--document-heading-3-font-size-base", "--document-heading-3-font-size"],
-  ["--document-heading-4-font-size-base", "--document-heading-4-font-size"],
-  ["--document-heading-5-font-size-base", "--document-heading-5-font-size"],
-  ["--document-heading-6-font-size-base", "--document-heading-6-font-size"],
-  ["--document-pre-font-size-base", "--document-pre-font-size"],
-] as const;
-
 export function zoomedDocumentView(
   preferences: DocumentViewPreferences,
   delta: number,
@@ -78,15 +57,11 @@ export function applyDocumentViewPreferences(
   const zoomFactor = preferences.zoom / 100;
 
   root.dataset.documentLayout = preferences.layout;
+  root.style.setProperty("--document-zoom-factor", String(zoomFactor));
   root.style.setProperty(
-    "--document-page-width",
-    `${cssPixels(computedStyle, "--document-page-width-base") * zoomFactor}px`,
+    "--document-page-scaled-content-width",
+    `${cssPixels(computedStyle, "--document-page-content-width-base") * zoomFactor}px`,
   );
-
-  for (const [baseProperty, scaledProperty] of SCALED_LENGTH_PROPERTIES) {
-    const basePixels = cssPixels(computedStyle, baseProperty);
-    root.style.setProperty(scaledProperty, `${basePixels * zoomFactor}px`);
-  }
 }
 
 function cssPixels(

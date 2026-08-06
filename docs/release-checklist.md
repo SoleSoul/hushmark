@@ -122,8 +122,8 @@ For an AUR update:
 - Check Ctrl+O from Home and from an open document.
 - Check Ctrl+H enters Home history and Alt+Left/Alt+Right move between Home and the document.
 - Check Ctrl++/Ctrl+=, Ctrl+-, Ctrl+0, and Ctrl+MouseWheel across the 50%-200% zoom range.
-- Check Ctrl+L toggles Page and Full Width at non-default zoom without changing apparent text size or reading position.
-- Resize wide and narrow windows in both layouts and confirm resizing does not change zoom.
+- Check Ctrl+L toggles Page and Full Width without changing the apparent scale of text, images, or spacing, and without losing the reading position. At the default 900px window width and 100% zoom, confirm the text edges do not move.
+- Resize wide and narrow windows at 50%, 100%, and 200% in both layouts and confirm resizing does not change zoom. Confirm Page preserves its scaled paper measure while it fits, Full Width retains its reading inset when space is available, and both reduce to the same side margins when the scaled Page cannot fit.
 - Check Back/Forward reading positions after zoom and layout changes with prose, headings, front matter, images, tables, and long code.
 - Open `examples/print-visual-inspection.md`, check Ctrl+P print preview and Print to PDF, and confirm Ctrl+P does nothing in empty, error, and setup views.
 - Check same-document fragments, missing fragments, Alt+Left, and Alt+Right.

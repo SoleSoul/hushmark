@@ -139,9 +139,12 @@ function renderDocument(
 
   const article = document.createElement("article");
   article.className = "document";
+  const content = document.createElement("div");
+  content.className = "document__content";
 
   // The HTML is rendered and sanitized by Rust before it reaches the UI.
-  article.innerHTML = documentView.html ?? "";
+  content.innerHTML = documentView.html ?? "";
+  article.append(content);
   article.addEventListener("click", handleDocumentLinkClick);
 
   app.replaceChildren(article);
@@ -765,13 +768,20 @@ function showDocumentMessage(heading: string, detail: string): void {
     return;
   }
 
-  article.querySelector(".document-message")?.remove();
+  const content = article.querySelector<HTMLElement>(
+    ":scope > .document__content",
+  );
+  if (!content) {
+    return;
+  }
+
+  content.querySelector(".document-message")?.remove();
 
   const message = document.createElement("aside");
   message.className = "document-message";
   message.setAttribute("role", "status");
   message.append(createTextElement("h2", heading), createTextElement("p", detail));
-  article.prepend(message);
+  content.prepend(message);
   message.scrollIntoView({ block: "nearest" });
 }
 

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- Make document zoom scale text, images, and spacing uniformly while keeping Page and Full Width identical at the default window size and 100% zoom.
+- Add a stable top-right Back action from Windows Setup to Help.
+
 ## 0.1.12
 
 Windows update recovery and Markdown table sizing update.

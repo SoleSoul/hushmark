@@ -8,7 +8,13 @@
   --font-code:
     "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
     monospace;
-  --document-page-width-base: 760px;
+  /* Keep aligned with the default window width in tauri.conf.json. */
+  --document-layout-reference-width-base: 900px;
+  --document-page-content-width-base: 712px;
+  --document-page-scaled-content-width: var(
+    --document-page-content-width-base
+  );
+  --document-zoom-factor: 1;
   --document-body-font-size-base: 16px;
   --document-front-matter-font-size-base: 14px;
   --document-front-matter-term-font-size-base: 12.48px;
@@ -471,12 +477,17 @@ body {
 }
 
 .document {
+  /* The frame follows Page zoom; the inner content keeps logical dimensions. */
   width: min(
-    100%,
-    var(--document-page-width, var(--document-page-width-base))
+    calc(100% - 3rem),
+    var(--document-page-scaled-content-width)
   );
-  margin: 0 auto;
-  padding: clamp(2rem, 6vw, 4.5rem) 1.5rem 5rem;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.document__content {
+  padding-block: clamp(2rem, 6vw, 4.5rem) 5rem;
   overflow-wrap: anywhere;
   color: #24292f;
   font-family: var(--font-reader);
@@ -485,23 +496,39 @@ body {
     var(--document-body-font-size-base)
   );
   line-height: 1.7;
+  zoom: var(--document-zoom-factor);
 }
 
-:root[data-platform="windows"] .document {
+:root[data-platform="windows"] .document__content {
   line-height: 1.72;
 }
 
 :root[data-document-layout="full-width"] .document {
-  width: 100%;
+  width: auto;
   max-width: none;
-  padding-inline: clamp(2rem, 5vw, 5rem);
+  /* Hold the reference inset until a scaled Page would need less room. */
+  margin-inline: min(
+    max(
+      1.5rem,
+      calc(
+        (
+            min(100%, var(--document-layout-reference-width-base)) -
+              var(--document-page-content-width-base)
+          ) / 2
+      )
+    ),
+    max(
+      1.5rem,
+      calc((100% - var(--document-page-scaled-content-width)) / 2)
+    )
+  );
 }
 
-.document > :first-child {
+.document__content > :first-child {
   margin-top: 0;
 }
 
-.document > :last-child {
+.document__content > :last-child {
   margin-bottom: 0;
 }
 
@@ -795,7 +822,6 @@ body {
   }
 
   .document,
-  :root[data-platform="windows"] .document,
   :root[data-document-layout] .document {
     --document-front-matter-font-size: 0.875rem;
     --document-front-matter-term-font-size: 0.78rem;
@@ -813,6 +839,14 @@ body {
     color: #111;
     font-size: 11pt;
     line-height: 1.5;
+  }
+
+  .document__content,
+  :root[data-platform="windows"] .document__content {
+    padding: 0;
+    font-size: 11pt;
+    line-height: 1.5;
+    zoom: 1;
   }
 
   .document a {

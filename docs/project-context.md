@@ -24,7 +24,7 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Resolve safe local Markdown image paths and embed them as `data:` URLs.
 - Preserve controlled table alignment classes.
 - Print an open document with Ctrl+P through the native WebView print dialog.
-- Zoom open documents from 50% to 200% and switch between the default Page layout and an uncapped Full Width layout without adding reader chrome.
+- Zoom all open-document content uniformly from 50% to 200% and switch between the default Page layout and an uncapped Full Width layout without adding reader chrome. Keep their text edges identical at the default window size and 100% zoom.
 - Preserve semantic reading positions across document reflow, layout changes, zoom changes, and Back/Forward navigation.
 - Disable the internal WebView context menu.
 - Provide per-user Windows install, Open With, right-click integration, and complete Hushmark-owned uninstall behavior without admin rights.
