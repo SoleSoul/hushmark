@@ -12,6 +12,7 @@ The current `pulldown-cmark` options are:
 
 - `Options::ENABLE_TABLES`
 - `Options::ENABLE_STRIKETHROUGH`
+- `Options::ENABLE_MATH`
 
 All other non-CommonMark options remain disabled for now.
 
@@ -35,6 +36,7 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - `---`-delimited YAML front matter at the start of a file
 - tables
 - strikethrough
+- inline `$...$` and display `$$...$$` TeX mathematics
 - Unicode text, including Hebrew
 
 ## Known limitations
@@ -43,7 +45,7 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - Footnotes are not enabled. Footnote syntax is not rendered as numbered footnotes; depending on the exact text, it remains visible text or is treated as ordinary CommonMark link-reference syntax.
 - Heading attributes are not enabled. `# Heading {#id .class}` remains heading text instead of setting an explicit author-provided HTML `id` or class.
 - Broader GitHub-Flavored Markdown behavior is not enabled beyond tables and strikethrough.
-- Definition lists, math, smart punctuation, superscript, subscript, and wikilinks are not enabled.
+- Definition lists, smart punctuation, superscript, subscript, and wikilinks are not enabled.
 - Raw HTML is parsed by `pulldown-cmark`, but Hushmark sanitizes the resulting HTML with `ammonia`. Safe tags and attributes may remain; unsafe elements, event handlers, arbitrary style attributes, and dangerous URL schemes should not.
 - Relative Markdown document links must stay inside the navigation root, which is the folder of the first opened Markdown file. Absolute local paths, `file://` links, links outside that root, and links to non-Markdown files are not opened.
 - Relative local image paths are resolved for Markdown image syntax and sanitized raw HTML `<img src="...">` tags. Raw HTML image support is limited to rewriting safe relative local image `src` values; it does not provide broader raw HTML or local-file access.
@@ -57,6 +59,14 @@ Tables use the browser's automatic, content-sensitive column sizing. Ordinary sh
 Do not impose equal-width or position-based column rules on general Markdown tables. Markdown does not identify columns as labels, numbers, or prose, so fixed widths and first-column assumptions create surprising results across real documents.
 
 Possible future minimum-height optimization approaches are recorded in `docs/table-layout-optimization.md`. Current Hushmark behavior intentionally remains browser-driven.
+
+## Mathematics
+
+Hushmark recognizes `$...$` as inline mathematics and `$$...$$` as display mathematics through `pulldown-cmark`'s math extension. Math delimiters protect their contents from ordinary Markdown interpretation. Unclosed delimiters remain plain source.
+
+The Rust renderer emits escaped, controlled math spans before sanitization. Temporary unforgeable classes prevent raw author HTML from opting into the math renderer. After sanitization, the frontend uses a locally bundled KaTeX build to typeset only those spans. KaTeX runs with untrusted commands disabled and bounded size and macro expansion. Invalid or unsupported formulas retain their original source and delimiters rather than disappearing.
+
+KaTeX accepts a practical TeX mathematics subset, not complete LaTeX documents or arbitrary packages. Display expressions are centered and receive local horizontal overflow when they cannot fit the reading width. Screen zoom scales typeset mathematics with the rest of the document, while print output ignores screen layout and zoom preferences.
 
 ## YAML front matter
 
@@ -99,7 +109,7 @@ This behavior is stable for Hushmark, but it is not claimed to be exact GitHub a
 
 ## Visual fixture
 
-Open `examples/markdown-features.md` when checking reader changes. It intentionally covers common Markdown shapes plus unsupported syntax examples.
+Open `examples/markdown-features.md` when checking general reader changes. Open `examples/math-visual-inspection.md` for inline and display mathematics, currency, invalid input, narrow-window overflow, zoom/layout behavior, and printing.
 
 Manual visual checklist:
 
@@ -117,3 +127,5 @@ Manual visual checklist:
 - Hebrew and mixed English/Hebrew text display correctly.
 - Raw unsafe HTML does not execute or display unsafe script/link behavior.
 - Valid YAML front matter appears as quiet metadata without raw delimiters, while malformed or unterminated front matter remains visible as Markdown.
+- Inline mathematics follows the prose baseline, display mathematics is centered, and long expressions overflow locally without widening the document.
+- Currency and unclosed delimiters remain ordinary source, while invalid closed formulas remain visible with their delimiters.

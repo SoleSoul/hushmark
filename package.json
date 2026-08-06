@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "@tauri-apps/api": "2.10.1",
-    "@tauri-apps/plugin-dialog": "2.6.0"
+    "@tauri-apps/plugin-dialog": "2.6.0",
+    "katex": "^0.18.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",

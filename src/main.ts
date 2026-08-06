@@ -14,6 +14,7 @@ import {
 } from "./documentView";
 import type { DocumentViewPreferences } from "./documentView";
 import { createHomeView } from "./homeView";
+import { renderMath } from "./math";
 import { PRODUCT } from "./product";
 import { renderSetup, WINDOWS_SETUP_TITLE } from "./setupView";
 import { isControlShortcut, SHORTCUTS } from "./shortcuts";
@@ -144,6 +145,7 @@ function renderDocument(
 
   // The HTML is rendered and sanitized by Rust before it reaches the UI.
   content.innerHTML = documentView.html ?? "";
+  renderMath(content);
   article.append(content);
   article.addEventListener("click", handleDocumentLinkClick);
 

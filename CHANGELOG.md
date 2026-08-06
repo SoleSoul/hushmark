@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Render inline `$...$` and display `$$...$$` TeX mathematics with locally bundled KaTeX while preserving invalid formulas as visible source.
 - Make document zoom scale text, images, and spacing uniformly while keeping Page and Full Width identical at the default window size and 100% zoom.
 - Add a stable top-right Back action from Windows Setup to Help.
 

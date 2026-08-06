@@ -17,7 +17,7 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Show a Windows setup affordance on Help with a same-position Back action from Setup. Use a quiet `Setup` label when the installed copy is current, and action-specific Install, Update, Downgrade, or Reinstall labels when attention is useful.
 - Render Markdown in Rust with `pulldown-cmark`, then sanitize HTML with `ammonia`.
 - Pre-parse valid `---`-delimited YAML front matter and render it as sanitized metadata before the untouched Markdown body.
-- Support CommonMark-style Markdown plus tables and strikethrough.
+- Support CommonMark-style Markdown plus tables, strikethrough, and locally typeset TeX mathematics using `$...$` and `$$...$$` delimiters.
 - Generate heading anchors and handle same-document `#fragment` history.
 - Open safe relative `.md` / `.markdown` links inside Hushmark under the starting document folder.
 - Open external `http`, `https`, and `mailto` links in the system app.

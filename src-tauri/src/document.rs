@@ -170,23 +170,32 @@ fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path
     let mut local_images = LocalImageResolver::new(document_path);
     let mut table_alignments = TableAlignmentRewriter::new();
     let mut heading_ids = HeadingIdRewriter::new(collect_heading_ids(markdown));
+    let mut math_classes = MathClassRewriter::new();
     let mut rendered = String::new();
 
     {
-        let parser = Parser::new_ext(markdown, markdown_options()).map(|event| {
+        let parser = Parser::new_ext(markdown, markdown_options()).flat_map(|event| {
             let event = local_images.rewrite_event(event);
             let event = table_alignments.rewrite_event(event);
-            heading_ids.rewrite_event(event)
+            let event = heading_ids.rewrite_event(event);
+            math_classes.rewrite_event(event)
         });
         html::push_html(&mut rendered, parser);
     }
 
     let allowed_table_classes = table_alignments.allowed_classes();
     let allowed_heading_ids = heading_ids.allowed_ids();
-    let safe_html = sanitize_rendered_html(&rendered, &allowed_table_classes, &allowed_heading_ids);
+    let allowed_math_classes = math_classes.allowed_classes();
+    let safe_html = sanitize_rendered_html(
+        &rendered,
+        &allowed_table_classes,
+        &allowed_heading_ids,
+        &allowed_math_classes,
+    );
     let safe_html = local_images.rewrite_sanitized_html_image_sources(safe_html);
     let safe_html = heading_ids.apply_replacements(safe_html);
     let safe_html = table_alignments.apply_replacements(safe_html);
+    let safe_html = math_classes.apply_replacements(safe_html);
     local_images.apply_replacements(safe_html)
 }
 
@@ -194,14 +203,17 @@ fn sanitize_rendered_html(
     rendered: &str,
     allowed_table_classes: &[String],
     allowed_heading_ids: &[String],
+    allowed_math_classes: &[String],
 ) -> String {
     let allowed_table_classes: Vec<&str> =
         allowed_table_classes.iter().map(String::as_str).collect();
     let allowed_heading_ids: Vec<&str> = allowed_heading_ids.iter().map(String::as_str).collect();
+    let allowed_math_classes: Vec<&str> = allowed_math_classes.iter().map(String::as_str).collect();
     let mut builder = Builder::default();
 
     builder.add_allowed_classes("th", &allowed_table_classes);
     builder.add_allowed_classes("td", &allowed_table_classes);
+    builder.add_allowed_classes("span", &allowed_math_classes);
 
     for tag in ["h1", "h2", "h3", "h4", "h5", "h6"] {
         builder.add_tag_attribute_values(tag, "id", &allowed_heading_ids);
@@ -214,6 +226,7 @@ fn markdown_options() -> Options {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_MATH);
     options
 }
 
@@ -499,6 +512,68 @@ fn table_alignment_placeholder_prefix() -> String {
         .unwrap_or_default();
 
     format!("hushmark-align-token-{nanos}-{}", std::process::id())
+}
+
+struct MathClassRewriter {
+    placeholder_prefix: String,
+    replacements: Vec<(String, &'static str)>,
+}
+
+impl MathClassRewriter {
+    fn new() -> Self {
+        Self {
+            placeholder_prefix: math_class_placeholder_prefix(),
+            replacements: Vec::new(),
+        }
+    }
+
+    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Vec<Event<'a>> {
+        match event {
+            Event::InlineMath(source) => self.math_events(source, "math math-inline"),
+            Event::DisplayMath(source) => self.math_events(source, "math math-display"),
+            _ => vec![event],
+        }
+    }
+
+    fn math_events<'a>(
+        &mut self,
+        source: CowStr<'a>,
+        public_classes: &'static str,
+    ) -> Vec<Event<'a>> {
+        let placeholder = format!("{}-{}", self.placeholder_prefix, self.replacements.len());
+        self.replacements
+            .push((placeholder.clone(), public_classes));
+
+        vec![
+            Event::Html(CowStr::from(format!("<span class=\"{placeholder}\">"))),
+            Event::Text(source),
+            Event::Html(CowStr::from("</span>")),
+        ]
+    }
+
+    fn allowed_classes(&self) -> Vec<String> {
+        self.replacements
+            .iter()
+            .map(|(placeholder, _)| placeholder.clone())
+            .collect()
+    }
+
+    fn apply_replacements(&self, mut safe_html: String) -> String {
+        for (placeholder, public_classes) in self.replacements.iter().rev() {
+            safe_html = safe_html.replace(placeholder, public_classes);
+        }
+
+        safe_html
+    }
+}
+
+fn math_class_placeholder_prefix() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+
+    format!("hushmark-math-token-{nanos}-{}", std::process::id())
 }
 
 struct LocalImageResolver {
@@ -925,6 +1000,7 @@ mod tests {
 
         assert!(options.contains(Options::ENABLE_TABLES));
         assert!(options.contains(Options::ENABLE_STRIKETHROUGH));
+        assert!(options.contains(Options::ENABLE_MATH));
         assert!(!options.contains(Options::ENABLE_TASKLISTS));
         assert!(!options.contains(Options::ENABLE_FOOTNOTES));
         assert!(!options.contains(Options::ENABLE_HEADING_ATTRIBUTES));
@@ -941,6 +1017,39 @@ mod tests {
         assert!(html.contains("<th>Feature</th>"));
         assert!(html.contains("<td>Enabled</td>"));
         assert!(html.contains("<del>removed</del>"));
+    }
+
+    #[test]
+    fn inline_and_display_math_render_as_escaped_controlled_spans() {
+        let html = render_markdown_to_safe_html("Inline $a < b$.\n\n$$\nE = mc^2 < script\n$$");
+
+        assert!(html.contains("<span class=\"math math-inline\">a &lt; b</span>"));
+        assert!(html.contains("<span class=\"math math-display\">"));
+        assert!(html.contains("E = mc^2 &lt; script"));
+        assert!(!html.contains("hushmark-math-token"));
+    }
+
+    #[test]
+    fn raw_html_cannot_opt_into_math_rendering() {
+        let html = render_markdown_to_safe_html(
+            r#"<span class="math math-display">\href{javascript:alert(1)}{unsafe}</span>"#,
+        );
+
+        assert!(html.contains("<span"));
+        assert!(!html.contains("class=\"math"));
+        assert!(!html.contains("href=\"javascript:"));
+    }
+
+    #[test]
+    fn currency_and_unclosed_math_delimiters_remain_plain_text() {
+        let html = render_markdown_to_safe_html(
+            "The notebook costs $5.00 and the pen costs $2.00.\n\nUnclosed $x + y",
+        );
+
+        assert!(html.contains("$5.00"));
+        assert!(html.contains("$2.00"));
+        assert!(html.contains("Unclosed $x + y"));
+        assert!(!html.contains("class=\"math"));
     }
 
     #[test]

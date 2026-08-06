@@ -719,6 +719,37 @@ body {
   font-size: 0.9em;
 }
 
+.document .math-display {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.document .math-display > .katex-display {
+  width: max-content;
+  min-width: 100%;
+  margin: 1.35rem 0;
+}
+
+.document p:has(> .math-display:only-child) {
+  margin-block: 1.35rem;
+}
+
+.document p > .math-display:only-child > .katex-display {
+  margin: 0;
+}
+
+.document .math-error {
+  color: #8b4c3b;
+  font-family: var(--font-code);
+  font-size: 0.9em;
+}
+
+.document .math-display.math-error {
+  white-space: pre-wrap;
+}
+
 .document pre {
   max-width: 100%;
   overflow-x: auto;
@@ -876,6 +907,15 @@ body {
     white-space: inherit;
   }
 
+  .document .math-display {
+    overflow: visible;
+  }
+
+  .document .math-display > .katex-display {
+    width: auto;
+    min-width: 0;
+  }
+
   .document table {
     display: table;
     width: 100%;
@@ -891,6 +931,7 @@ body {
   }
 
   .document img,
+  .document .math-display,
   .document pre,
   .document table,
   .document tr,
