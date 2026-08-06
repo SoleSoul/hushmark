@@ -53,11 +53,11 @@ Keep Tauri JavaScript and Rust plugin versions aligned. Dialog support is curren
 
 Windows release artifacts and Windows smoke tests should be produced through GitHub Actions or a Windows machine. On Linux, local checks can still be useful, but they should not be treated as Windows release validation.
 
-## Version And Tester Builds
+## Version And Releases
 
-Use human-readable patch versions for tester-visible builds. Keep version metadata aligned across `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, and `CHANGELOG.md`.
+Use human-readable patch versions for public releases and explicitly shared prerelease builds. Keep version metadata aligned across `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, and `CHANGELOG.md`.
 
-Do not bump the version for docs-only changes, internal refactors, or other behavior-preserving maintenance unless a tester build is being prepared.
+Do not bump the version for docs-only changes, internal refactors, or other behavior-preserving maintenance unless a release or shared prerelease build is being prepared.
 
 ## Design Principles
 
@@ -79,7 +79,7 @@ See `docs/reader-design.md` for the focused design note.
 - Linux packages should own installation, updates, desktop integration, icons, and MIME registration. See `docs/linux-support.md`.
 - Same-document fragment history currently re-renders during popstate restoration. This is acceptable while the reader has little transient DOM-only state.
 - Document zoom and layout intentionally reset to Page at 100% on every launch so Hushmark always opens with its paper-like reading baseline.
-- Release binaries are unsigned unless a signing step is added, so Windows SmartScreen may warn testers.
+- Release binaries are unsigned unless a signing step is added, so Windows SmartScreen may warn users.
 
 ## Focused Docs
 
@@ -91,4 +91,4 @@ See `docs/reader-design.md` for the focused design note.
 - `docs/document-view.md`: Document layout, zoom, reading-position, and launch-default behavior.
 - `docs/table-layout-optimization.md`: Research note on possible minimum-height table sizing beyond the current browser algorithm.
 - `docs/roadmap.md`: Active ideas and possible future work.
-- `docs/release-checklist.md`: Repeatable tester/GitHub release process.
+- `docs/release-checklist.md`: Repeatable GitHub release and prerelease-build process.
