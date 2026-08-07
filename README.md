@@ -1,6 +1,6 @@
 # Hushmark
 
-A quiet Markdown reader.
+A calm Markdown reader.
 
 Hushmark opens Markdown files in a calm, uncluttered reading view. It is meant for reading documents, notes, READMEs, and small collections of linked Markdown files, not for editing them.
 

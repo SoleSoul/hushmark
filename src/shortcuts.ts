@@ -3,6 +3,7 @@ export type ShortcutDefinition = {
   alternateKey?: string;
   allowShift?: boolean;
   displayKeys: readonly string[];
+  ariaLabel?: string;
 };
 
 export const SHORTCUTS = {
@@ -24,6 +25,7 @@ export const SHORTCUTS = {
     alternateKey: "+",
     allowShift: true,
     displayKeys: ["Ctrl", "+ / ="],
+    ariaLabel: "Control plus Plus or Equals",
   },
   zoomOut: { key: "-", displayKeys: ["Ctrl", "-"] },
   resetZoom: { key: "0", displayKeys: ["Ctrl", "0"] },

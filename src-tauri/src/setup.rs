@@ -670,7 +670,7 @@ fn remove_installed_exe() -> Result<SetupMessage, String> {
 
     if same_path(&current_exe, &install_path) {
         return Ok(SetupMessage::warning(
-            "The installed executable could not be removed because it is currently running.",
+            "The installed copy could not be removed because it is currently running.",
             Some(format!(
                 "The running executable is {}. Close {DISPLAY_NAME}, then delete {} manually if you want to remove the installed copy.",
                 current_exe.display(),
@@ -684,7 +684,7 @@ fn remove_installed_exe() -> Result<SetupMessage, String> {
             finish_install_file_cleanup(&install_path, format!("{DISPLAY_NAME} was uninstalled."))
         }
         Err(error) => Ok(SetupMessage::warning(
-            "The installed executable could not be removed because it is currently running.",
+            "The installed copy could not be removed because it is currently running.",
             Some(format!(
                 "Could not delete {}: {error}",
                 install_path.display()

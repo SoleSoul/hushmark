@@ -4,6 +4,7 @@ import { SHORTCUTS } from "./shortcuts";
 type Shortcut = {
   action: string;
   keys: readonly string[];
+  keysAriaLabel?: string;
 };
 
 type ShortcutSection = {
@@ -22,11 +23,15 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
   {
     title: "View",
     shortcuts: [
-      { action: "Zoom in", keys: SHORTCUTS.zoomIn.displayKeys },
+      {
+        action: "Zoom in",
+        keys: SHORTCUTS.zoomIn.displayKeys,
+        keysAriaLabel: SHORTCUTS.zoomIn.ariaLabel,
+      },
       { action: "Zoom out", keys: SHORTCUTS.zoomOut.displayKeys },
       { action: "Reset zoom", keys: SHORTCUTS.resetZoom.displayKeys },
       {
-        action: "Toggle Page / Full Width",
+        action: "Switch between Page and Full Width",
         keys: SHORTCUTS.toggleLayout.displayKeys,
       },
     ],
@@ -54,7 +59,10 @@ function createShortcutRow(shortcut: Shortcut): HTMLLIElement {
 
   const keys = document.createElement("span");
   keys.className = "home__keys";
-  keys.setAttribute("aria-label", shortcut.keys.join(" plus "));
+  keys.setAttribute(
+    "aria-label",
+    shortcut.keysAriaLabel ?? shortcut.keys.join(" plus "),
+  );
 
   shortcut.keys.forEach((key, index) => {
     if (index > 0) {
@@ -92,7 +100,7 @@ export function createHomeView(): HTMLElement {
   header.className = "home__header";
   const title = createTextElement("h1", "Hushmark");
   title.id = "home-title";
-  header.append(title, createTextElement("p", "A quiet Markdown reader."));
+  header.append(title, createTextElement("p", "A calm Markdown reader."));
   page.append(header);
 
   const contents = document.createElement("div");

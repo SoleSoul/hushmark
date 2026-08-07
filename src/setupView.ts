@@ -19,9 +19,10 @@ const WINDOWS_SETUP_COPY = {
   downgradeRowLabel: "Downgrade Hushmark",
   reinstallRowLabel: "Reinstall Hushmark",
   openWithRowLabel: "Show Hushmark in Open With",
-  openWithRowDescription: "Offer Hushmark for .md and .markdown files.",
-  contextMenuRowLabel: "Add right-click menu entry",
-  contextMenuRowDescription: "Add 'Open with Hushmark' to Markdown file context menus.",
+  openWithRowDescription: "Make Hushmark available in Open With for Markdown files.",
+  contextMenuRowLabel: "Add to the right-click menu",
+  contextMenuRowDescription:
+    "Show 'Open with Hushmark' when you right-click a Markdown file.",
   removeInstalledCopyButtonLabel: "Remove installed copy",
   removeIntegrationButtonLabel: "Remove Hushmark integration",
 } as const;
@@ -55,7 +56,7 @@ function installRowDescription(status: SetupStatus): string {
     case "reinstall":
       return "Replace the installed build with this copy.";
     default:
-      return "Keep Hushmark in your local Programs folder.";
+      return "Install Hushmark in your local Programs folder.";
   }
 }
 

@@ -8,7 +8,7 @@ mod windows {
     pub const INSTALL_DIR_NAME: &str = "Hushmark";
     pub const PROG_ID: &str = "Hushmark.md";
     pub const DOCUMENT_FRIENDLY_NAME: &str = "Hushmark Markdown Document";
-    pub const APPLICATION_DESCRIPTION: &str = "Read Markdown files with Hushmark.";
+    pub const APPLICATION_DESCRIPTION: &str = "Read Markdown files in a calm, uncluttered view.";
     pub const CONTEXT_MENU_VERB: &str = "OpenWithHushmark";
     pub const CONTEXT_MENU_LABEL: &str = "Open with Hushmark";
     pub const REGISTERED_APPLICATIONS_VALUE: &str = DISPLAY_NAME;

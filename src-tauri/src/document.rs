@@ -785,21 +785,21 @@ fn resolve_linked_markdown_path(
     let parsed = parse_relative_markdown_link(href)?;
     let navigation_root = fs::canonicalize(navigation_root).map_err(|error| {
         format!(
-            "Hushmark could not resolve the Markdown navigation root {}. {error}",
+            "Hushmark could not access the document folder {}. {error}",
             navigation_root.display()
         )
     })?;
 
     if !navigation_root.is_dir() {
         return Err(format!(
-            "Hushmark could not use {} as a Markdown navigation root.",
+            "Hushmark could not use {} as the document folder.",
             navigation_root.display()
         ));
     }
 
     let current_path = fs::canonicalize(current_path).map_err(|error| {
         format!(
-            "Hushmark could not resolve the current Markdown document {}. {error}",
+            "Hushmark could not locate the current Markdown document {}. {error}",
             current_path.display()
         )
     })?;
@@ -815,7 +815,7 @@ fn resolve_linked_markdown_path(
     let target_path = current_dir.join(&parsed.path);
     let target_path = fs::canonicalize(&target_path).map_err(|error| {
         format!(
-            "Hushmark could not resolve linked Markdown file {}. {error}",
+            "Hushmark could not find the linked Markdown file at {}. {error}",
             target_path.display()
         )
     })?;
@@ -873,7 +873,7 @@ fn parse_relative_markdown_link(href: &str) -> Result<ParsedRelativeMarkdownLink
 
     let path = Path::new(decoded_path.as_ref());
     if !is_safe_relative_document_link_path(path) {
-        return Err("Hushmark only opens relative Markdown document links.".to_string());
+        return Err("Hushmark only opens relative links to local Markdown files.".to_string());
     }
 
     if !is_markdown_path(path) {

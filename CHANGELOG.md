@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 - Reduce the packaged mathematics font size by retaining only modern WOFF2 resources from KaTeX.
+- Use consistent, calm product descriptions across Hushmark and its desktop metadata.
+- Clarify Windows Setup, keyboard accessibility, and linked-document error text.
 
 ## 0.1.13
 
