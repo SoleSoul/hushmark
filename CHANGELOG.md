@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Reduce the packaged mathematics font size by retaining only modern WOFF2 resources from KaTeX.
+
 ## 0.1.13
 
 Mathematics, document layout, and Windows Setup navigation update.
