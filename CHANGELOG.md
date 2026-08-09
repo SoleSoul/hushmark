@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## 0.1.14
+
+Task-list, package-size, and language update.
+
 - Render Markdown task lists as quiet, read-only checkboxes.
 - Reduce the packaged mathematics font size by retaining only modern WOFF2 resources from KaTeX.
 - Use consistent, calm product descriptions across Hushmark and its desktop metadata.
