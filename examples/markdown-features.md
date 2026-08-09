@@ -83,6 +83,12 @@ Ordered list:
    1. Nested ordered step
    2. Another nested ordered step
 
+Task list:
+
+- [ ] Review the draft
+- [x] Confirm the rendered document
+  - [X] Keep nested completed tasks readable
+
 ###### H6 Links and images
 
 External links should open outside Hushmark:
@@ -108,7 +114,7 @@ The local placeholder above should render from `examples\assets\hushmark-placeho
 | --- | --- | --- |
 | Tables | Enabled | Provided by `pulldown-cmark` table extension |
 | Strikethrough | Enabled | Renders with `<del>` |
-| Task lists | Not enabled | Stays as ordinary list text |
+| Task lists | Enabled | Renders as read-only checkboxes |
 
 | Left aligned | Center aligned | Right aligned |
 | :--- | :---: | ---: |

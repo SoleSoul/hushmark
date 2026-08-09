@@ -15,7 +15,7 @@ Hushmark opens Markdown files in a calm, uncluttered reading view. It is meant f
 - Page and Full Width document layouts with keyboard zoom
 - Generated heading anchors
 - Local and remote images
-- Tables and strikethrough
+- Tables, task lists, and strikethrough
 - Native document printing with **Ctrl+P**
 - External links open outside Hushmark
 - Optional Windows Open With and right-click integration

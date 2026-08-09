@@ -13,6 +13,7 @@ The current `pulldown-cmark` options are:
 - `Options::ENABLE_TABLES`
 - `Options::ENABLE_STRIKETHROUGH`
 - `Options::ENABLE_MATH`
+- `Options::ENABLE_TASKLISTS`
 
 All other non-CommonMark options remain disabled for now.
 
@@ -36,12 +37,12 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - `---`-delimited YAML front matter at the start of a file
 - tables
 - strikethrough
+- read-only task lists
 - inline `$...$` and display `$$...$$` TeX mathematics
 - Unicode text, including Hebrew
 
 ## Known limitations
 
-- Task lists are not enabled. `- [x] item` renders as ordinary list text, not as a checkbox.
 - Footnotes are not enabled. Footnote syntax is not rendered as numbered footnotes; depending on the exact text, it remains visible text or is treated as ordinary CommonMark link-reference syntax.
 - Heading attributes are not enabled. `# Heading {#id .class}` remains heading text instead of setting an explicit author-provided HTML `id` or class.
 - Broader GitHub-Flavored Markdown behavior is not enabled beyond tables and strikethrough.
@@ -116,6 +117,7 @@ Manual visual checklist:
 - The document stays within the reading column.
 - Headings H1-H6 are readable and clearly ordered.
 - Paragraphs, lists, blockquotes, and horizontal rules remain calm and readable.
+- Task-list markers render as quiet, disabled checkboxes, including in nested lists.
 - Code blocks and very long code/path lines scroll horizontally instead of breaking the page.
 - Tables remain usable and do not force the whole window wider.
 - Intra-document links scroll to the expected generated heading anchors.

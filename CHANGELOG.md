@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Render Markdown task lists as quiet, read-only checkboxes.
 - Reduce the packaged mathematics font size by retaining only modern WOFF2 resources from KaTeX.
 - Use consistent, calm product descriptions across Hushmark and its desktop metadata.
 - Clarify Windows Setup, keyboard accessibility, and linked-document error text.

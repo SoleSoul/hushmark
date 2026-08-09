@@ -688,6 +688,20 @@ body {
   margin-top: 0.25rem;
 }
 
+.document li:has(> .task-list-marker:first-child) {
+  list-style: none;
+}
+
+.document .task-list-marker {
+  width: 0.9em;
+  height: 0.9em;
+  margin: 0 0.45em 0 -1.35em;
+  accent-color: #786445;
+  opacity: 0.8;
+  pointer-events: none;
+  vertical-align: -0.06em;
+}
+
 .document a {
   color: #0969da;
   text-decoration-color: rgb(9 105 218 / 35%);

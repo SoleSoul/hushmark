@@ -171,6 +171,7 @@ fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path
     let mut table_alignments = TableAlignmentRewriter::new();
     let mut heading_ids = HeadingIdRewriter::new(collect_heading_ids(markdown));
     let mut math_classes = MathClassRewriter::new();
+    let mut task_list_markers = TaskListMarkerRewriter::new();
     let mut rendered = String::new();
 
     {
@@ -178,6 +179,7 @@ fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path
             let event = local_images.rewrite_event(event);
             let event = table_alignments.rewrite_event(event);
             let event = heading_ids.rewrite_event(event);
+            let event = task_list_markers.rewrite_event(event);
             math_classes.rewrite_event(event)
         });
         html::push_html(&mut rendered, parser);
@@ -186,16 +188,19 @@ fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path
     let allowed_table_classes = table_alignments.allowed_classes();
     let allowed_heading_ids = heading_ids.allowed_ids();
     let allowed_math_classes = math_classes.allowed_classes();
+    let allowed_task_list_classes = task_list_markers.allowed_classes();
     let safe_html = sanitize_rendered_html(
         &rendered,
         &allowed_table_classes,
         &allowed_heading_ids,
         &allowed_math_classes,
+        &allowed_task_list_classes,
     );
     let safe_html = local_images.rewrite_sanitized_html_image_sources(safe_html);
     let safe_html = heading_ids.apply_replacements(safe_html);
     let safe_html = table_alignments.apply_replacements(safe_html);
     let safe_html = math_classes.apply_replacements(safe_html);
+    let safe_html = task_list_markers.apply_replacements(safe_html);
     local_images.apply_replacements(safe_html)
 }
 
@@ -204,16 +209,22 @@ fn sanitize_rendered_html(
     allowed_table_classes: &[String],
     allowed_heading_ids: &[String],
     allowed_math_classes: &[String],
+    allowed_task_list_classes: &[String],
 ) -> String {
     let allowed_table_classes: Vec<&str> =
         allowed_table_classes.iter().map(String::as_str).collect();
     let allowed_heading_ids: Vec<&str> = allowed_heading_ids.iter().map(String::as_str).collect();
     let allowed_math_classes: Vec<&str> = allowed_math_classes.iter().map(String::as_str).collect();
+    let allowed_task_list_classes: Vec<&str> = allowed_task_list_classes
+        .iter()
+        .map(String::as_str)
+        .collect();
     let mut builder = Builder::default();
 
     builder.add_allowed_classes("th", &allowed_table_classes);
     builder.add_allowed_classes("td", &allowed_table_classes);
     builder.add_allowed_classes("span", &allowed_math_classes);
+    builder.add_allowed_classes("span", &allowed_task_list_classes);
 
     for tag in ["h1", "h2", "h3", "h4", "h5", "h6"] {
         builder.add_tag_attribute_values(tag, "id", &allowed_heading_ids);
@@ -227,6 +238,7 @@ fn markdown_options() -> Options {
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_STRIKETHROUGH);
     options.insert(Options::ENABLE_MATH);
+    options.insert(Options::ENABLE_TASKLISTS);
     options
 }
 
@@ -574,6 +586,64 @@ fn math_class_placeholder_prefix() -> String {
         .unwrap_or_default();
 
     format!("hushmark-math-token-{nanos}-{}", std::process::id())
+}
+
+struct TaskListMarkerRewriter {
+    placeholder_prefix: String,
+    replacements: Vec<(String, bool)>,
+}
+
+impl TaskListMarkerRewriter {
+    fn new() -> Self {
+        Self {
+            placeholder_prefix: task_list_marker_placeholder_prefix(),
+            replacements: Vec::new(),
+        }
+    }
+
+    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Event<'a> {
+        match event {
+            Event::TaskListMarker(checked) => {
+                let placeholder =
+                    format!("{}-{}", self.placeholder_prefix, self.replacements.len());
+                self.replacements.push((placeholder.clone(), checked));
+                Event::Html(CowStr::from(format!(
+                    "<span class=\"{placeholder}\"></span>"
+                )))
+            }
+            _ => event,
+        }
+    }
+
+    fn allowed_classes(&self) -> Vec<String> {
+        self.replacements
+            .iter()
+            .map(|(placeholder, _)| placeholder.clone())
+            .collect()
+    }
+
+    fn apply_replacements(&self, mut safe_html: String) -> String {
+        for (placeholder, checked) in self.replacements.iter().rev() {
+            let placeholder_html = format!("<span class=\"{placeholder}\"></span>");
+            let marker = if *checked {
+                r#"<input class="task-list-marker" type="checkbox" checked disabled aria-label="Completed task">"#
+            } else {
+                r#"<input class="task-list-marker" type="checkbox" disabled aria-label="Incomplete task">"#
+            };
+            safe_html = safe_html.replace(&placeholder_html, marker);
+        }
+
+        safe_html
+    }
+}
+
+fn task_list_marker_placeholder_prefix() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+
+    format!("hushmark-task-token-{nanos}-{}", std::process::id())
 }
 
 struct LocalImageResolver {
@@ -1001,7 +1071,7 @@ mod tests {
         assert!(options.contains(Options::ENABLE_TABLES));
         assert!(options.contains(Options::ENABLE_STRIKETHROUGH));
         assert!(options.contains(Options::ENABLE_MATH));
-        assert!(!options.contains(Options::ENABLE_TASKLISTS));
+        assert!(options.contains(Options::ENABLE_TASKLISTS));
         assert!(!options.contains(Options::ENABLE_FOOTNOTES));
         assert!(!options.contains(Options::ENABLE_HEADING_ATTRIBUTES));
         assert!(!options.contains(Options::ENABLE_GFM));
@@ -1027,6 +1097,32 @@ mod tests {
         assert!(html.contains("<span class=\"math math-display\">"));
         assert!(html.contains("E = mc^2 &lt; script"));
         assert!(!html.contains("hushmark-math-token"));
+    }
+
+    #[test]
+    fn task_lists_render_as_controlled_disabled_checkboxes() {
+        let html = render_markdown_to_safe_html(
+            "- [ ] Review the draft\n- [x] Publish it\n  - [X] Keep nested tasks readable",
+        );
+
+        assert_eq!(html.matches("class=\"task-list-marker\"").count(), 3);
+        assert_eq!(html.matches("checked disabled").count(), 2);
+        assert!(html.contains("aria-label=\"Incomplete task\""));
+        assert!(html.contains("aria-label=\"Completed task\""));
+        assert!(!html.contains("hushmark-task-token"));
+    }
+
+    #[test]
+    fn raw_html_cannot_inject_task_list_controls() {
+        let html = render_markdown_to_safe_html(
+            r#"<input class="task-list-marker" type="checkbox" checked>
+<span class="task-list-marker" role="checkbox">Forged</span>"#,
+        );
+
+        assert!(!html.contains("<input"));
+        assert!(!html.contains("class=\"task-list-marker\""));
+        assert!(!html.contains("role=\"checkbox\""));
+        assert!(html.contains("Forged"));
     }
 
     #[test]
@@ -1254,11 +1350,9 @@ mod tests {
     #[test]
     fn unsupported_markdown_extensions_remain_plain_content() {
         let html = render_markdown_to_safe_html(
-            "- [x] Task item\n\nFootnote reference[^1]\n\n[^1]: Footnote body\n\n# Heading {#custom .accent}",
+            "Footnote reference[^1]\n\n[^1]: Footnote body\n\n# Heading {#custom .accent}",
         );
 
-        assert!(html.contains("[x] Task item"));
-        assert!(!html.contains("checkbox"));
         assert!(html.contains("Footnote reference[^1]"));
         assert!(!html.contains("footnote-reference"));
         assert!(html.contains("Heading {#custom .accent}"));
