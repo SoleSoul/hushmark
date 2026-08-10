@@ -8,7 +8,8 @@ Build and smoke-test Windows releases through GitHub Actions or on a Windows mac
 
 ## Version Policy
 
-- Bump the patch version for public releases and explicitly shared prerelease builds.
+- Bump the patch version for public maintenance releases and explicitly shared prerelease builds.
+- Bump the minor version for deliberate pre-1.0 product milestones that introduce a substantial reader capability.
 - Do not bump the version for docs-only changes, internal refactors, or behavior-preserving maintenance.
 - Keep versions aligned in `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, and `CHANGELOG.md`.
 

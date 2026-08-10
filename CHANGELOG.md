@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
-- Render fenced `mermaid` diagrams offline with the official Mermaid renderer while preserving invalid diagrams as visible source.
+## 0.2.0
+
+Mermaid diagram support milestone.
+
+- Render fenced `mermaid` diagrams offline with the official Mermaid renderer.
+- Present diagrams as restrained document figures using Hushmark typography and a muted color palette while retaining Mermaid's native layout geometry.
+- Preserve invalid diagrams as visible source and keep asynchronous diagram preparation compatible with reading-position restoration and printing.
 
 ## 0.1.14
 
