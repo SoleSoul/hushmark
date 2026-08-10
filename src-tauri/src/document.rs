@@ -10,7 +10,7 @@ use std::{
 use ammonia::Builder;
 use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use percent_encoding::percent_decode_str;
-use pulldown_cmark::{html, Alignment, CowStr, Event, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{html, Alignment, CodeBlockKind, CowStr, Event, Options, Parser, Tag, TagEnd};
 use serde::Serialize;
 
 use crate::{
@@ -170,6 +170,7 @@ fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path
     let mut local_images = LocalImageResolver::new(document_path);
     let mut table_alignments = TableAlignmentRewriter::new();
     let mut heading_ids = HeadingIdRewriter::new(collect_heading_ids(markdown));
+    let mut mermaid_code_blocks = MermaidCodeBlockRewriter::new();
     let mut math_classes = MathClassRewriter::new();
     let mut task_list_markers = TaskListMarkerRewriter::new();
     let mut rendered = String::new();
@@ -180,6 +181,7 @@ fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path
             let event = table_alignments.rewrite_event(event);
             let event = heading_ids.rewrite_event(event);
             let event = task_list_markers.rewrite_event(event);
+            let event = mermaid_code_blocks.rewrite_event(event);
             math_classes.rewrite_event(event)
         });
         html::push_html(&mut rendered, parser);
@@ -187,18 +189,21 @@ fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path
 
     let allowed_table_classes = table_alignments.allowed_classes();
     let allowed_heading_ids = heading_ids.allowed_ids();
+    let allowed_mermaid_classes = mermaid_code_blocks.allowed_classes();
     let allowed_math_classes = math_classes.allowed_classes();
     let allowed_task_list_classes = task_list_markers.allowed_classes();
     let safe_html = sanitize_rendered_html(
         &rendered,
         &allowed_table_classes,
         &allowed_heading_ids,
+        &allowed_mermaid_classes,
         &allowed_math_classes,
         &allowed_task_list_classes,
     );
     let safe_html = local_images.rewrite_sanitized_html_image_sources(safe_html);
     let safe_html = heading_ids.apply_replacements(safe_html);
     let safe_html = table_alignments.apply_replacements(safe_html);
+    let safe_html = mermaid_code_blocks.apply_replacements(safe_html);
     let safe_html = math_classes.apply_replacements(safe_html);
     let safe_html = task_list_markers.apply_replacements(safe_html);
     local_images.apply_replacements(safe_html)
@@ -208,12 +213,15 @@ fn sanitize_rendered_html(
     rendered: &str,
     allowed_table_classes: &[String],
     allowed_heading_ids: &[String],
+    allowed_mermaid_classes: &[String],
     allowed_math_classes: &[String],
     allowed_task_list_classes: &[String],
 ) -> String {
     let allowed_table_classes: Vec<&str> =
         allowed_table_classes.iter().map(String::as_str).collect();
     let allowed_heading_ids: Vec<&str> = allowed_heading_ids.iter().map(String::as_str).collect();
+    let allowed_mermaid_classes: Vec<&str> =
+        allowed_mermaid_classes.iter().map(String::as_str).collect();
     let allowed_math_classes: Vec<&str> = allowed_math_classes.iter().map(String::as_str).collect();
     let allowed_task_list_classes: Vec<&str> = allowed_task_list_classes
         .iter()
@@ -223,6 +231,7 @@ fn sanitize_rendered_html(
 
     builder.add_allowed_classes("th", &allowed_table_classes);
     builder.add_allowed_classes("td", &allowed_table_classes);
+    builder.add_allowed_classes("code", &allowed_mermaid_classes);
     builder.add_allowed_classes("span", &allowed_math_classes);
     builder.add_allowed_classes("span", &allowed_task_list_classes);
 
@@ -524,6 +533,66 @@ fn table_alignment_placeholder_prefix() -> String {
         .unwrap_or_default();
 
     format!("hushmark-align-token-{nanos}-{}", std::process::id())
+}
+
+struct MermaidCodeBlockRewriter {
+    placeholder_prefix: String,
+    replacements: Vec<String>,
+}
+
+impl MermaidCodeBlockRewriter {
+    fn new() -> Self {
+        Self {
+            placeholder_prefix: mermaid_class_placeholder_prefix(),
+            replacements: Vec::new(),
+        }
+    }
+
+    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Event<'a> {
+        match event {
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info)))
+                if is_mermaid_fence(&info) =>
+            {
+                let placeholder =
+                    format!("{}-{}", self.placeholder_prefix, self.replacements.len());
+                self.replacements.push(placeholder.clone());
+                Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(CowStr::from(
+                    placeholder,
+                ))))
+            }
+            _ => event,
+        }
+    }
+
+    fn allowed_classes(&self) -> Vec<String> {
+        self.replacements
+            .iter()
+            .map(|placeholder| format!("language-{placeholder}"))
+            .collect()
+    }
+
+    fn apply_replacements(&self, mut safe_html: String) -> String {
+        for placeholder in self.replacements.iter().rev() {
+            safe_html = safe_html.replace(&format!("language-{placeholder}"), "mermaid-source");
+        }
+
+        safe_html
+    }
+}
+
+fn is_mermaid_fence(info: &str) -> bool {
+    info.split_ascii_whitespace()
+        .next()
+        .is_some_and(|language| language.eq_ignore_ascii_case("mermaid"))
+}
+
+fn mermaid_class_placeholder_prefix() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+
+    format!("hushmark-mermaid-token-{nanos}-{}", std::process::id())
 }
 
 struct MathClassRewriter {
@@ -1097,6 +1166,37 @@ mod tests {
         assert!(html.contains("<span class=\"math math-display\">"));
         assert!(html.contains("E = mc^2 &lt; script"));
         assert!(!html.contains("hushmark-math-token"));
+    }
+
+    #[test]
+    fn mermaid_fences_render_as_escaped_controlled_code_blocks() {
+        let html = render_markdown_to_safe_html(
+            "```mermaid\nflowchart LR\n    Start --> \"<Finish>\"\n```",
+        );
+
+        assert!(html.contains("<pre><code class=\"mermaid-source\">"));
+        assert!(html.contains("Start --&gt; \"&lt;Finish&gt;\""));
+        assert!(!html.contains("hushmark-mermaid-token"));
+    }
+
+    #[test]
+    fn mermaid_fence_language_is_case_insensitive_and_allows_info_suffixes() {
+        let html = render_markdown_to_safe_html(
+            "```Mermaid diagram-title\nsequenceDiagram\n    A->>B: Hello\n```",
+        );
+
+        assert!(html.contains("<pre><code class=\"mermaid-source\">"));
+    }
+
+    #[test]
+    fn ordinary_fences_and_raw_html_cannot_opt_into_mermaid_rendering() {
+        let html = render_markdown_to_safe_html(
+            "```text\nflowchart LR\n    A --> B\n```\n\n<code class=\"mermaid-source\">graph TD; X-->Y</code>",
+        );
+
+        assert!(html.contains("<pre><code"), "{html}");
+        assert!(!html.contains("class=\"mermaid-source\""));
+        assert!(html.contains("graph TD; X--&gt;Y"));
     }
 
     #[test]

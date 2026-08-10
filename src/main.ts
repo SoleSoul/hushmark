@@ -15,6 +15,7 @@ import {
 import type { DocumentViewPreferences } from "./documentView";
 import { createHomeView } from "./homeView";
 import { renderMath } from "./math";
+import { renderMermaid } from "./mermaid";
 import { PRODUCT } from "./product";
 import { renderSetup, WINDOWS_SETUP_TITLE } from "./setupView";
 import { isControlShortcut, SHORTCUTS } from "./shortcuts";
@@ -33,6 +34,11 @@ import type {
 } from "./types";
 
 type AppMode = "reader" | "setup";
+type DocumentRenderOptions = {
+  fragment?: string | null;
+  readingPosition?: DocumentReadingPosition | null;
+  scrollY?: number | null;
+};
 
 const appElement = document.querySelector<HTMLElement>("#app");
 
@@ -56,6 +62,7 @@ let documentViewPreferences: DocumentViewPreferences = {
   ...DEFAULT_DOCUMENT_VIEW,
 };
 let wheelZoomAccumulator = 0;
+let pendingMermaidArticle: HTMLElement | null = null;
 
 document.addEventListener("contextmenu", preventInternalContextMenu, {
   capture: true,
@@ -94,6 +101,7 @@ function renderState(
   heading: string,
   detail?: string,
 ): HTMLElement {
+  pendingMermaidArticle = null;
   const section = document.createElement("section");
   section.className = `state state--${kind}`;
 
@@ -118,14 +126,11 @@ function renderState(
 
 function renderDocument(
   documentView: LoadedDocument,
-  options: {
-    fragment?: string | null;
-    readingPosition?: DocumentReadingPosition | null;
-    scrollY?: number | null;
-  } = {},
+  options: DocumentRenderOptions = {},
 ): void {
   currentMode = "reader";
   currentDocument = documentView;
+  pendingMermaidArticle = null;
   document.title = titleFor(documentView);
 
   if (documentView.error) {
@@ -151,18 +156,39 @@ function renderDocument(
 
   app.replaceChildren(article);
 
-  if (options.readingPosition) {
-    restoreReadingPositionAfterRender(article, options.readingPosition);
-  } else if (options.fragment) {
-    scrollToFragmentAfterRender(options.fragment);
-  } else if (options.scrollY !== undefined && options.scrollY !== null) {
-    restoreScrollAfterRender(options.scrollY);
+  let liveReadingPosition: DocumentReadingPosition | null = null;
+  const diagrams = renderMermaid(content, () => {
+    if (article.isConnected && !hasRequestedDocumentPosition(options)) {
+      liveReadingPosition = captureDocumentReadingPosition(article);
+    }
+  });
+
+  if (diagrams) {
+    pendingMermaidArticle = article;
+    void diagrams.then(
+      () => {
+        if (pendingMermaidArticle === article) {
+          pendingMermaidArticle = null;
+        }
+        if (article.isConnected) {
+          restoreRequestedDocumentPosition(article, options, liveReadingPosition);
+        }
+      },
+      () => {
+        if (pendingMermaidArticle === article) {
+          pendingMermaidArticle = null;
+        }
+      },
+    );
+  } else {
+    restoreRequestedDocumentPosition(article, options);
   }
 }
 
 function renderHome(scrollY = 0): void {
   currentMode = "reader";
   currentDocument = null;
+  pendingMermaidArticle = null;
   document.title = PRODUCT.displayName;
 
   const section = createHomeView();
@@ -694,11 +720,13 @@ function updateDocumentView(nextPreferences: DocumentViewPreferences): void {
 }
 
 function canPrintCurrentDocument(): boolean {
+  const article = app.querySelector<HTMLElement>(":scope > .document");
   return (
     currentMode === "reader" &&
     Boolean(currentDocument?.path) &&
     !currentDocument?.error &&
-    app.querySelector(":scope > .document") !== null
+    article !== null &&
+    pendingMermaidArticle !== article
   );
 }
 
@@ -787,8 +815,38 @@ function showDocumentMessage(heading: string, detail: string): void {
   message.scrollIntoView({ block: "nearest" });
 }
 
-function scrollToFragmentAfterRender(fragment: string): void {
+function hasRequestedDocumentPosition(options: DocumentRenderOptions): boolean {
+  return Boolean(
+    options.readingPosition ||
+      options.fragment ||
+      (options.scrollY !== undefined && options.scrollY !== null),
+  );
+}
+
+function restoreRequestedDocumentPosition(
+  article: HTMLElement,
+  options: DocumentRenderOptions,
+  fallbackPosition: DocumentReadingPosition | null = null,
+): void {
+  if (options.readingPosition) {
+    restoreReadingPositionAfterRender(article, options.readingPosition);
+  } else if (options.fragment) {
+    scrollToFragmentAfterRender(article, options.fragment);
+  } else if (options.scrollY !== undefined && options.scrollY !== null) {
+    restoreScrollAfterRender(options.scrollY, article);
+  } else if (fallbackPosition) {
+    restoreReadingPositionAfterRender(article, fallbackPosition);
+  }
+}
+
+function scrollToFragmentAfterRender(
+  article: HTMLElement,
+  fragment: string,
+): void {
   window.requestAnimationFrame(() => {
+    if (!article.isConnected) {
+      return;
+    }
     const target = findFragmentTarget(fragment);
     if (target) {
       target.scrollIntoView();
@@ -796,9 +854,14 @@ function scrollToFragmentAfterRender(fragment: string): void {
   });
 }
 
-function restoreScrollAfterRender(scrollY: number): void {
+function restoreScrollAfterRender(
+  scrollY: number,
+  renderedView?: HTMLElement,
+): void {
   window.requestAnimationFrame(() => {
-    window.scrollTo(0, scrollY);
+    if (!renderedView || renderedView.isConnected) {
+      window.scrollTo(0, scrollY);
+    }
   });
 }
 
