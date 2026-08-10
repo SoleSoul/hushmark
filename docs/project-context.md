@@ -17,7 +17,7 @@ Hushmark is not a Markdown editor, IDE, note workspace, browser, Electron app, o
 - Show a Windows setup affordance on Help with a same-position Back action from Setup. Use a quiet `Setup` label when the installed copy is current, and action-specific Install, Update, Downgrade, or Reinstall labels when attention is useful.
 - Render Markdown in Rust with `pulldown-cmark`, then sanitize HTML with `ammonia`.
 - Pre-parse valid `---`-delimited YAML front matter and render it as sanitized metadata before the untouched Markdown body.
-- Support CommonMark-style Markdown plus tables, strikethrough, read-only task lists, and locally typeset TeX mathematics using `$...$` and `$$...$$` delimiters.
+- Support CommonMark-style Markdown plus tables, strikethrough, read-only task lists, locally typeset TeX mathematics using `$...$` and `$$...$$` delimiters, and offline fenced Mermaid diagrams.
 - Generate heading anchors and handle same-document `#fragment` history.
 - Open safe relative `.md` / `.markdown` links inside Hushmark under the starting document folder.
 - Open external `http`, `https`, and `mailto` links in the system app.
@@ -43,6 +43,7 @@ For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integrat
 - `src-tauri/src/lib.rs`: Tauri command and plugin registration plus startup platform capabilities.
 - `src/main.ts`: Reader startup, rendering, link handling, document/home navigation history, keyboard commands, drag/drop, and capability-gated home setup affordance.
 - `src/documentView.ts`: Platform-neutral document zoom/layout calculations and rendered-structure reading-position capture/restore.
+- `src/mermaid.ts`: Lazy, bounded Mermaid rendering, strict renderer configuration, isolated SVG images, and readable-source failure fallback.
 - `src/homeView.ts`: Platform-neutral home and keyboard-contents page rendering.
 - `src/setupView.ts`: Setup screen rendering and setup actions.
 - `src/types.ts`, `src/dom.ts`, and `src/product.ts`: Shared frontend types, DOM helper, and frontend product labels.

@@ -6,7 +6,7 @@ This roadmap is not a contract. It is a short parking lot for likely next work a
 
 - Keep `CHANGELOG.md` current under `Unreleased` for user-visible changes.
 - Run the release checklist before publishing any GitHub release or explicitly shared prerelease binary.
-- Smoke-test `examples/markdown-visual-inspection.md`, `examples/math-visual-inspection.md`, same-document fragments, relative Markdown links, Home/Back/Forward, document zoom/layout, Ctrl+O, Ctrl+P, Ctrl+H, local images, table alignment, external links, and Windows setup mode.
+- Smoke-test `examples/markdown-visual-inspection.md`, `examples/math-visual-inspection.md`, `examples/mermaid-visual-inspection.md`, same-document fragments, relative Markdown links, Home/Back/Forward, document zoom/layout, Ctrl+O, Ctrl+P, Ctrl+H, local images, table alignment, external links, and Windows setup mode.
 - Smoke-test the quiet Windows setup entry point and install-version action labels.
 
 ## Near-Term Linux Support

@@ -17,6 +17,8 @@ The default Page layout keeps the established paper-like measure. Zoom scales th
 
 Mathematics belongs to the document typography rather than a framed widget. Inline expressions follow the prose baseline; display expressions receive calm vertical separation and center within the reading measure. Oversized display expressions scroll locally on screen instead of widening the document. Invalid expressions remain visible as restrained source text.
 
+Mermaid diagrams are document figures, not interactive widgets. They should inherit Hushmark's restrained visual character, remain centered within the reading measure, scale with document zoom, and fit printed pages. Diagram preparation must not disturb stored reading positions. Invalid diagrams remain visible as code rather than disappearing or adding an application-level error panel.
+
 The no-document home view may carry more information than the reader itself. Treat it as a restrained book contents page: keep the Hushmark title and short identity line prominent, group keyboard commands by purpose, and use dotted leaders to connect actions to their keys. It belongs in the same navigation history as documents so Home, Back, and Forward feel like movement between pages rather than application chrome.
 
 Windows setup should feel like an interactive Hushmark document rather than a separate themed control panel. Use the reader's unframed warm canvas, content width, spacing, sans-serif heading hierarchy, serif explanatory copy, restrained rules, and square or lightly rounded controls. The Help-to-Setup action and Setup-to-Help Back action occupy the same stable top-right target. Avoid nested cards, a second paper surface inside the window, pills, or large areas of status color.

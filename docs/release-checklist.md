@@ -126,6 +126,7 @@ For an AUR update:
 - Resize wide and narrow windows at 50%, 100%, and 200% in both layouts and confirm resizing does not change zoom. Confirm Page preserves its scaled paper measure while it fits, Full Width retains its reading inset when space is available, and both reduce to the same side margins when the scaled Page cannot fit.
 - Check Back/Forward reading positions after zoom and layout changes with prose, headings, front matter, images, tables, and long code.
 - Open `examples/math-visual-inspection.md` and check inline/display math, currency, invalid formulas, long-expression overflow, zoom/layout changes, and print preview.
+- Open `examples/mermaid-visual-inspection.md` and check valid, configured, wide, accessible, and invalid diagrams; zoom/layout changes; Back/Forward position; and print preview.
 - Open `examples/print-visual-inspection.md`, check Ctrl+P print preview and Print to PDF, and confirm Ctrl+P does nothing in empty, error, and setup views.
 - Check same-document fragments, missing fragments, Alt+Left, and Alt+Right.
 - Check relative `.md` / `.markdown` links, linked fragments, Back/Forward, and blocked unsafe links.

@@ -39,6 +39,7 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - strikethrough
 - read-only task lists
 - inline `$...$` and display `$$...$$` TeX mathematics
+- fenced Mermaid diagrams
 - Unicode text, including Hebrew
 
 ## Known limitations
@@ -68,6 +69,16 @@ Hushmark recognizes `$...$` as inline mathematics and `$$...$$` as display mathe
 The Rust renderer emits escaped, controlled math spans before sanitization. Temporary unforgeable classes prevent raw author HTML from opting into the math renderer. After sanitization, the frontend uses a locally bundled KaTeX build to typeset only those spans. KaTeX runs with untrusted commands disabled and bounded size and macro expansion. Its published stylesheet is narrowed during Vite preprocessing to WOFF2 font sources supported by Hushmark's modern WebViews, avoiding redundant WOFF and TTF copies while keeping the canonical KaTeX styling. The build fails if those upstream font declarations change unexpectedly. Invalid or unsupported formulas retain their original source and delimiters rather than disappearing.
 
 KaTeX accepts a practical TeX mathematics subset, not complete LaTeX documents or arbitrary packages. Display expressions are centered and receive local horizontal overflow when they cannot fit the reading width. Screen zoom scales typeset mathematics with the rest of the document, while print output ignores screen layout and zoom preferences.
+
+## Mermaid diagrams
+
+Hushmark recognizes fenced code blocks whose first info-string word is `mermaid`, case-insensitively. The Rust Markdown renderer gives only genuine Mermaid fences an unforgeable class that survives sanitization; raw author HTML cannot opt into diagram rendering. Until a diagram is ready, and whenever it is invalid, it remains an ordinary escaped code block.
+
+The frontend loads the locally bundled official Mermaid renderer only when a document contains a recognized fence. Diagrams are prepared before reading-position restoration and committed as one batch. The generated SVG is displayed through a `data:` image rather than inserted as live SVG document content. This retains vector scaling and printing while preventing diagram scripts, links, handlers, and embedded elements from becoming interactive Hushmark DOM.
+
+Mermaid runs in strict security mode with HTML labels and click behavior unavailable. Renderer security settings, CSS injection settings, fonts, input length, and edge limits cannot be overridden by diagram directives or Mermaid front matter. Ordinary author configuration such as diagram layout, curves, look, and safe theme variables remains available. A diagram is limited to 50,000 source characters and 500 edges. Hushmark does not fetch Mermaid or diagram resources from a CDN.
+
+Diagram figures stay within the document measure, scale with Hushmark zoom, and fit the printable page. The official Mermaid package supports many diagram families, but Hushmark does not separately promise every Mermaid syntax or external icon pack. Invalid, unsupported, or resource-limited diagrams retain their escaped source and receive a restrained explanatory tooltip.
 
 ## YAML front matter
 
@@ -110,7 +121,7 @@ This behavior is stable for Hushmark, but it is not claimed to be exact GitHub a
 
 ## Visual fixture
 
-Open `examples/markdown-features.md` when checking general reader changes. Open `examples/math-visual-inspection.md` for inline and display mathematics, currency, invalid input, narrow-window overflow, zoom/layout behavior, and printing.
+Open `examples/markdown-features.md` when checking general reader changes. Open `examples/math-visual-inspection.md` for inline and display mathematics, currency, invalid input, narrow-window overflow, zoom/layout behavior, and printing. Open `examples/mermaid-visual-inspection.md` for diagram rendering, author configuration, invalid-source fallback, navigation stability, zoom/layout behavior, and printing.
 
 Manual visual checklist:
 
@@ -131,3 +142,4 @@ Manual visual checklist:
 - Valid YAML front matter appears as quiet metadata without raw delimiters, while malformed or unterminated front matter remains visible as Markdown.
 - Inline mathematics follows the prose baseline, display mathematics is centered, and long expressions overflow locally without widening the document.
 - Currency and unclosed delimiters remain ordinary source, while invalid closed formulas remain visible with their delimiters.
+- Mermaid fences become sharp, centered figures without widening the document; configured diagrams remain bounded by Hushmark's security settings, and invalid diagrams remain readable source.

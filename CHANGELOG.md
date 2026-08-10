@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Render fenced `mermaid` diagrams offline with the official Mermaid renderer while preserving invalid diagrams as visible source.
+
 ## 0.1.14
 
 Task-list, package-size, and language update.
