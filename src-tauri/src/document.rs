@@ -13,10 +13,7 @@ use percent_encoding::percent_decode_str;
 use pulldown_cmark::{html, Alignment, CodeBlockKind, CowStr, Event, Options, Parser, Tag, TagEnd};
 use serde::Serialize;
 
-use crate::{
-    document_parts::{parse_document_parts, render_front_matter_to_safe_html},
-    identity::DISPLAY_NAME,
-};
+use crate::document_parts::{parse_document_parts, render_front_matter_to_safe_html};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -128,15 +125,6 @@ pub fn load_linked_markdown_file(
             document: LoadedDocument::failed(&current_path, Some(&navigation_root), error),
             fragment: None,
         },
-    }
-}
-
-pub fn title_for(document: &LoadedDocument) -> String {
-    match (&document.file_name, &document.error) {
-        (Some(file_name), Some(_)) => format!("Error: {file_name} - {DISPLAY_NAME}"),
-        (Some(file_name), None) => format!("{file_name} - {DISPLAY_NAME}"),
-        (None, Some(_)) => format!("Error - {DISPLAY_NAME}"),
-        (None, None) => DISPLAY_NAME.to_string(),
     }
 }
 
@@ -1130,7 +1118,7 @@ mod tests {
     use super::{
         load_dropped_markdown_file, load_initial_document_from_arg, load_linked_markdown_file,
         load_markdown_file, markdown_options, render_document_to_safe_html,
-        render_markdown_to_safe_html, title_for, LoadedDocument,
+        render_markdown_to_safe_html,
     };
 
     #[test]
@@ -1676,19 +1664,6 @@ mod tests {
         assert!(!html.contains("file:///"));
         assert!(!html.contains("secret.png"));
         assert!(!html.contains("data:image/"));
-    }
-
-    #[test]
-    fn title_uses_file_name_when_loaded() {
-        let document = LoadedDocument {
-            path: Some("notes.md".to_string()),
-            navigation_root: None,
-            file_name: Some("notes.md".to_string()),
-            html: Some("<h1>Notes</h1>".to_string()),
-            error: None,
-        };
-
-        assert_eq!(title_for(&document), "notes.md - Hushmark");
     }
 
     #[test]

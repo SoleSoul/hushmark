@@ -16,9 +16,14 @@ import type { DocumentViewPreferences } from "./documentView";
 import { createHomeView } from "./homeView";
 import { renderMath } from "./math";
 import { renderMermaid } from "./mermaid";
+import {
+  createPlatformShell,
+  defaultPlatformShell,
+} from "./platformShell";
+import type { PlatformShell } from "./platformShell";
 import { PRODUCT } from "./product";
 import { renderSetup, WINDOWS_SETUP_TITLE } from "./setupView";
-import { isControlShortcut, SHORTCUTS } from "./shortcuts";
+import { isAppShortcut, SHORTCUTS } from "./shortcuts";
 import "./styles.css";
 import type {
   HushmarkHistoryState,
@@ -51,6 +56,7 @@ const currentWindow = getCurrentWindow();
 const navigationEntries = new Map<number, NavigationEntry>();
 let currentDocument: LoadedDocument | null = null;
 let currentMode: AppMode = "reader";
+let currentPlatform = "unknown";
 let platformCapabilities: PlatformCapabilities = { setup: false };
 let filePickerOpen = false;
 let activeNavigationEntryId: number | null = null;
@@ -63,6 +69,8 @@ let documentViewPreferences: DocumentViewPreferences = {
 };
 let wheelZoomAccumulator = 0;
 let pendingMermaidArticle: HTMLElement | null = null;
+let platformOpenQueue = Promise.resolve();
+let platformShell: PlatformShell = defaultPlatformShell;
 
 document.addEventListener("contextmenu", preventInternalContextMenu, {
   capture: true,
@@ -85,6 +93,14 @@ function preventInternalContextMenu(event: MouseEvent): void {
 }
 
 function titleFor(documentView: LoadedDocument): string {
+  if (currentPlatform === "macos") {
+    if (documentView.error) {
+      return documentView.fileName ? `Error: ${documentView.fileName}` : "Error";
+    }
+
+    return documentView.fileName ?? PRODUCT.displayName;
+  }
+
   if (documentView.error) {
     return documentView.fileName
       ? `Error: ${documentView.fileName} - ${PRODUCT.displayName}`
@@ -94,6 +110,13 @@ function titleFor(documentView: LoadedDocument): string {
   return documentView.fileName
     ? `${documentView.fileName} - ${PRODUCT.displayName}`
     : PRODUCT.displayName;
+}
+
+function setReaderWindowTitle(title: string): void {
+  document.title = title;
+  void currentWindow.setTitle(title).catch((error) => {
+    console.warn("failed to set reader window title", error);
+  });
 }
 
 function renderState(
@@ -120,6 +143,7 @@ function renderState(
 
   section.append(content);
   app.replaceChildren(section);
+  syncPlatformShellState();
 
   return section;
 }
@@ -131,7 +155,7 @@ function renderDocument(
   currentMode = "reader";
   currentDocument = documentView;
   pendingMermaidArticle = null;
-  document.title = titleFor(documentView);
+  setReaderWindowTitle(titleFor(documentView));
 
   if (documentView.error) {
     renderState("error", "This file could not be opened.", documentView.error);
@@ -173,11 +197,13 @@ function renderDocument(
         if (article.isConnected) {
           restoreRequestedDocumentPosition(article, options, liveReadingPosition);
         }
+        syncPlatformShellState();
       },
       () => {
         if (pendingMermaidArticle === article) {
           pendingMermaidArticle = null;
         }
+        syncPlatformShellState();
       },
     );
   } else {
@@ -189,9 +215,9 @@ function renderHome(scrollY = 0): void {
   currentMode = "reader";
   currentDocument = null;
   pendingMermaidArticle = null;
-  document.title = PRODUCT.displayName;
+  setReaderWindowTitle(PRODUCT.displayName);
 
-  const section = createHomeView();
+  const section = createHomeView(currentPlatform);
   app.replaceChildren(section);
   if (platformCapabilities.setup) {
     void renderEmptySetupAffordance(section);
@@ -242,18 +268,12 @@ function emptySetupActionLabel(status: SetupStatus): string {
 
 function openSetupFromEmptyState(status: SetupStatus): void {
   currentMode = "setup";
-  document.title = WINDOWS_SETUP_TITLE;
-  void currentWindow.setTitle(WINDOWS_SETUP_TITLE).catch((error) => {
-    console.warn("failed to set setup window title", error);
-  });
+  setReaderWindowTitle(WINDOWS_SETUP_TITLE);
   renderSetup(app, status, { onBackToHome: returnToHomeFromSetup });
 }
 
 function returnToHomeFromSetup(): void {
   currentMode = "reader";
-  void currentWindow.setTitle(PRODUCT.displayName).catch((error) => {
-    console.warn("failed to restore window title", error);
-  });
   pushHomeNavigation();
 }
 
@@ -477,6 +497,7 @@ function renderNavigationEntry(
 ): void {
   if (entry.view.kind === "home") {
     renderHome(options.scrollY ?? entry.scrollY);
+    syncPlatformShellState();
     return;
   }
 
@@ -488,6 +509,7 @@ function renderNavigationEntry(
     scrollY:
       readingPosition || fragment ? null : (options.scrollY ?? entry.scrollY),
   });
+  syncPlatformShellState();
 }
 
 function historyStateFor(entryId: number): HushmarkHistoryState {
@@ -568,7 +590,7 @@ function parseHistoryState(state: unknown): HushmarkHistoryState | null {
 }
 
 function handleNavigationKeydown(event: KeyboardEvent): void {
-  if (isControlShortcut(event, SHORTCUTS.zoomIn)) {
+  if (isAppShortcut(event, SHORTCUTS.zoomIn, currentPlatform)) {
     event.preventDefault();
     if (!event.repeat) {
       changeDocumentZoom(DOCUMENT_ZOOM_STEP);
@@ -576,7 +598,7 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (isControlShortcut(event, SHORTCUTS.zoomOut)) {
+  if (isAppShortcut(event, SHORTCUTS.zoomOut, currentPlatform)) {
     event.preventDefault();
     if (!event.repeat) {
       changeDocumentZoom(-DOCUMENT_ZOOM_STEP);
@@ -584,7 +606,7 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (isControlShortcut(event, SHORTCUTS.resetZoom)) {
+  if (isAppShortcut(event, SHORTCUTS.resetZoom, currentPlatform)) {
     event.preventDefault();
     if (!event.repeat && canAdjustDocumentView()) {
       updateDocumentView(resetDocumentZoom(documentViewPreferences));
@@ -592,7 +614,7 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (isControlShortcut(event, SHORTCUTS.toggleLayout)) {
+  if (isAppShortcut(event, SHORTCUTS.toggleLayout, currentPlatform)) {
     event.preventDefault();
     if (!event.repeat && canAdjustDocumentView()) {
       updateDocumentView(toggledDocumentLayout(documentViewPreferences));
@@ -600,7 +622,7 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (isControlShortcut(event, SHORTCUTS.home)) {
+  if (isAppShortcut(event, SHORTCUTS.home, currentPlatform)) {
     event.preventDefault();
     if (!event.repeat) {
       if (currentMode === "setup") {
@@ -612,15 +634,18 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (isControlShortcut(event, SHORTCUTS.print)) {
+  if (isAppShortcut(event, SHORTCUTS.print, currentPlatform)) {
     event.preventDefault();
     if (canPrintCurrentDocument() && !event.repeat) {
-      window.print();
+      printCurrentDocument();
     }
     return;
   }
 
-  if (isControlShortcut(event, SHORTCUTS.open)) {
+  if (
+    currentPlatform !== "macos" &&
+    isAppShortcut(event, SHORTCUTS.open, currentPlatform)
+  ) {
     event.preventDefault();
     if (currentMode === "reader") {
       void openDocumentFromPicker();
@@ -629,7 +654,7 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
   }
 
   const navigationDirection = navigationDirectionForEvent(event);
-  if (!navigationDirection || event.ctrlKey || event.metaKey || event.shiftKey) {
+  if (!navigationDirection) {
     return;
   }
 
@@ -717,6 +742,8 @@ function updateDocumentView(nextPreferences: DocumentViewPreferences): void {
   if (article && readingPosition) {
     restoreDocumentReadingPosition(article, readingPosition);
   }
+
+  syncPlatformShellState();
 }
 
 function canPrintCurrentDocument(): boolean {
@@ -740,17 +767,11 @@ function canAdjustDocumentView(): boolean {
 }
 
 function navigationDirectionForEvent(event: KeyboardEvent): "back" | "forward" | null {
-  if (
-    (event.altKey && event.key === SHORTCUTS.back.key) ||
-    event.key === SHORTCUTS.back.alternateKey
-  ) {
+  if (isAppShortcut(event, SHORTCUTS.back, currentPlatform)) {
     return "back";
   }
 
-  if (
-    (event.altKey && event.key === SHORTCUTS.forward.key) ||
-    event.key === SHORTCUTS.forward.alternateKey
-  ) {
+  if (isAppShortcut(event, SHORTCUTS.forward, currentPlatform)) {
     return "forward";
   }
 
@@ -793,7 +814,7 @@ function showDocumentMessage(heading: string, detail: string): void {
   const article = app.querySelector<HTMLElement>(".document");
 
   if (!article) {
-    document.title = `Error - ${PRODUCT.displayName}`;
+    setReaderWindowTitle(`Error - ${PRODUCT.displayName}`);
     renderState("error", heading, detail);
     return;
   }
@@ -920,9 +941,48 @@ async function openTopLevelDocument(path: string): Promise<void> {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    document.title = `Error - ${PRODUCT.displayName}`;
+    setReaderWindowTitle(`Error - ${PRODUCT.displayName}`);
     renderState("error", "This file could not be opened.", message);
   }
+}
+
+function queuePlatformOpenDocument(path: string): void {
+  platformOpenQueue = platformOpenQueue
+    .then(() => openTopLevelDocument(path))
+    .catch((error) => {
+      console.error("failed to handle an operating-system open-document event", error);
+    });
+}
+
+function setDocumentLayout(layout: "page" | "full-width"): void {
+  if (!canAdjustDocumentView() || documentViewPreferences.layout === layout) {
+    syncPlatformShellState();
+    return;
+  }
+
+  updateDocumentView({ ...documentViewPreferences, layout });
+}
+
+function printCurrentDocument(): void {
+  if (!canPrintCurrentDocument()) {
+    return;
+  }
+
+  void platformShell.printDocument().catch((error) => {
+    console.warn("failed to open the print dialog", error);
+  });
+}
+
+function syncPlatformShellState(): void {
+  void platformShell.updateState({
+    canGoBack: activeNavigationIndex > 0,
+    canGoForward: activeNavigationIndex < navigationOrder.length - 1,
+    canPrintDocument: canPrintCurrentDocument(),
+    hasDocument: canAdjustDocumentView(),
+    layout: documentViewPreferences.layout,
+  }).catch((error) => {
+    console.warn("failed to update platform menu state", error);
+  });
 }
 
 async function registerDragAndDrop(): Promise<void> {
@@ -950,19 +1010,57 @@ async function start(): Promise<void> {
 
   try {
     const startupView = await invoke<StartupView>("load_initial_view");
+    currentPlatform = startupView.platform;
     document.documentElement.dataset.platform = startupView.platform;
     platformCapabilities = startupView.capabilities;
     applyDocumentViewPreferences(document.documentElement, documentViewPreferences);
     currentMode = "reader";
+
+    try {
+      platformShell = await createPlatformShell(currentPlatform, {
+        openDocumentPath: queuePlatformOpenDocument,
+        goBack: () => {
+          if (activeNavigationIndex > 0) {
+            window.history.back();
+          }
+        },
+        goForward: () => {
+          if (activeNavigationIndex < navigationOrder.length - 1) {
+            window.history.forward();
+          }
+        },
+        showHome: pushHomeNavigation,
+        setLayout: setDocumentLayout,
+        zoomIn: () => changeDocumentZoom(DOCUMENT_ZOOM_STEP),
+        zoomOut: () => changeDocumentZoom(-DOCUMENT_ZOOM_STEP),
+        resetZoom: () => {
+          if (canAdjustDocumentView()) {
+            updateDocumentView(resetDocumentZoom(documentViewPreferences));
+          }
+        },
+      });
+    } catch (error) {
+      console.warn("failed to initialize the platform shell", error);
+      platformShell = defaultPlatformShell;
+    }
 
     if (!startupView.document) {
       throw new Error("Initial document state was not returned.");
     }
 
     resetNavigation(startupView.document);
+
+    try {
+      const pendingPaths = await platformShell.takePendingOpenDocuments();
+      for (const path of pendingPaths) {
+        await openTopLevelDocument(path);
+      }
+    } catch (error) {
+      console.warn("failed to receive pending open-document events", error);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    document.title = `Error - ${PRODUCT.displayName}`;
+    setReaderWindowTitle(`Error - ${PRODUCT.displayName}`);
     renderState("error", `Could not start ${PRODUCT.displayName}.`, message);
   } finally {
     await revealWindow();

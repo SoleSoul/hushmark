@@ -1,10 +1,14 @@
 import { createTextElement } from "./dom";
-import { SHORTCUTS } from "./shortcuts";
+import {
+  ariaLabelForShortcut,
+  displayKeysForShortcut,
+  SHORTCUTS,
+} from "./shortcuts";
+import type { ShortcutDefinition } from "./shortcuts";
 
 type Shortcut = {
   action: string;
-  keys: readonly string[];
-  keysAriaLabel?: string;
+  definition: ShortcutDefinition;
 };
 
 type ShortcutSection = {
@@ -16,8 +20,8 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
   {
     title: "Files",
     shortcuts: [
-      { action: "Open a Markdown file", keys: SHORTCUTS.open.displayKeys },
-      { action: "Print the current document", keys: SHORTCUTS.print.displayKeys },
+      { action: "Open a Markdown file", definition: SHORTCUTS.open },
+      { action: "Print the current document", definition: SHORTCUTS.print },
     ],
   },
   {
@@ -25,28 +29,27 @@ const SHORTCUT_SECTIONS: ShortcutSection[] = [
     shortcuts: [
       {
         action: "Zoom in",
-        keys: SHORTCUTS.zoomIn.displayKeys,
-        keysAriaLabel: SHORTCUTS.zoomIn.ariaLabel,
+        definition: SHORTCUTS.zoomIn,
       },
-      { action: "Zoom out", keys: SHORTCUTS.zoomOut.displayKeys },
-      { action: "Reset zoom", keys: SHORTCUTS.resetZoom.displayKeys },
+      { action: "Zoom out", definition: SHORTCUTS.zoomOut },
+      { action: "Reset zoom", definition: SHORTCUTS.resetZoom },
       {
         action: "Switch between Page and Full Width",
-        keys: SHORTCUTS.toggleLayout.displayKeys,
+        definition: SHORTCUTS.toggleLayout,
       },
     ],
   },
   {
     title: "Navigation",
     shortcuts: [
-      { action: "Go back", keys: SHORTCUTS.back.displayKeys },
-      { action: "Go forward", keys: SHORTCUTS.forward.displayKeys },
-      { action: "Help", keys: SHORTCUTS.home.displayKeys },
+      { action: "Go back", definition: SHORTCUTS.back },
+      { action: "Go forward", definition: SHORTCUTS.forward },
+      { action: "Home / Help", definition: SHORTCUTS.home },
     ],
   },
 ];
 
-function createShortcutRow(shortcut: Shortcut): HTMLLIElement {
+function createShortcutRow(shortcut: Shortcut, platform: string): HTMLLIElement {
   const row = document.createElement("li");
   row.className = "home__shortcut";
 
@@ -59,12 +62,14 @@ function createShortcutRow(shortcut: Shortcut): HTMLLIElement {
 
   const keys = document.createElement("span");
   keys.className = "home__keys";
+  const displayKeys = displayKeysForShortcut(shortcut.definition, platform);
   keys.setAttribute(
     "aria-label",
-    shortcut.keysAriaLabel ?? shortcut.keys.join(" plus "),
+    ariaLabelForShortcut(shortcut.definition, platform) ??
+      displayKeys.join(" plus "),
   );
 
-  shortcut.keys.forEach((key, index) => {
+  displayKeys.forEach((key, index) => {
     if (index > 0) {
       keys.append(createTextElement("span", "+", "home__key-separator"));
     }
@@ -75,20 +80,25 @@ function createShortcutRow(shortcut: Shortcut): HTMLLIElement {
   return row;
 }
 
-function createShortcutSection(section: ShortcutSection): HTMLElement {
+function createShortcutSection(
+  section: ShortcutSection,
+  platform: string,
+): HTMLElement {
   const element = document.createElement("section");
   element.className = "home__section";
   element.append(createTextElement("h2", section.title));
 
   const list = document.createElement("ol");
   list.className = "home__shortcuts";
-  list.append(...section.shortcuts.map(createShortcutRow));
+  list.append(
+    ...section.shortcuts.map((shortcut) => createShortcutRow(shortcut, platform)),
+  );
   element.append(list);
 
   return element;
 }
 
-export function createHomeView(): HTMLElement {
+export function createHomeView(platform: string): HTMLElement {
   const home = document.createElement("section");
   home.className = "home";
   home.setAttribute("aria-labelledby", "home-title");
@@ -105,7 +115,11 @@ export function createHomeView(): HTMLElement {
 
   const contents = document.createElement("div");
   contents.className = "home__contents";
-  contents.append(...SHORTCUT_SECTIONS.map(createShortcutSection));
+  contents.append(
+    ...SHORTCUT_SECTIONS.map((section) =>
+      createShortcutSection(section, platform),
+    ),
+  );
   page.append(contents);
 
   home.append(page);

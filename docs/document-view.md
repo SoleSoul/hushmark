@@ -6,7 +6,7 @@ Page is the default layout. At 100%, it keeps the established 712px text measure
 
 Full Width uses the available window width with a stable reading inset and no artificial measure cap. Its contents receive the same uniform scale as Page but may reflow into a different logical width. At Hushmark's default 900px window width and 100% zoom, Page and Full Width have identical text edges. In a wider window or at a lower zoom, Page may accumulate more surrounding whitespace while Full Width retains its reading inset. When a scaled Page cannot fit, both layouts reduce their side margins by the same amount, down to 24px.
 
-Zoom ranges from 50% to 200% in 10 percentage-point steps. Use Ctrl++ or Ctrl+= to zoom in, Ctrl+- to zoom out, Ctrl+0 to reset, Ctrl+MouseWheel to zoom, and Ctrl+L to toggle Page and Full Width. These commands are intercepted outside documents so the WebView does not accidentally zoom Home or Windows Setup.
+Zoom ranges from 50% to 200% in 10 percentage-point steps. On Windows and Linux, use Ctrl++ or Ctrl+= to zoom in, Ctrl+- to zoom out, Ctrl+0 to reset, Ctrl+MouseWheel to zoom, and Ctrl+L to toggle Page and Full Width. On macOS, use the corresponding Command shortcuts, including Command-L for the layout toggle; Page and Full Width are also direct native View-menu choices. These commands are intercepted outside documents so the WebView does not accidentally zoom Home or Windows Setup.
 
 ## Reading Position
 

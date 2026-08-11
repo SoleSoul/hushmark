@@ -30,6 +30,7 @@
 
   color: #24292f;
   background: #f8f7f3;
+  color-scheme: light;
   font-family: var(--font-ui);
   font-synthesis: none;
   text-rendering: optimizeLegibility;

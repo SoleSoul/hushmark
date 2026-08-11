@@ -6,3 +6,4 @@ project-context-handoff/
 local-artifacts/
 release-history/
 *.log
+.DS_Store

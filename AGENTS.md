@@ -1,6 +1,6 @@
 # Agent Instructions
 
-This is the canonical Hushmark codebase. GitHub Releases currently publish a standalone Windows executable. The shared reader runtime also supports Linux, with an AUR package maintained outside this repository; other first-party Linux package formats have not been selected.
+This is the canonical Hushmark codebase. GitHub Releases currently publish a standalone Windows executable. The shared reader runtime also supports Linux, with an AUR package maintained outside this repository; other first-party Linux package formats have not been selected. macOS uses a native application shell and first-party Universal DMG configuration; public Mac artifacts require signed/notarized release validation.
 
 Hushmark is a calm, minimalist Markdown reader. Platform-specific behavior and packaging must remain behind clear platform boundaries.
 
@@ -23,6 +23,10 @@ On non-Windows machines, do not claim Windows release validation from local buil
 
 Windows setup, self-install/update, and shell integration are Windows-only. Linux installation, updates, desktop integration, icons, and MIME registration belong to distribution packaging and must not appear as in-app setup flows.
 
+macOS lifecycle, menu, Finder events, bundle metadata, icons, signing, and notarization belong behind macOS platform boundaries. Do not add Windows-style setup or install management to the Mac app.
+
+The reader deliberately remains light on every platform. Do not infer or add a dark palette from operating-system appearance without an explicitly accepted shared reader design.
+
 Do not store project decisions in hidden agent/tool memory. Durable context belongs in tracked repository docs.
 
 Start here:
@@ -32,6 +36,7 @@ Start here:
 - `docs/markdown-support.md`
 - `docs/windows-integration.md`
 - `docs/linux-support.md`
+- `docs/macos-support.md`
 - `docs/document-view.md`
 - `docs/printing.md`
 - `docs/roadmap.md`

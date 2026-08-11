@@ -2,6 +2,8 @@ mod document;
 mod document_parts;
 mod external_links;
 mod identity;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(windows)]
 mod setup;
 mod startup;
@@ -10,7 +12,7 @@ use std::path::PathBuf;
 
 use document::{
     load_dropped_markdown_file, load_initial_document_from_arg, load_linked_markdown_file,
-    title_for, LinkedDocument, LoadedDocument,
+    LinkedDocument, LoadedDocument,
 };
 use serde::Serialize;
 #[cfg(windows)]
@@ -138,8 +140,25 @@ fn open_external_link(url: String, app: tauri::AppHandle) -> Result<(), String> 
 }
 
 fn set_window_title(window: &tauri::Window, document: &LoadedDocument) {
-    if let Err(error) = window.set_title(&title_for(document)) {
+    #[cfg(target_os = "macos")]
+    let title = macos::title_for(document);
+    #[cfg(not(target_os = "macos"))]
+    let title = default_window_title(document);
+
+    if let Err(error) = window.set_title(&title) {
         eprintln!("failed to set window title: {error}");
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn default_window_title(document: &LoadedDocument) -> String {
+    use identity::DISPLAY_NAME;
+
+    match (&document.file_name, &document.error) {
+        (Some(file_name), Some(_)) => format!("Error: {file_name} - {DISPLAY_NAME}"),
+        (Some(file_name), None) => format!("{file_name} - {DISPLAY_NAME}"),
+        (None, Some(_)) => format!("Error - {DISPLAY_NAME}"),
+        (None, None) => DISPLAY_NAME.to_string(),
     }
 }
 
@@ -148,6 +167,9 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init());
+
+    #[cfg(target_os = "macos")]
+    let builder = macos::configure(builder);
 
     #[cfg(windows)]
     let builder = builder.invoke_handler(tauri::generate_handler![
@@ -162,7 +184,7 @@ pub fn run() {
         open_external_link
     ]);
 
-    #[cfg(not(windows))]
+    #[cfg(all(not(windows), not(target_os = "macos")))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         load_initial_view,
         load_dropped_document,
@@ -170,7 +192,39 @@ pub fn run() {
         open_external_link
     ]);
 
+    #[cfg(target_os = "macos")]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        load_initial_view,
+        load_dropped_document,
+        load_linked_document,
+        open_external_link,
+        macos::macos_frontend_ready,
+        macos::print_macos_document,
+        macos::update_macos_menu_state
+    ]);
+
+    #[cfg(target_os = "macos")]
+    {
+        let app = builder
+            .build(tauri::generate_context!())
+            .expect("error while building tauri application");
+        app.run(macos::handle_run_event);
+    }
+
+    #[cfg(not(target_os = "macos"))]
     builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod capability_tests {
+    const DEFAULT_CAPABILITY: &str = include_str!("../capabilities/default.json");
+
+    #[test]
+    fn frontend_window_operations_have_explicit_permissions() {
+        assert!(DEFAULT_CAPABILITY.contains("core:window:allow-show"));
+        assert!(DEFAULT_CAPABILITY.contains("core:window:allow-set-title"));
+        assert!(DEFAULT_CAPABILITY.contains("dialog:allow-open"));
+    }
 }

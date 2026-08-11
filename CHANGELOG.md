@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add a native macOS application shell with Mac lifecycle behavior, menus and shortcuts, Finder document events, alternate Viewer registration, a dedicated ICNS icon, and Universal DMG configuration.
+
 ## 0.2.0
 
 Mermaid diagram support milestone.

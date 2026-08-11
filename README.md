@@ -16,7 +16,7 @@ Hushmark opens Markdown files in a calm, uncluttered reading view. It is meant f
 - Generated heading anchors
 - Local and remote images
 - Tables, task lists, strikethrough, mathematics, and Mermaid diagrams
-- Native document printing with **Ctrl+P**
+- Native document printing with the platform-standard shortcut
 - External links open outside Hushmark
 - Optional Windows Open With and right-click integration
 
@@ -29,6 +29,8 @@ Current Windows builds are unsigned, so Windows may show a SmartScreen warning.
 After opening Hushmark, you can use the setup view to add optional Windows integration for Markdown files.
 
 Linux runtime support is available from the same source release, and an [AUR package](https://aur.archlinux.org/packages/hushmark) provides downstream Arch Linux packaging. Linux desktop integration is handled by packaging rather than by an in-app setup flow.
+
+macOS builds use a normal DMG drag-to-Applications flow. The first public Mac download will be published after the Universal app has completed Intel and Apple Silicon validation plus Developer ID signing and notarization.
 
 ## Use
 
@@ -46,6 +48,8 @@ Press **Ctrl+P** to print the open document through the system print dialog.
 
 Press **Ctrl+H** for Hushmark's keyboard reference. Document view commands include **Ctrl+L** for Page or Full Width layout, **Ctrl++** / **Ctrl+-** for zoom, and **Ctrl+0** to reset zoom.
 
+On macOS, use **Command-O** to open, **Command-P** to print, **Command-[** / **Command-]** to navigate, **Command-L** to switch between Page and Full Width, and either **Shift-Command-H** or **Command-?** for Home / Help. Page and Full Width are also direct choices in the native View menu.
+
 ## Markdown support
 
 Hushmark supports common Markdown reading features, including headings, links, images, tables, strikethrough, code blocks, blockquotes, lists, TeX mathematics, and fenced Mermaid diagrams.
@@ -56,15 +60,13 @@ More details are in [docs/markdown-support.md](docs/markdown-support.md).
 
 ## Platform status
 
-The Hushmark reader runtime supports Windows and Linux. GitHub Releases currently provide a standalone Windows executable with optional in-app desktop integration. An AUR package is maintained separately; other first-party Linux package formats have not been selected. Linux integration belongs to packages and desktop files rather than an in-app setup flow.
-
-macOS may come later.
+The Hushmark reader runtime supports Windows, Linux, and macOS. GitHub Releases currently provide a standalone Windows executable with optional in-app desktop integration. An AUR package is maintained separately; other first-party Linux package formats have not been selected. Linux integration belongs to packages and desktop files rather than an in-app setup flow. macOS uses a native menu/lifecycle shell, Finder Viewer registration, and a first-party Universal DMG configuration.
 
 ## Development
 
 Hushmark is built with Rust, Tauri 2, TypeScript, HTML, and CSS.
 
-Install Node.js with npm, the stable Rust toolchain, and the native prerequisites required by Tauri 2 for your operating system. Windows development requires the Microsoft C++ Build Tools and WebView2; Linux development requires the appropriate WebKitGTK and system build packages for the distribution.
+Install Node.js with npm, the stable Rust toolchain, and the native prerequisites required by Tauri 2 for your operating system. Windows development requires the Microsoft C++ Build Tools and WebView2; Linux development requires the appropriate WebKitGTK and system build packages for the distribution. macOS development requires Apple's Command Line Tools, and a Universal build requires both `x86_64-apple-darwin` and `aarch64-apple-darwin` Rust targets.
 
 Install the locked JavaScript dependencies before the first build:
 
@@ -83,6 +85,8 @@ git diff --check
 ```
 
 Project notes for contributors and coding agents are in [AGENTS.md](AGENTS.md) and [docs/project-context.md](docs/project-context.md).
+
+macOS build, signing, Finder, and smoke-test details are in [docs/macos-support.md](docs/macos-support.md).
 
 ## License
 

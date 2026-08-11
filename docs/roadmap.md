@@ -33,6 +33,13 @@ The following user actions can currently fail without visible feedback:
 
 Top-level file failures, linked Markdown file failures, startup failures, and Windows setup-action failures already have visible states. Malformed mathematics remains visible as its source with local error styling and a tooltip. Window-title failures are cosmetic and should remain non-interrupting.
 
+## Near-Term macOS Release Readiness
+
+- Complete the Intel Mac smoke test in `docs/macos-support.md`, including Finder while quit/running, Dock reopen, native menus, full screen, and reader fixtures under WebKit.
+- Validate the Universal DMG on both Intel and Apple Silicon hardware before a public release.
+- Add Developer ID signing, notarization, stapling, and macOS release artifacts after the required Apple credentials are available.
+- Keep macOS installation and Finder integration bundle-owned; do not add an in-app installer, updater, or settings surface.
+
 ## Later Ideas
 
 These are speculative unless a future request explicitly accepts them:
@@ -43,7 +50,6 @@ These are speculative unless a future request explicitly accepts them:
 - More Markdown fixtures or focused tests for parser, sanitization, image, link, and navigation edge cases.
 - Optional frontend tests for link classification, document history, and setup affordance behavior.
 - Additional Linux package formats after a source-based package path is proven.
-- macOS support after Windows remains stable and Linux support is better understood.
 
 ## Refactoring Ideas
 
