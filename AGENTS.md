@@ -1,6 +1,6 @@
 # Agent Instructions
 
-This is the canonical Hushmark codebase. GitHub Releases currently publish a standalone Windows executable. The shared reader runtime also supports Linux, with an AUR package maintained outside this repository; other first-party Linux package formats have not been selected. macOS uses a native application shell and first-party Universal DMG configuration; public Mac artifacts require signed/notarized release validation.
+This is the canonical Hushmark codebase. GitHub Releases publish an unsigned standalone Windows executable and an unsigned Universal macOS DMG. The shared reader runtime also supports Linux, with an AUR package maintained outside this repository; other first-party Linux package formats have not been selected.
 
 Hushmark is a calm, minimalist Markdown reader. Platform-specific behavior and packaging must remain behind clear platform boundaries.
 

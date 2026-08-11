@@ -1,6 +1,6 @@
 # Hushmark Linux Support
 
-Linux runtime support is available from the shared Hushmark codebase. The reader core is platform-neutral, Windows setup code is excluded from Linux builds, and external links use Tauri's cross-platform opener. GitHub Releases currently publish only the standalone Windows executable; the AUR package is maintained as downstream packaging in a separate repository.
+Linux runtime support is available from the shared Hushmark codebase. The reader core is platform-neutral, Windows setup code is excluded from Linux builds, and external links use Tauri's cross-platform opener. GitHub Releases publish Windows and macOS artifacts; the AUR package is maintained as downstream Linux packaging in a separate repository.
 
 ## Runtime Policy
 

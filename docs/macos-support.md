@@ -50,7 +50,9 @@ npm run tauri -- build --target universal-apple-darwin
 
 The expected outputs are under `src-tauri/target/universal-apple-darwin/release/bundle/macos/` and `src-tauri/target/universal-apple-darwin/release/bundle/dmg/`.
 
-For public distribution outside the Mac App Store, install a **Developer ID Application** certificate and set `APPLE_SIGNING_IDENTITY`. Notarization can use App Store Connect API credentials (`APPLE_API_ISSUER`, `APPLE_API_KEY`, and `APPLE_API_KEY_PATH`) or Apple ID credentials (`APPLE_ID`, an app-specific `APPLE_PASSWORD`, and `APPLE_TEAM_ID`). Tauri signs with hardened runtime, submits the result, and staples the notarization ticket during the normal bundle build when those credentials are present. Do not commit credentials or certificate exports.
+GitHub Actions builds the same Universal target for manual workflow runs and version tags. Manual runs retain the DMG as a workflow artifact; tagged runs also attach it to the draft GitHub release as `Hushmark-<version>-macOS-universal-unsigned.dmg`. The filename and release notes identify the DMG as unsigned. macOS Gatekeeper may require users to attempt the first launch and then approve Hushmark with **Open Anyway** in System Settings → Privacy & Security.
+
+Developer ID signing and notarization are optional future release improvements. If adopted, use a **Developer ID Application** certificate and keep all signing and notarization credentials in GitHub Actions secrets; never commit credentials or certificate exports.
 
 ## Intel Mac Smoke Test
 
@@ -65,4 +67,4 @@ Test both a development build and the Universal DMG on the Intel Mac:
 7. Switch macOS between Light and Dark appearances and confirm the reader remains consistently light; check trackpad scrolling, selection, Command-C, and Select All.
 8. Open the Markdown, math, Mermaid, and print visual-inspection examples and check typography, code, tables, task lists, RTL/Hebrew, KaTeX, diagrams, local raster/SVG images, fragments, links, overflow, errors, and printing.
 9. Inspect the built app with `lipo -info` and confirm both `x86_64` and `arm64` are present.
-10. For a release candidate, verify `codesign --verify --deep --strict`, `spctl --assess --type execute`, notarization, stapling, and launch from a freshly downloaded DMG.
+10. For a release candidate, download the GitHub-built DMG, confirm the unsigned Gatekeeper flow, and launch the copy installed in Applications. If signing is added later, also verify the signature, notarization, and stapled ticket.

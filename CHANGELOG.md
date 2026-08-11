@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Add a native macOS application shell with Mac lifecycle behavior, menus and shortcuts, Finder document events, alternate Viewer registration, a dedicated ICNS icon, and Universal DMG configuration.
+- Build and attach an explicitly unsigned Universal macOS DMG alongside the Windows executable for GitHub releases.
 
 ## 0.2.0
 

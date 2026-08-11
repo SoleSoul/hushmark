@@ -82,7 +82,7 @@ jobs:
           releaseBody: |
             Hushmark __VERSION__.
 
-            The attached Windows binary is currently unsigned. Windows SmartScreen may show a warning.
+            The Windows executable and Universal macOS DMG are unsigned. Windows SmartScreen and macOS Gatekeeper may show warnings.
           releaseDraft: true
           prerelease: false
 
@@ -108,3 +108,120 @@ jobs:
           } else {
             "No Tauri artifact paths were reported. Check the build logs." >> $env:GITHUB_STEP_SUMMARY
           }
+
+  macos-build:
+    name: Build unsigned Universal macOS DMG
+    runs-on: macos-15-intel
+    outputs:
+      artifact_name: ${{ steps.prepare-artifact.outputs.artifact_name }}
+      asset_name: ${{ steps.prepare-artifact.outputs.asset_name }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Set up Rust stable and macOS targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Read and validate app version
+        id: app-version
+        shell: bash
+        run: |
+          node -p '"version=" + require("./package.json").version' >> "$GITHUB_OUTPUT"
+          version="$(node -p 'require("./package.json").version')"
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match app version $version." >&2
+            exit 1
+          fi
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Check Rust formatting
+        working-directory: src-tauri
+        run: cargo fmt -- --check
+
+      - name: Run Rust tests
+        working-directory: src-tauri
+        run: cargo test --release --quiet
+
+      - name: Build Universal macOS app and DMG
+        run: npm run tauri -- build --target universal-apple-darwin
+
+      - name: Verify Universal bundle and DMG
+        shell: bash
+        run: |
+          app="src-tauri/target/universal-apple-darwin/release/bundle/macos/Hushmark.app"
+          binary="$app/Contents/MacOS/hushmark"
+          dmg="src-tauri/target/universal-apple-darwin/release/bundle/dmg/Hushmark_${{ steps.app-version.outputs.version }}_universal.dmg"
+          architectures=" $(lipo -archs "$binary") "
+          [[ "$architectures" == *" x86_64 "* ]]
+          [[ "$architectures" == *" arm64 "* ]]
+          [[ "$(plutil -extract LSMinimumSystemVersion raw -o - "$app/Contents/Info.plist")" == "12.0" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:CFBundleTypeRole' "$app/Contents/Info.plist")" == "Viewer" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:LSHandlerRank' "$app/Contents/Info.plist")" == "Alternate" ]]
+          hdiutil verify "$dmg"
+
+      - name: Prepare unsigned macOS artifact
+        id: prepare-artifact
+        shell: bash
+        run: |
+          version="${{ steps.app-version.outputs.version }}"
+          asset_name="Hushmark-$version-macOS-universal-unsigned.dmg"
+          artifact_name="Hushmark-$version-macOS-universal-unsigned-DMG"
+          mkdir -p release-artifacts
+          cp "src-tauri/target/universal-apple-darwin/release/bundle/dmg/Hushmark_${version}_universal.dmg" "release-artifacts/$asset_name"
+          echo "asset_name=$asset_name" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload unsigned macOS workflow artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.prepare-artifact.outputs.artifact_name }}
+          path: release-artifacts/${{ steps.prepare-artifact.outputs.asset_name }}
+          if-no-files-found: error
+
+      - name: Summarize generated artifact
+        shell: bash
+        run: |
+          echo "### Hushmark macOS release artifact" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ${{ steps.prepare-artifact.outputs.asset_name }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Universal architectures: x86_64 and arm64" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Signing status: unsigned" >> "$GITHUB_STEP_SUMMARY"
+
+  macos-release-upload:
+    name: Attach unsigned macOS DMG to draft release
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    needs: [windows-release, macos-build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download unsigned macOS artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ needs.macos-build.outputs.artifact_name }}
+          path: release-artifacts
+
+      - name: Attach unsigned macOS DMG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ASSET_NAME: ${{ needs.macos-build.outputs.asset_name }}
+        run: gh release upload "$GITHUB_REF_NAME" "release-artifacts/$ASSET_NAME" --clobber

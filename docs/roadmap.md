@@ -36,8 +36,8 @@ Top-level file failures, linked Markdown file failures, startup failures, and Wi
 ## Near-Term macOS Release Readiness
 
 - Complete the Intel Mac smoke test in `docs/macos-support.md`, including Finder while quit/running, Dock reopen, native menus, full screen, and reader fixtures under WebKit.
-- Validate the Universal DMG on both Intel and Apple Silicon hardware before a public release.
-- Add Developer ID signing, notarization, stapling, and macOS release artifacts after the required Apple credentials are available.
+- Validate each GitHub-built Universal DMG on Intel and periodically on Apple Silicon hardware when available.
+- Consider Developer ID signing, notarization, and stapling later if the unsigned release experience becomes too burdensome.
 - Keep macOS installation and Finder integration bundle-owned; do not add an in-app installer, updater, or settings surface.
 
 ## Later Ideas

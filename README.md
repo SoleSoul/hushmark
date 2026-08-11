@@ -30,7 +30,7 @@ After opening Hushmark, you can use the setup view to add optional Windows integ
 
 Linux runtime support is available from the same source release, and an [AUR package](https://aur.archlinux.org/packages/hushmark) provides downstream Arch Linux packaging. Linux desktop integration is handled by packaging rather than by an in-app setup flow.
 
-macOS builds use a normal DMG drag-to-Applications flow. The first public Mac download will be published after the Universal app has completed Intel and Apple Silicon validation plus Developer ID signing and notarization.
+Download the Universal macOS DMG from the Releases page, open it, and drag Hushmark to Applications. The DMG is unsigned, so macOS Gatekeeper may require you to confirm the first launch with **Open Anyway** in System Settings → Privacy & Security.
 
 ## Use
 
@@ -60,7 +60,7 @@ More details are in [docs/markdown-support.md](docs/markdown-support.md).
 
 ## Platform status
 
-The Hushmark reader runtime supports Windows, Linux, and macOS. GitHub Releases currently provide a standalone Windows executable with optional in-app desktop integration. An AUR package is maintained separately; other first-party Linux package formats have not been selected. Linux integration belongs to packages and desktop files rather than an in-app setup flow. macOS uses a native menu/lifecycle shell, Finder Viewer registration, and a first-party Universal DMG configuration.
+The Hushmark reader runtime supports Windows, Linux, and macOS. GitHub Releases provide an unsigned standalone Windows executable with optional in-app desktop integration and an unsigned Universal macOS DMG. An AUR package is maintained separately; other first-party Linux package formats have not been selected. Linux integration belongs to packages and desktop files rather than an in-app setup flow. macOS uses a native menu/lifecycle shell and Finder Viewer registration.
 
 ## Development
 

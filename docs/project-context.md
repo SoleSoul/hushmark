@@ -2,7 +2,7 @@
 
 Hushmark is a small Markdown reader built with Rust, Tauri 2, and a minimal vanilla TypeScript frontend. It opens Markdown files into a quiet reader view with restrained typography, limited chrome, and operating-system file integration.
 
-This repository is the canonical Hushmark codebase. GitHub Releases currently publish a standalone Windows executable, and Windows is the only in-app setup/integration surface. The shared reader code also supports Linux runtime builds, with an AUR package maintained downstream in a separate repository. Other first-party Linux package formats have not been selected. Linux desktop integration belongs in packaging rather than in-app setup. macOS has a native application shell and first-party DMG configuration; signed and notarized publication still requires release credentials and Mac validation.
+This repository is the canonical Hushmark codebase. GitHub Releases publish an unsigned standalone Windows executable and an unsigned Universal macOS DMG; Windows remains the only in-app setup/integration surface. The shared reader code also supports Linux runtime builds, with an AUR package maintained downstream in a separate repository. Other first-party Linux package formats have not been selected. Linux desktop integration belongs in packaging rather than in-app setup.
 
 ## What Hushmark Is Not
 
@@ -83,11 +83,11 @@ See `docs/reader-design.md` for the focused design note.
 - Markdown support is intentionally limited; Hushmark is not full GitHub-Flavored Markdown. See `docs/markdown-support.md`.
 - Windows default-app assignment remains user-controlled. Hushmark registers itself as a candidate for Open With, but the setup page does not try to guide or automate default-app selection.
 - Linux packages should own installation, updates, desktop integration, icons, and MIME registration. See `docs/linux-support.md`.
-- macOS release artifacts still require Intel/Apple Silicon smoke tests plus Developer ID signing and notarization before public distribution.
+- The macOS release DMG is unsigned, so Gatekeeper may require users to approve its first launch manually. Developer ID signing and notarization remain a possible future improvement.
 - Same-document fragment history currently re-renders during popstate restoration. This is acceptable while the reader has little transient DOM-only state.
 - Document zoom and layout intentionally reset to Page at 100% on every launch so Hushmark always opens with its paper-like reading baseline.
 - The reader deliberately remains light when the operating system uses a dark appearance; dark mode is not accepted until it has a shared reader design.
-- Release binaries are unsigned unless a signing step is added, so Windows SmartScreen may warn users.
+- Release binaries are unsigned unless a signing step is added, so Windows SmartScreen and macOS Gatekeeper may warn users.
 
 ## Focused Docs
 
