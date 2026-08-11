@@ -40,6 +40,18 @@ Top-level file failures, linked Markdown file failures, startup failures, and Wi
 - Consider Developer ID signing, notarization, and stapling later if the unsigned release experience becomes too burdensome.
 - Keep macOS installation and Finder integration bundle-owned; do not add an in-app installer, updater, or settings surface.
 
+## macOS 0.3.0 Release Handoff
+
+This section is temporary durable context for completing the first macOS release from a computer without local Mac build access. Remove it after 0.3.0 is published and its results are reflected in the normal release documentation.
+
+- The intended next release is **0.3.0**, reflecting macOS support as a substantial pre-1.0 platform milestone. Version metadata remains at 0.2.0 until the release-preparation commit is deliberately made; no `v0.3.0` tag or draft release exists yet.
+- macOS support was committed in `9eeb274`; the Windows/macOS release workflow was committed in `e43d6bf` and pushed to `origin/master`.
+- Manual GitHub Actions run [31497918690](https://github.com/SoleSoul/hushmark/actions/runs/31497918690) passed on 2026-08-11. It produced the Windows executable artifact and `Hushmark-0.2.0-macOS-universal-unsigned-DMG`; the tag-only release attachment job correctly skipped.
+- The downloaded CI DMG passed `hdiutil verify`. Its enclosed binary contains x86_64 and arm64, targets macOS 12, declares Markdown as `Viewer` / `Alternate`, and is unsigned as intended.
+- Intel macOS Sequoia testing has confirmed DMG drag-to-Applications installation, application launch, and native printing. The latest fixes for File → Open / Command-O from an open document, document-to-Home title restoration, and the restored Hushmark Home heading were built and statically validated but still need one final user smoke test from a freshly downloaded CI or tagged DMG.
+- Before tagging, update all version locations listed in `docs/release-checklist.md` to 0.3.0, move the Unreleased changelog notes into a 0.3.0 entry, run the normal checks, commit, and push. Create and push annotated tag `v0.3.0`; its workflow must create a draft release containing `hushmark.exe` and `Hushmark-0.3.0-macOS-universal-unsigned.dmg`.
+- Before publishing that draft, retain the explicit unsigned warnings, test the downloaded Mac asset on available hardware, and complete any remaining applicable items in `docs/macos-support.md`. CI architecture inspection allows release work to continue without a local Mac, but it does not replace interaction testing.
+
 ## Later Ideas
 
 These are speculative unless a future request explicitly accepts them:
