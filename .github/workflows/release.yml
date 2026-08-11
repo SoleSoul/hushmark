@@ -186,6 +186,12 @@ jobs:
           grep -Fq '<string>md</string>' <<< "$document_types"
           grep -Fq '<string>markdown</string>' <<< "$document_types"
           grep -Fq '<string>net.daringfireball.markdown</string>' <<< "$document_types"
+          imported_type=":UTImportedTypeDeclarations:0"
+          [[ "$(/usr/libexec/PlistBuddy -c "Print $imported_type:UTTypeIdentifier" "$app/Contents/Info.plist")" == "net.daringfireball.markdown" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c "Print $imported_type:UTTypeConformsTo:0" "$app/Contents/Info.plist")" == "public.utf8-plain-text" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c "Print $imported_type:UTTypeTagSpecification:public.filename-extension:0" "$app/Contents/Info.plist")" == "md" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c "Print $imported_type:UTTypeTagSpecification:public.filename-extension:1" "$app/Contents/Info.plist")" == "markdown" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c "Print $imported_type:UTTypeTagSpecification:public.mime-type" "$app/Contents/Info.plist")" == "text/markdown" ]]
           hdiutil verify "$dmg"
 
       - name: Prepare unsigned macOS artifact

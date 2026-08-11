@@ -34,11 +34,13 @@ Command-P opens WKWebView's native macOS print sheet. The Print item is enabled 
 
 The macOS bundle declares `.md` and `.markdown` as Markdown documents with `Viewer` role and `Alternate` handler rank. This makes Hushmark available in Finder and Open With without claiming ownership or changing the user's default application.
 
+Hushmark also imports `net.daringfireball.markdown`, maps it to both extensions and `text/markdown`, and declares conformance to `public.utf8-plain-text`. The imported declaration is required because Hushmark supports macOS versions where Markdown is not a system-declared type. It intentionally uses `UTImportedTypeDeclarations`, not an exported declaration: Hushmark supports the established Markdown format but does not own it.
+
 Tauri's macOS `Opened` application events handle files opened while Hushmark is starting or already running, including Finder, Open With, and Dock-icon drops. Events received before the webview is ready are queued in the macOS shell. Additional top-level files replace the current single-window navigation session, matching Hushmark's existing model.
 
 ## Packaging
 
-`src-tauri/tauri.macos.conf.json` is merged only for macOS builds. It enables `.app` and `.dmg` bundles, the macOS ICNS icon, Finder declarations, hardened runtime, and a deliberate minimum deployment target of macOS 12 Monterey. It does not enable App Store sandboxing or any Windows setup behavior. Its null `licenseFile` is also deliberate: the repository remains GPL-licensed, but the license text must not become a DMG click-through agreement, which prevents normal drag-to-Applications copying on current macOS.
+`src-tauri/tauri.macos.conf.json` is merged only for macOS builds. It enables `.app` and `.dmg` bundles, the macOS ICNS icon, Finder declarations, the macOS-only `Info.macos.plist` additions, hardened runtime, and a deliberate minimum deployment target of macOS 12 Monterey. It does not enable App Store sandboxing or any Windows setup behavior. Its null `licenseFile` is also deliberate: the repository remains GPL-licensed, but the license text must not become a DMG click-through agreement, which prevents normal drag-to-Applications copying on current macOS.
 
 The supported distribution is a DMG containing Hushmark and an Applications link. Build a Universal binary for Intel and Apple Silicon with:
 
