@@ -122,7 +122,6 @@ async function loadRenderer(): Promise<MermaidRenderer> {
           },
         },
         sequence: {
-          mirrorActors: false,
           actorFontSize: DIAGRAM_FONT_SIZE,
           actorFontFamily: fontFamily,
           noteFontSize: DIAGRAM_FONT_SIZE,

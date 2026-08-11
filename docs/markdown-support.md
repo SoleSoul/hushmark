@@ -76,9 +76,11 @@ Hushmark recognizes fenced code blocks whose first info-string word is `mermaid`
 
 The frontend loads the locally bundled official Mermaid renderer only when a document contains a recognized fence. Diagrams are prepared before reading-position restoration and committed as one batch. The generated SVG is displayed through a `data:` image rather than inserted as live SVG document content. This retains vector scaling and printing while preventing diagram scripts, links, handlers, and embedded elements from becoming interactive Hushmark DOM.
 
-Mermaid runs in strict security mode with HTML labels and click behavior unavailable. Renderer security settings, CSS injection settings, fonts, input length, and edge limits cannot be overridden by diagram directives or Mermaid front matter. Ordinary author configuration such as diagram layout, curves, look, and safe theme variables remains available. A diagram is limited to 50,000 source characters and 500 edges. Hushmark does not fetch Mermaid or diagram resources from a CDN.
+Mermaid runs in strict security mode with HTML labels and click behavior unavailable. Renderer security settings, CSS injection settings, global font settings, input length, and edge limits cannot be overridden by diagram directives or Mermaid front matter. Hushmark supplies reader-aligned typography by default, while Mermaid's diagram-specific typography remains ordinary author configuration alongside layout, curves, look, and safe theme variables. A diagram is limited to 50,000 source characters and 500 edges. Hushmark does not fetch Mermaid or diagram resources from a CDN.
 
 Diagram figures stay within the document measure, scale with Hushmark zoom, and fit the printable page. The official Mermaid package supports many diagram families, but Hushmark does not separately promise every Mermaid syntax or external icon pack. Invalid, unsupported, or resource-limited diagrams retain their escaped source and receive a restrained explanatory tooltip.
+
+Hushmark leaves Mermaid's sequence-diagram participant mirroring at its default, so participant labels appear at both the top and bottom unless the author configures the diagram otherwise.
 
 ## YAML front matter
 

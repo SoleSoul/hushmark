@@ -20,7 +20,7 @@ flowchart LR
 
 ## Sequence and accessible description
 
-This diagram supplies author-written accessibility text. It should remain sharp when zooming and printing.
+This diagram supplies author-written accessibility text. It should remain sharp when zooming and printing, with Mermaid's default participant labels visible at both the top and bottom.
 
 ```mermaid
 sequenceDiagram
