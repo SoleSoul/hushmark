@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
+## 0.3.0
+
+Native macOS support milestone.
+
 - Add a native macOS application shell with Mac lifecycle behavior, menus and shortcuts, Finder document events, alternate Viewer registration, a dedicated ICNS icon, and Universal DMG configuration.
+- Keep the shared reader and its Windows/Linux behavior intact behind a narrow platform-shell boundary.
+- Support native Open and Print dialogs, document-aware window titles, Dock reopen, standard window closing, full screen, and Mac-specific navigation and view shortcuts.
 - Build and attach an explicitly unsigned Universal macOS DMG alongside the Windows executable for GitHub releases.
 
 ## 0.2.0

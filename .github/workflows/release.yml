@@ -82,7 +82,12 @@ jobs:
           releaseBody: |
             Hushmark __VERSION__.
 
-            The Windows executable and Universal macOS DMG are unsigned. Windows SmartScreen and macOS Gatekeeper may show warnings.
+            ## Downloads
+
+            - `hushmark.exe`: standalone Windows x86-64 executable.
+            - `Hushmark-__VERSION__-macOS-universal-unsigned.dmg`: supports Intel and Apple Silicon; open the DMG and drag Hushmark to Applications.
+
+            Both downloads are unsigned. Windows SmartScreen may warn about the executable. On macOS, Gatekeeper may require you to attempt the first launch and then approve Hushmark with **Open Anyway** in System Settings → Privacy & Security.
           releaseDraft: true
           prerelease: false
 
