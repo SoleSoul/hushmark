@@ -55,9 +55,9 @@ For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integrat
 - `src-tauri/capabilities/default.json`: Tauri permissions, including dialog access.
 - `src-tauri/tauri.macos.conf.json`: macOS-only app/DMG, Viewer association, icon, hardened-runtime, and deployment-target configuration.
 
-Keep Tauri JavaScript and Rust plugin versions aligned. Dialog support is currently pinned in npm and Cargo metadata. The Rust-only opener plugin provides shared Windows/Linux external-link OS access behind Hushmark's URL allowlist.
+Keep Tauri JavaScript and Rust plugin versions aligned. Dialog support is currently pinned in npm and Cargo metadata. The Rust-only opener plugin provides shared operating-system external-link access behind Hushmark's URL allowlist.
 
-Windows release artifacts and Windows smoke tests should be produced through GitHub Actions or a Windows machine. On Linux, local checks can still be useful, but they should not be treated as Windows release validation.
+Windows release artifacts and Windows smoke tests should be produced through GitHub Actions or a Windows machine. macOS bundle checks should run through GitHub Actions, and native Finder, menu, lifecycle, Gatekeeper, and visual behavior should be tested on a Mac. Linux checks remain useful for the shared reader, but they are not substitutes for native Windows or macOS validation.
 
 ## Version And Releases
 

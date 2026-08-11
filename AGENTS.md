@@ -21,6 +21,8 @@ Before claiming success, run the relevant checks for the change. For docs-only c
 
 On non-Windows machines, do not claim Windows release validation from local builds. Prefer lightweight docs/diff checks locally and use GitHub Actions or a Windows machine for Windows release artifacts and smoke tests.
 
+On non-macOS machines, do not claim native Mac interaction or release validation from local builds. Use the macOS GitHub Actions job for bundle checks and a Mac for Finder, menu, lifecycle, Gatekeeper, and visual smoke tests.
+
 Windows setup, self-install/update, and shell integration are Windows-only. Linux installation, updates, desktop integration, icons, and MIME registration belong to distribution packaging and must not appear as in-app setup flows.
 
 macOS lifecycle, menu, Finder events, bundle metadata, icons, signing, and notarization belong behind macOS platform boundaries. Do not add Windows-style setup or install management to the Mac app.

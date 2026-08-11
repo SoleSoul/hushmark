@@ -182,6 +182,10 @@ jobs:
           [[ "$(plutil -extract LSMinimumSystemVersion raw -o - "$app/Contents/Info.plist")" == "12.0" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:CFBundleTypeRole' "$app/Contents/Info.plist")" == "Viewer" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:LSHandlerRank' "$app/Contents/Info.plist")" == "Alternate" ]]
+          document_types="$(plutil -extract CFBundleDocumentTypes xml1 -o - "$app/Contents/Info.plist")"
+          grep -Fq '<string>md</string>' <<< "$document_types"
+          grep -Fq '<string>markdown</string>' <<< "$document_types"
+          grep -Fq '<string>net.daringfireball.markdown</string>' <<< "$document_types"
           hdiutil verify "$dmg"
 
       - name: Prepare unsigned macOS artifact
@@ -229,4 +233,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ASSET_NAME: ${{ needs.macos-build.outputs.asset_name }}
-        run: gh release upload "$GITHUB_REF_NAME" "release-artifacts/$ASSET_NAME" --clobber
+        run: gh release upload "$GITHUB_REF_NAME" "release-artifacts/$ASSET_NAME" --clobber --repo "$GITHUB_REPOSITORY"

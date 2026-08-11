@@ -228,3 +228,21 @@ mod capability_tests {
         assert!(DEFAULT_CAPABILITY.contains("dialog:allow-open"));
     }
 }
+
+#[cfg(all(test, not(target_os = "macos")))]
+mod title_tests {
+    use super::{default_window_title, LoadedDocument};
+
+    #[test]
+    fn default_titles_include_the_product_name() {
+        let document = LoadedDocument {
+            path: Some("notes.md".to_string()),
+            navigation_root: None,
+            file_name: Some("notes.md".to_string()),
+            html: Some("<h1>Notes</h1>".to_string()),
+            error: None,
+        };
+
+        assert_eq!(default_window_title(&document), "notes.md - Hushmark");
+    }
+}
