@@ -68,7 +68,7 @@ let documentViewPreferences: DocumentViewPreferences = {
   ...DEFAULT_DOCUMENT_VIEW,
 };
 let wheelZoomAccumulator = 0;
-let pendingMermaidArticle: HTMLElement | null = null;
+let documentRenderId = 0;
 let platformOpenQueue = Promise.resolve();
 let platformShell: PlatformShell = defaultPlatformShell;
 
@@ -124,7 +124,7 @@ function renderState(
   heading: string,
   detail?: string,
 ): HTMLElement {
-  pendingMermaidArticle = null;
+  documentRenderId += 1;
   const section = document.createElement("section");
   section.className = `state state--${kind}`;
 
@@ -154,7 +154,6 @@ function renderDocument(
 ): void {
   currentMode = "reader";
   currentDocument = documentView;
-  pendingMermaidArticle = null;
   setReaderWindowTitle(titleFor(documentView));
 
   if (documentView.error) {
@@ -167,6 +166,8 @@ function renderDocument(
     return;
   }
 
+  renderState("loading", "Opening Markdown file...");
+
   const article = document.createElement("article");
   article.className = "document";
   const content = document.createElement("div");
@@ -178,43 +179,38 @@ function renderDocument(
   article.append(content);
   article.addEventListener("click", handleDocumentLinkClick);
 
-  app.replaceChildren(article);
+  const renderId = documentRenderId;
+  const diagrams = renderMermaid(content);
+  const images = decodeImages(content);
+  const preparations = [diagrams, images].filter(
+    (preparation): preparation is Promise<void> => preparation !== null,
+  );
 
-  let liveReadingPosition: DocumentReadingPosition | null = null;
-  const diagrams = renderMermaid(content, () => {
-    if (article.isConnected && !hasRequestedDocumentPosition(options)) {
-      liveReadingPosition = captureDocumentReadingPosition(article);
+  const commit = (): void => {
+    if (renderId !== documentRenderId) {
+      return;
     }
-  });
 
-  if (diagrams) {
-    pendingMermaidArticle = article;
-    void diagrams.then(
-      () => {
-        if (pendingMermaidArticle === article) {
-          pendingMermaidArticle = null;
-        }
-        if (article.isConnected) {
-          restoreRequestedDocumentPosition(article, options, liveReadingPosition);
-        }
-        syncPlatformShellState();
-      },
-      () => {
-        if (pendingMermaidArticle === article) {
-          pendingMermaidArticle = null;
-        }
-        syncPlatformShellState();
-      },
-    );
-  } else {
+    app.replaceChildren(article);
     restoreRequestedDocumentPosition(article, options);
+    syncPlatformShellState();
+  };
+
+  if (preparations.length === 0) {
+    commit();
+    return;
   }
+
+  void Promise.all(preparations).then(commit, (error) => {
+    console.warn("failed to finish preparing the document", error);
+    commit();
+  });
 }
 
 function renderHome(scrollY = 0): void {
   currentMode = "reader";
   currentDocument = null;
-  pendingMermaidArticle = null;
+  documentRenderId += 1;
   setReaderWindowTitle(PRODUCT.displayName);
 
   const section = createHomeView(currentPlatform);
@@ -752,8 +748,7 @@ function canPrintCurrentDocument(): boolean {
     currentMode === "reader" &&
     Boolean(currentDocument?.path) &&
     !currentDocument?.error &&
-    article !== null &&
-    pendingMermaidArticle !== article
+    article !== null
   );
 }
 
@@ -836,18 +831,9 @@ function showDocumentMessage(heading: string, detail: string): void {
   message.scrollIntoView({ block: "nearest" });
 }
 
-function hasRequestedDocumentPosition(options: DocumentRenderOptions): boolean {
-  return Boolean(
-    options.readingPosition ||
-      options.fragment ||
-      (options.scrollY !== undefined && options.scrollY !== null),
-  );
-}
-
 function restoreRequestedDocumentPosition(
   article: HTMLElement,
   options: DocumentRenderOptions,
-  fallbackPosition: DocumentReadingPosition | null = null,
 ): void {
   if (options.readingPosition) {
     restoreReadingPositionAfterRender(article, options.readingPosition);
@@ -855,9 +841,18 @@ function restoreRequestedDocumentPosition(
     scrollToFragmentAfterRender(article, options.fragment);
   } else if (options.scrollY !== undefined && options.scrollY !== null) {
     restoreScrollAfterRender(options.scrollY, article);
-  } else if (fallbackPosition) {
-    restoreReadingPositionAfterRender(article, fallbackPosition);
   }
+}
+
+function decodeImages(root: ParentNode): Promise<void> | null {
+  const images = Array.from(root.querySelectorAll<HTMLImageElement>("img"));
+  if (images.length === 0) {
+    return null;
+  }
+
+  return Promise.allSettled(images.map((image) => image.decode())).then(
+    () => undefined,
+  );
 }
 
 function scrollToFragmentAfterRender(

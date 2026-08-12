@@ -43,7 +43,7 @@ For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integrat
 - `src-tauri/src/identity.rs`: Shared display identity plus Windows-gated integration identifiers.
 - `src-tauri/src/lib.rs`: Tauri command and plugin registration plus startup platform capabilities.
 - `src-tauri/src/macos.rs`: macOS-only native menus, window lifecycle, Dock reopen behavior, Finder open-document events, and native menu state.
-- `src/main.ts`: Reader startup, rendering, link handling, document/home navigation history, keyboard commands, drag/drop, and capability-gated home setup affordance.
+- `src/main.ts`: Reader startup, atomic document preparation and display, link handling, document/home navigation history, keyboard commands, drag/drop, and capability-gated home setup affordance.
 - `src/platformShell.ts`: Platform-neutral shell contract and no-op/default implementation; dynamically loads platform code only when required.
 - `src/macos.ts`: Narrow macOS implementation of the frontend shell contract for native menu commands, printing, state, and queued Finder document opens.
 - `src/documentView.ts`: Platform-neutral document zoom/layout calculations and rendered-structure reading-position capture/restore.

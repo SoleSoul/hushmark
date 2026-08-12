@@ -28,10 +28,7 @@ type PreparedDiagram = {
   replacement: HTMLElement | null;
 };
 
-export function renderMermaid(
-  root: ParentNode,
-  beforeCommit: () => void,
-): Promise<void> | null {
+export function renderMermaid(root: ParentNode): Promise<void> | null {
   const sources = Array.from(
     root.querySelectorAll<HTMLElement>(MERMAID_SELECTOR),
   );
@@ -41,8 +38,6 @@ export function renderMermaid(
   }
 
   return prepareDiagrams(sources).then((diagrams) => {
-    beforeCommit();
-
     for (const diagram of diagrams) {
       const pre = diagram.source.parentElement;
       if (!(pre instanceof HTMLPreElement)) {
