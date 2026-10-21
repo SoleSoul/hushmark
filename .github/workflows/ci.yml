@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each platform compiles its own gated shell code (setup.rs on
+        # Windows, macos.rs on macOS), so lint and test all three.
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Linux build dependencies
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libxdo-dev libssl-dev
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      # Tauri's build script requires the built frontend before Rust compiles.
+      - name: Type-check and build frontend
+        run: npm run build
+
+      - name: Run frontend tests
+        if: ${{ runner.os == 'Linux' }}
+        run: npm test
+
+      - name: Check Rust formatting
+        if: ${{ runner.os == 'Linux' }}
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - name: Lint Rust
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --quiet

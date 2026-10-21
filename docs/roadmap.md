@@ -16,7 +16,6 @@ This roadmap is not a contract. It is a short parking lot for likely next work a
 - Keep the checked-in desktop entry and icon aligned with downstream Linux packaging, and verify Markdown MIME associations when packaging changes.
 - Validate file opening, Ctrl+O, drag/drop, document links, local images, external links, and navigation on Linux.
 - Keep install, update, and desktop-integration ownership in Linux packaging; do not add an in-app setup flow.
-- Add Linux CI only when it performs a useful build or test rather than duplicating the Windows release workflow.
 
 ## Deferred Failure Feedback
 
