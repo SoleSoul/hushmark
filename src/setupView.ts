@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { createTextElement } from "./dom";
-import { PRODUCT } from "./product";
 import { isAppShortcut, SHORTCUTS } from "./shortcuts";
 import type { SetupActionId, SetupCommand, SetupMessage, SetupStatus } from "./types";
 

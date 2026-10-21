@@ -13,9 +13,15 @@ import {
   zoomedDocumentView,
 } from "./documentView";
 import type { DocumentViewPreferences } from "./documentView";
+import {
+  prepareDocumentArticle,
+  restoreRequestedDocumentPosition,
+  restoreScrollAfterRender,
+} from "./documentPresentation";
+import type { DocumentPositionRequest } from "./documentPresentation";
 import { createHomeView } from "./homeView";
-import { renderMath } from "./math";
-import { renderMermaid } from "./mermaid";
+import { classifyDocumentLink, findFragmentTarget } from "./links";
+import { NavigationHistory } from "./navigationHistory";
 import {
   createPlatformShell,
   defaultPlatformShell,
@@ -26,9 +32,6 @@ import { renderSetup, WINDOWS_SETUP_TITLE } from "./setupView";
 import { isAppShortcut, SHORTCUTS } from "./shortcuts";
 import "./styles.css";
 import type {
-  HushmarkHistoryState,
-  DocumentReadingPosition,
-  LinkAction,
   LinkedDocument,
   LoadedDocument,
   NavigationEntry,
@@ -37,13 +40,10 @@ import type {
   SetupStatus,
   StartupView,
 } from "./types";
+import { normalizedWheelDelta, WheelZoomGesture } from "./wheelZoom";
+import { documentWindowTitle, ERROR_WINDOW_TITLE } from "./windowTitle";
 
 type AppMode = "reader" | "setup";
-type DocumentRenderOptions = {
-  fragment?: string | null;
-  readingPosition?: DocumentReadingPosition | null;
-  scrollY?: number | null;
-};
 
 const appElement = document.querySelector<HTMLElement>("#app");
 
@@ -53,21 +53,16 @@ if (!appElement) {
 
 const app = appElement;
 const currentWindow = getCurrentWindow();
-const navigationEntries = new Map<number, NavigationEntry>();
+const navigation = new NavigationHistory();
+const wheelZoom = new WheelZoomGesture();
 let currentDocument: LoadedDocument | null = null;
 let currentMode: AppMode = "reader";
 let currentPlatform = "unknown";
 let platformCapabilities: PlatformCapabilities = { setup: false };
 let filePickerOpen = false;
-let activeNavigationEntryId: number | null = null;
-let activeNavigationIndex = -1;
-let navigationOrder: number[] = [];
-let navigationSessionId = 0;
-let nextNavigationEntryId = 1;
 let documentViewPreferences: DocumentViewPreferences = {
   ...DEFAULT_DOCUMENT_VIEW,
 };
-let wheelZoomAccumulator = 0;
 let documentRenderId = 0;
 let platformOpenQueue = Promise.resolve();
 let platformShell: PlatformShell = defaultPlatformShell;
@@ -90,26 +85,6 @@ if ("scrollRestoration" in window.history) {
 
 function preventInternalContextMenu(event: MouseEvent): void {
   event.preventDefault();
-}
-
-function titleFor(documentView: LoadedDocument): string {
-  if (currentPlatform === "macos") {
-    if (documentView.error) {
-      return documentView.fileName ? `Error: ${documentView.fileName}` : "Error";
-    }
-
-    return documentView.fileName ?? PRODUCT.displayName;
-  }
-
-  if (documentView.error) {
-    return documentView.fileName
-      ? `Error: ${documentView.fileName} - ${PRODUCT.displayName}`
-      : `Error - ${PRODUCT.displayName}`;
-  }
-
-  return documentView.fileName
-    ? `${documentView.fileName} - ${PRODUCT.displayName}`
-    : PRODUCT.displayName;
 }
 
 function setReaderWindowTitle(title: string): void {
@@ -150,11 +125,11 @@ function renderState(
 
 function renderDocument(
   documentView: LoadedDocument,
-  options: DocumentRenderOptions = {},
+  position: DocumentPositionRequest = {},
 ): void {
   currentMode = "reader";
   currentDocument = documentView;
-  setReaderWindowTitle(titleFor(documentView));
+  setReaderWindowTitle(documentWindowTitle(documentView, currentPlatform));
 
   if (documentView.error) {
     renderState("error", "This file could not be opened.", documentView.error);
@@ -168,23 +143,9 @@ function renderDocument(
 
   renderState("loading", "Opening Markdown file...");
 
-  const article = document.createElement("article");
-  article.className = "document";
-  const content = document.createElement("div");
-  content.className = "document__content";
-
-  // The HTML is rendered and sanitized by Rust before it reaches the UI.
-  content.innerHTML = documentView.html ?? "";
-  renderMath(content);
-  article.append(content);
-  article.addEventListener("click", handleDocumentLinkClick);
-
   const renderId = documentRenderId;
-  const diagrams = renderMermaid(content);
-  const images = decodeImages(content);
-  const preparations = [diagrams, images].filter(
-    (preparation): preparation is Promise<void> => preparation !== null,
-  );
+  const { article, ready } = prepareDocumentArticle(documentView.html ?? "");
+  article.addEventListener("click", handleDocumentLinkClick);
 
   const commit = (): void => {
     if (renderId !== documentRenderId) {
@@ -192,16 +153,16 @@ function renderDocument(
     }
 
     app.replaceChildren(article);
-    restoreRequestedDocumentPosition(article, options);
+    restoreRequestedDocumentPosition(article, position);
     syncPlatformShellState();
   };
 
-  if (preparations.length === 0) {
+  if (!ready) {
     commit();
     return;
   }
 
-  void Promise.all(preparations).then(commit, (error) => {
+  void ready.then(commit, (error) => {
     console.warn("failed to finish preparing the document", error);
     commit();
   });
@@ -304,57 +265,6 @@ function handleDocumentLinkClick(event: MouseEvent): void {
   }
 }
 
-function classifyDocumentLink(href: string | null): LinkAction {
-  const value = href?.trim();
-  if (!value) {
-    return { kind: "unsupported" };
-  }
-
-  if (value.startsWith("#")) {
-    return { kind: "internal", fragment: value };
-  }
-
-  const schemeMatch = /^([a-z][a-z0-9+.-]*):/i.exec(value);
-  const scheme = schemeMatch?.[1]?.toLowerCase();
-
-  if (
-    (scheme === "http" || scheme === "https") &&
-    /^https?:\/\/[^/?#].+/i.test(value)
-  ) {
-    return { kind: "external", url: value };
-  }
-
-  if (scheme === "mailto" && value.length > "mailto:".length) {
-    return { kind: "external", url: value };
-  }
-
-  if (!scheme && isRelativeMarkdownHref(value)) {
-    return { kind: "document", href: value };
-  }
-
-  return { kind: "unsupported" };
-}
-
-function isRelativeMarkdownHref(href: string): boolean {
-  const [pathPart] = href.split("#", 1);
-  if (!pathPart || pathPart.startsWith("/") || pathPart.startsWith("\\")) {
-    return false;
-  }
-
-  try {
-    const decodedPath = decodeURIComponent(pathPart);
-    return (
-      decodedPath.length > 0 &&
-      !decodedPath.startsWith("/") &&
-      !decodedPath.startsWith("\\") &&
-      !/[\u0000-\u001f\u007f]/.test(decodedPath) &&
-      /\.(md|markdown)$/i.test(decodedPath)
-    );
-  } catch {
-    return false;
-  }
-}
-
 async function openExternalLink(url: string): Promise<void> {
   try {
     await invoke("open_external_link", { url });
@@ -411,21 +321,13 @@ function pushSameDocumentFragmentNavigation(fragment: string): void {
 }
 
 function resetNavigation(documentView: LoadedDocument): void {
-  navigationSessionId += 1;
-  navigationEntries.clear();
-  navigationOrder = [];
-
   const view: NavigationView =
     !documentView.path && !documentView.html && !documentView.error
       ? { kind: "home" }
       : { kind: "document", document: documentView, fragment: null };
-  const entry = createNavigationEntry(view, 0);
-  navigationEntries.set(entry.id, entry);
-  navigationOrder.push(entry.id);
-  activeNavigationEntryId = entry.id;
-  activeNavigationIndex = 0;
+  const entry = navigation.reset(view);
 
-  window.history.replaceState(historyStateFor(entry.id), "");
+  window.history.replaceState(navigation.stateFor(entry.id), "");
   renderNavigationEntry(entry);
 }
 
@@ -437,7 +339,7 @@ function pushDocumentNavigation(
 }
 
 function pushHomeNavigation(): void {
-  const activeEntry = getActiveNavigationEntry();
+  const activeEntry = navigation.activeEntry;
 
   if (activeEntry?.view.kind === "home") {
     renderNavigationEntry(activeEntry, { scrollY: 0 });
@@ -448,43 +350,10 @@ function pushHomeNavigation(): void {
   pushNavigationView({ kind: "home" });
 }
 
-function getActiveNavigationEntry(): NavigationEntry | null {
-  return activeNavigationEntryId === null
-    ? null
-    : navigationEntries.get(activeNavigationEntryId) ?? null;
-}
-
 function pushNavigationView(view: NavigationView): void {
-  if (activeNavigationIndex < navigationOrder.length - 1) {
-    for (const staleEntryId of navigationOrder.slice(activeNavigationIndex + 1)) {
-      navigationEntries.delete(staleEntryId);
-    }
-    navigationOrder = navigationOrder.slice(0, activeNavigationIndex + 1);
-  }
-
-  const entry = createNavigationEntry(view, 0);
-  navigationEntries.set(entry.id, entry);
-  navigationOrder.push(entry.id);
-  activeNavigationEntryId = entry.id;
-  activeNavigationIndex = navigationOrder.length - 1;
-
-  window.history.pushState(historyStateFor(entry.id), "");
+  const entry = navigation.push(view);
+  window.history.pushState(navigation.stateFor(entry.id), "");
   renderNavigationEntry(entry);
-}
-
-function createNavigationEntry(
-  view: NavigationView,
-  scrollY: number,
-): NavigationEntry {
-  const id = nextNavigationEntryId;
-  nextNavigationEntryId += 1;
-
-  return {
-    id,
-    view,
-    scrollY,
-    readingPosition: null,
-  };
 }
 
 function renderNavigationEntry(
@@ -508,16 +377,8 @@ function renderNavigationEntry(
   syncPlatformShellState();
 }
 
-function historyStateFor(entryId: number): HushmarkHistoryState {
-  return {
-    kind: "hushmark-navigation",
-    sessionId: navigationSessionId,
-    entryId,
-  };
-}
-
 function saveActiveReadingPosition(): void {
-  const entry = getActiveNavigationEntry();
+  const entry = navigation.activeEntry;
   if (!entry) {
     return;
   }
@@ -527,62 +388,46 @@ function saveActiveReadingPosition(): void {
     return;
   }
 
-  const article = app.querySelector<HTMLElement>(":scope > .document");
+  const article = currentArticle();
   if (article) {
     entry.readingPosition = captureDocumentReadingPosition(article);
   }
 }
 
 function handleHistoryPopState(event: PopStateEvent): void {
-  const state = parseHistoryState(event.state);
+  const lookup = navigation.lookup(event.state);
 
-  if (!state || state.sessionId !== navigationSessionId) {
+  if (lookup.kind === "foreign") {
     keepCurrentHistoryEntry();
     return;
   }
 
-  if (state.entryId === activeNavigationEntryId) {
-    return;
-  }
-
-  const entry = navigationEntries.get(state.entryId);
-  const entryIndex = navigationOrder.indexOf(state.entryId);
-  if (!entry || entryIndex === -1) {
-    keepCurrentHistoryEntry();
+  if (lookup.kind === "active") {
     return;
   }
 
   saveActiveReadingPosition();
-  activeNavigationEntryId = state.entryId;
-  activeNavigationIndex = entryIndex;
-  renderNavigationEntry(entry);
+  navigation.activate(lookup.entry);
+  renderNavigationEntry(lookup.entry);
 }
 
 function keepCurrentHistoryEntry(): void {
-  if (activeNavigationEntryId !== null) {
-    window.history.pushState(historyStateFor(activeNavigationEntryId), "");
+  const activeEntryId = navigation.activeEntryId;
+  if (activeEntryId !== null) {
+    window.history.pushState(navigation.stateFor(activeEntryId), "");
   }
 }
 
-function parseHistoryState(state: unknown): HushmarkHistoryState | null {
-  if (!state || typeof state !== "object") {
-    return null;
+function goBack(): void {
+  if (navigation.canGoBack) {
+    window.history.back();
   }
+}
 
-  const candidate = state as Partial<HushmarkHistoryState>;
-  if (
-    candidate.kind !== "hushmark-navigation" ||
-    typeof candidate.sessionId !== "number" ||
-    typeof candidate.entryId !== "number"
-  ) {
-    return null;
+function goForward(): void {
+  if (navigation.canGoForward) {
+    window.history.forward();
   }
-
-  return {
-    kind: candidate.kind,
-    sessionId: candidate.sessionId,
-    entryId: candidate.entryId,
-  };
 }
 
 function handleNavigationKeydown(event: KeyboardEvent): void {
@@ -604,7 +449,7 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
 
   if (isAppShortcut(event, SHORTCUTS.resetZoom, currentPlatform)) {
     event.preventDefault();
-    if (!event.repeat && canAdjustDocumentView()) {
+    if (!event.repeat && hasOpenDocument()) {
       updateDocumentView(resetDocumentZoom(documentViewPreferences));
     }
     return;
@@ -612,7 +457,7 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
 
   if (isAppShortcut(event, SHORTCUTS.toggleLayout, currentPlatform)) {
     event.preventDefault();
-    if (!event.repeat && canAdjustDocumentView()) {
+    if (!event.repeat && hasOpenDocument()) {
       updateDocumentView(toggledDocumentLayout(documentViewPreferences));
     }
     return;
@@ -632,7 +477,7 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
 
   if (isAppShortcut(event, SHORTCUTS.print, currentPlatform)) {
     event.preventDefault();
-    if (canPrintCurrentDocument() && !event.repeat) {
+    if (hasOpenDocument() && !event.repeat) {
       printCurrentDocument();
     }
     return;
@@ -654,62 +499,39 @@ function handleNavigationKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (activeNavigationEntryId === null) {
+  if (navigation.activeEntryId === null) {
     return;
   }
 
   event.preventDefault();
 
-  if (navigationDirection === "back" && activeNavigationIndex > 0) {
-    window.history.back();
-  } else if (
-    navigationDirection === "forward" &&
-    activeNavigationIndex < navigationOrder.length - 1
-  ) {
-    window.history.forward();
+  if (navigationDirection === "back") {
+    goBack();
+  } else {
+    goForward();
   }
 }
 
 function handleDocumentWheel(event: WheelEvent): void {
   if (!event.ctrlKey || event.altKey || event.metaKey) {
-    wheelZoomAccumulator = 0;
+    wheelZoom.reset();
     return;
   }
 
   event.preventDefault();
-  if (!canAdjustDocumentView() || event.deltaY === 0) {
-    wheelZoomAccumulator = 0;
+  if (!hasOpenDocument() || event.deltaY === 0) {
+    wheelZoom.reset();
     return;
   }
 
-  const delta = normalizedWheelDelta(event);
-  if (Math.sign(delta) !== Math.sign(wheelZoomAccumulator)) {
-    wheelZoomAccumulator = 0;
+  const direction = wheelZoom.add(normalizedWheelDelta(event));
+  if (direction !== 0) {
+    changeDocumentZoom(direction * DOCUMENT_ZOOM_STEP);
   }
-  wheelZoomAccumulator += delta;
-
-  if (Math.abs(wheelZoomAccumulator) < 50) {
-    return;
-  }
-
-  changeDocumentZoom(
-    wheelZoomAccumulator < 0 ? DOCUMENT_ZOOM_STEP : -DOCUMENT_ZOOM_STEP,
-  );
-  wheelZoomAccumulator = 0;
-}
-
-function normalizedWheelDelta(event: WheelEvent): number {
-  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
-    return event.deltaY * 16;
-  }
-  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-    return event.deltaY * window.innerHeight;
-  }
-  return event.deltaY;
 }
 
 function changeDocumentZoom(delta: number): void {
-  if (!canAdjustDocumentView()) {
+  if (!hasOpenDocument()) {
     return;
   }
   updateDocumentView(zoomedDocumentView(documentViewPreferences, delta));
@@ -723,11 +545,11 @@ function updateDocumentView(nextPreferences: DocumentViewPreferences): void {
     return;
   }
 
-  const article = app.querySelector<HTMLElement>(":scope > .document");
+  const article = currentArticle();
   const readingPosition = article
     ? captureDocumentReadingPosition(article)
     : null;
-  const activeEntry = getActiveNavigationEntry();
+  const activeEntry = navigation.activeEntry;
   if (readingPosition && activeEntry?.view.kind === "document") {
     activeEntry.readingPosition = readingPosition;
   }
@@ -742,22 +564,18 @@ function updateDocumentView(nextPreferences: DocumentViewPreferences): void {
   syncPlatformShellState();
 }
 
-function canPrintCurrentDocument(): boolean {
-  const article = app.querySelector<HTMLElement>(":scope > .document");
-  return (
-    currentMode === "reader" &&
-    Boolean(currentDocument?.path) &&
-    !currentDocument?.error &&
-    article !== null
-  );
+function currentArticle(): HTMLElement | null {
+  return app.querySelector<HTMLElement>(":scope > .document");
 }
 
-function canAdjustDocumentView(): boolean {
+// True when a successfully loaded document is displayed in the reader, which is
+// when printing, zoom, and layout commands apply.
+function hasOpenDocument(): boolean {
   return (
     currentMode === "reader" &&
     Boolean(currentDocument?.path) &&
     !currentDocument?.error &&
-    app.querySelector(":scope > .document") !== null
+    currentArticle() !== null
   );
 }
 
@@ -809,7 +627,7 @@ function showDocumentMessage(heading: string, detail: string): void {
   const article = app.querySelector<HTMLElement>(".document");
 
   if (!article) {
-    setReaderWindowTitle(`Error - ${PRODUCT.displayName}`);
+    setReaderWindowTitle(ERROR_WINDOW_TITLE);
     renderState("error", heading, detail);
     return;
   }
@@ -831,96 +649,8 @@ function showDocumentMessage(heading: string, detail: string): void {
   message.scrollIntoView({ block: "nearest" });
 }
 
-function restoreRequestedDocumentPosition(
-  article: HTMLElement,
-  options: DocumentRenderOptions,
-): void {
-  if (options.readingPosition) {
-    restoreReadingPositionAfterRender(article, options.readingPosition);
-  } else if (options.fragment) {
-    scrollToFragmentAfterRender(article, options.fragment);
-  } else if (options.scrollY !== undefined && options.scrollY !== null) {
-    restoreScrollAfterRender(options.scrollY, article);
-  }
-}
-
-function decodeImages(root: ParentNode): Promise<void> | null {
-  const images = Array.from(root.querySelectorAll<HTMLImageElement>("img"));
-  if (images.length === 0) {
-    return null;
-  }
-
-  return Promise.allSettled(images.map((image) => image.decode())).then(
-    () => undefined,
-  );
-}
-
-function scrollToFragmentAfterRender(
-  article: HTMLElement,
-  fragment: string,
-): void {
-  window.requestAnimationFrame(() => {
-    if (!article.isConnected) {
-      return;
-    }
-    const target = findFragmentTarget(fragment);
-    if (target) {
-      target.scrollIntoView();
-    }
-  });
-}
-
-function restoreScrollAfterRender(
-  scrollY: number,
-  renderedView?: HTMLElement,
-): void {
-  window.requestAnimationFrame(() => {
-    if (!renderedView || renderedView.isConnected) {
-      window.scrollTo(0, scrollY);
-    }
-  });
-}
-
-function restoreReadingPositionAfterRender(
-  article: HTMLElement,
-  position: DocumentReadingPosition,
-): void {
-  window.requestAnimationFrame(() => {
-    if (article.isConnected) {
-      restoreDocumentReadingPosition(article, position);
-    }
-  });
-}
-
-function fragmentIdCandidates(fragment: string): string[] {
-  const cleanFragment = fragment.startsWith("#") ? fragment.slice(1) : fragment;
-  const candidates = [cleanFragment];
-
-  try {
-    const decoded = decodeURIComponent(cleanFragment);
-    if (!candidates.includes(decoded)) {
-      candidates.unshift(decoded);
-    }
-  } catch {
-    // Use the original fragment when percent-decoding fails.
-  }
-
-  return candidates.filter((candidate) => candidate.length > 0);
-}
-
-function findFragmentTarget(fragment: string): HTMLElement | null {
-  for (const id of fragmentIdCandidates(fragment)) {
-    const target = document.getElementById(id);
-    if (target) {
-      return target;
-    }
-  }
-
-  return null;
-}
-
 async function openTopLevelDocument(path: string): Promise<void> {
-  const openedFromHome = getActiveNavigationEntry()?.view.kind === "home";
+  const openedFromHome = navigation.activeEntry?.view.kind === "home";
   saveActiveReadingPosition();
   renderState("loading", "Opening Markdown file...");
 
@@ -929,14 +659,14 @@ async function openTopLevelDocument(path: string): Promise<void> {
       path,
     });
     currentMode = "reader";
-    if (openedFromHome && getActiveNavigationEntry()?.view.kind === "home") {
+    if (openedFromHome && navigation.activeEntry?.view.kind === "home") {
       pushDocumentNavigation(documentView, null);
     } else {
       resetNavigation(documentView);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    setReaderWindowTitle(`Error - ${PRODUCT.displayName}`);
+    setReaderWindowTitle(ERROR_WINDOW_TITLE);
     renderState("error", "This file could not be opened.", message);
   }
 }
@@ -950,7 +680,7 @@ function queuePlatformOpenDocument(path: string): void {
 }
 
 function setDocumentLayout(layout: "page" | "full-width"): void {
-  if (!canAdjustDocumentView() || documentViewPreferences.layout === layout) {
+  if (!hasOpenDocument() || documentViewPreferences.layout === layout) {
     syncPlatformShellState();
     return;
   }
@@ -959,7 +689,7 @@ function setDocumentLayout(layout: "page" | "full-width"): void {
 }
 
 function printCurrentDocument(): void {
-  if (!canPrintCurrentDocument()) {
+  if (!hasOpenDocument()) {
     return;
   }
 
@@ -970,10 +700,10 @@ function printCurrentDocument(): void {
 
 function syncPlatformShellState(): void {
   void platformShell.updateState({
-    canGoBack: activeNavigationIndex > 0,
-    canGoForward: activeNavigationIndex < navigationOrder.length - 1,
-    canPrintDocument: canPrintCurrentDocument(),
-    hasDocument: canAdjustDocumentView(),
+    canGoBack: navigation.canGoBack,
+    canGoForward: navigation.canGoForward,
+    canPrintDocument: hasOpenDocument(),
+    hasDocument: hasOpenDocument(),
     layout: documentViewPreferences.layout,
   }).catch((error) => {
     console.warn("failed to update platform menu state", error);
@@ -1014,22 +744,14 @@ async function start(): Promise<void> {
     try {
       platformShell = await createPlatformShell(currentPlatform, {
         openDocumentPath: queuePlatformOpenDocument,
-        goBack: () => {
-          if (activeNavigationIndex > 0) {
-            window.history.back();
-          }
-        },
-        goForward: () => {
-          if (activeNavigationIndex < navigationOrder.length - 1) {
-            window.history.forward();
-          }
-        },
+        goBack,
+        goForward,
         showHome: pushHomeNavigation,
         setLayout: setDocumentLayout,
         zoomIn: () => changeDocumentZoom(DOCUMENT_ZOOM_STEP),
         zoomOut: () => changeDocumentZoom(-DOCUMENT_ZOOM_STEP),
         resetZoom: () => {
-          if (canAdjustDocumentView()) {
+          if (hasOpenDocument()) {
             updateDocumentView(resetDocumentZoom(documentViewPreferences));
           }
         },
@@ -1055,7 +777,7 @@ async function start(): Promise<void> {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    setReaderWindowTitle(`Error - ${PRODUCT.displayName}`);
+    setReaderWindowTitle(ERROR_WINDOW_TITLE);
     renderState("error", `Could not start ${PRODUCT.displayName}.`, message);
   } finally {
     await revealWindow();

@@ -53,7 +53,6 @@ These are speculative unless a future request explicitly accepts them:
 
 ## Refactoring Ideas
 
-- Split reader rendering/link handling/navigation out of `src/main.ts` when frontend work next grows.
 - Keep setup UI in `src/setupView.ts`; avoid mixing setup concerns back into reader code.
 - Keep Windows registry, ShellExecute, and setup/install behavior isolated behind platform gates or platform-specific modules.
 - Consolidate version and identity update checks if release work becomes repetitive.
