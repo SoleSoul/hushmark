@@ -48,7 +48,7 @@ These are speculative unless a future request explicitly accepts them:
 - Table-of-contents overlay generated from document headings.
 - Source/render toggle for inspection only, with no editing workflow.
 - More Markdown fixtures or focused tests for parser, sanitization, image, link, and navigation edge cases.
-- Optional frontend tests for link classification, document history, and setup affordance behavior.
+- Frontend tests for setup affordance behavior and DOM-level rendering, if a DOM test environment proves worthwhile.
 - Additional Linux package formats after a source-based package path is proven.
 
 ## Refactoring Ideas

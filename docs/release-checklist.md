@@ -29,6 +29,7 @@ PowerShell:
 
 ```powershell
 npm run build
+npm test
 Push-Location .\src-tauri; cargo fmt; cargo test --quiet; Pop-Location
 npm run tauri -- build
 git diff --check
@@ -38,6 +39,7 @@ Bash:
 
 ```bash
 npm run build
+npm test
 (cd src-tauri && cargo fmt && cargo test --quiet)
 npm run tauri -- build
 git diff --check

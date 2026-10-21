@@ -17,7 +17,7 @@ Preserve the product restraint:
 
 Prefer small, behavior-preserving changes that follow the existing Rust + Tauri 2 + vanilla TypeScript structure. Do not bump the app version unless the work is an intentional tester-visible release.
 
-Before claiming success, run the relevant checks for the change. For docs-only changes, at least inspect the diff and run `git diff --check`. From the repository root, prefer `npm run build`, `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check`, `cargo test --manifest-path src-tauri/Cargo.toml --quiet`, and `npm run tauri -- build` when the touched area warrants it.
+Before claiming success, run the relevant checks for the change. For docs-only changes, at least inspect the diff and run `git diff --check`. From the repository root, prefer `npm run build`, `npm test`, `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check`, `cargo test --manifest-path src-tauri/Cargo.toml --quiet`, and `npm run tauri -- build` when the touched area warrants it.
 
 On non-Windows machines, do not claim Windows release validation from local builds. Prefer lightweight docs/diff checks locally and use GitHub Actions or a Windows machine for Windows release artifacts and smoke tests.
 

@@ -83,7 +83,7 @@ See `docs/reader-design.md` for the focused design note.
 
 ## Known Limitations
 
-- There is no dedicated frontend unit test harness yet; UI/navigation behavior relies on TypeScript build checks, Rust tests, and manual smoke testing.
+- Frontend unit tests (Vitest, `npm test`) cover pure logic such as navigation history, link classification, shortcuts, and view preferences. DOM rendering, reading-position restoration, and platform integration still rely on manual smoke testing.
 - Markdown support is intentionally limited; Hushmark is not full GitHub-Flavored Markdown. See `docs/markdown-support.md`.
 - Windows default-app assignment remains user-controlled. Hushmark registers itself as a candidate for Open With, but the setup page does not try to guide or automate default-app selection.
 - Linux packages should own installation, updates, desktop integration, icons, and MIME registration. See `docs/linux-support.md`.
