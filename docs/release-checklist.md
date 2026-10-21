@@ -13,7 +13,7 @@ Build macOS releases through GitHub Actions and smoke-test the downloaded DMG on
 - Bump the patch version for public maintenance releases and explicitly shared prerelease builds.
 - Bump the minor version for deliberate pre-1.0 product milestones that introduce a substantial reader capability.
 - Do not bump the version for docs-only changes, internal refactors, or behavior-preserving maintenance.
-- Keep versions aligned in `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, and `CHANGELOG.md`.
+- Set the version with `node scripts/version.mjs <version>`, which updates `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, and `src-tauri/Cargo.lock`; `src-tauri/tauri.conf.json` reads `package.json` directly. Add the matching `CHANGELOG.md` entry, then confirm with `node scripts/version.mjs --check`.
 
 ## Before Building
 

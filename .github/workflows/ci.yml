@@ -55,6 +55,10 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Check version metadata
+        if: ${{ runner.os == 'Linux' }}
+        run: node scripts/version.mjs --check
+
       # Tauri's build script requires the built frontend before Rust compiles.
       - name: Type-check and build frontend
         run: npm run build

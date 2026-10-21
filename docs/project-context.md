@@ -66,7 +66,7 @@ Windows release artifacts and Windows smoke tests should be produced through Git
 
 ## Version And Releases
 
-Use human-readable patch versions for public releases and explicitly shared prerelease builds. Keep version metadata aligned across `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, and `CHANGELOG.md`.
+Use human-readable patch versions for public releases and explicitly shared prerelease builds. `package.json` is the version source of truth, and `src-tauri/tauri.conf.json` reads it directly. Use `node scripts/version.mjs <version>` to update `package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, and `src-tauri/Cargo.lock` together, then add the matching `CHANGELOG.md` entry. CI runs `node scripts/version.mjs --check` to catch drift.
 
 Do not bump the version for docs-only changes, internal refactors, or other behavior-preserving maintenance unless a release or shared prerelease build is being prepared.
 

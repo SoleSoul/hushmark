@@ -54,7 +54,6 @@ These are speculative unless a future request explicitly accepts them:
 
 - Keep setup UI in `src/setupView.ts`; avoid mixing setup concerns back into reader code.
 - Keep Windows registry, ShellExecute, and setup/install behavior isolated behind platform gates or platform-specific modules.
-- Consolidate version and identity update checks if release work becomes repetitive.
 - Extract Markdown rendering helpers only if `src-tauri/src/document.rs` becomes harder to reason about.
 
 Refactors should be behavior-preserving unless the user asks for a visible product change.
