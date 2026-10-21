@@ -37,6 +37,7 @@ For detailed behavior, see `docs/markdown-support.md` and `docs/windows-integrat
 
 - `src-tauri/src/document_parts.rs`: Source preprocessing, YAML front matter parsing, metadata rendering and sanitization, and Markdown body offsets.
 - `src-tauri/src/document.rs`: Markdown loading, body rendering and sanitization, local images, heading anchors, linked-document validation, and Rust tests.
+- `src-tauri/src/placeholders.rs`: Unguessable placeholder tokens that carry Hushmark-generated markup (heading ids, alignment and math classes, Mermaid fences, task markers, embedded images) through whole-document sanitization, replaced in a single linear pass afterwards.
 - `src-tauri/src/setup.rs`: Windows-only install/setup integration, registry handling, setup status, and deferred self-uninstall cleanup. The module and its Tauri commands are compiled only on Windows.
 - `src-tauri/src/startup.rs`: Platform-neutral first-positional-argument parsing. There is no setup command-line mode.
 - `src-tauri/src/external_links.rs`: External URL allowlisting before Tauri opens approved links with the system default application.

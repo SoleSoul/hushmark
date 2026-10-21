@@ -4,6 +4,7 @@ mod external_links;
 mod identity;
 #[cfg(target_os = "macos")]
 mod macos;
+mod placeholders;
 #[cfg(windows)]
 mod setup;
 mod startup;

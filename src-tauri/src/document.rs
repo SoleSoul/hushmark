@@ -4,7 +4,6 @@ use std::{
     fs,
     io::ErrorKind,
     path::{Component, Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 use ammonia::Builder;
@@ -14,6 +13,7 @@ use pulldown_cmark::{html, Alignment, CodeBlockKind, CowStr, Event, Options, Par
 use serde::Serialize;
 
 use crate::document_parts::{parse_document_parts, render_front_matter_to_safe_html};
+use crate::placeholders::{Placeholders, Slot};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -155,76 +155,44 @@ fn render_document_with_document_path(source: &str, document_path: Option<&Path>
 }
 
 fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path>) -> String {
-    let mut local_images = LocalImageResolver::new(document_path);
+    let mut placeholders = Placeholders::new();
+    let local_images = LocalImageResolver::new(document_path);
     let mut table_alignments = TableAlignmentRewriter::new();
     let mut heading_ids = HeadingIdRewriter::new(collect_heading_ids(markdown));
-    let mut mermaid_code_blocks = MermaidCodeBlockRewriter::new();
-    let mut math_classes = MathClassRewriter::new();
-    let mut task_list_markers = TaskListMarkerRewriter::new();
     let mut rendered = String::new();
 
     {
         let parser = Parser::new_ext(markdown, markdown_options()).flat_map(|event| {
-            let event = local_images.rewrite_event(event);
-            let event = table_alignments.rewrite_event(event);
-            let event = heading_ids.rewrite_event(event);
-            let event = task_list_markers.rewrite_event(event);
-            let event = mermaid_code_blocks.rewrite_event(event);
-            math_classes.rewrite_event(event)
+            let event = local_images.rewrite_event(event, &mut placeholders);
+            let event = table_alignments.rewrite_event(event, &mut placeholders);
+            let event = heading_ids.rewrite_event(event, &mut placeholders);
+            let event = rewrite_task_list_marker(event, &mut placeholders);
+            let event = rewrite_mermaid_code_block(event, &mut placeholders);
+            rewrite_math(event, &mut placeholders)
         });
         html::push_html(&mut rendered, parser);
     }
 
-    let allowed_table_classes = table_alignments.allowed_classes();
-    let allowed_heading_ids = heading_ids.allowed_ids();
-    let allowed_mermaid_classes = mermaid_code_blocks.allowed_classes();
-    let allowed_math_classes = math_classes.allowed_classes();
-    let allowed_task_list_classes = task_list_markers.allowed_classes();
-    let safe_html = sanitize_rendered_html(
-        &rendered,
-        &allowed_table_classes,
-        &allowed_heading_ids,
-        &allowed_mermaid_classes,
-        &allowed_math_classes,
-        &allowed_task_list_classes,
-    );
-    let safe_html = local_images.rewrite_sanitized_html_image_sources(safe_html);
-    let safe_html = heading_ids.apply_replacements(safe_html);
-    let safe_html = table_alignments.apply_replacements(safe_html);
-    let safe_html = mermaid_code_blocks.apply_replacements(safe_html);
-    let safe_html = math_classes.apply_replacements(safe_html);
-    let safe_html = task_list_markers.apply_replacements(safe_html);
-    local_images.apply_replacements(safe_html)
+    let safe_html = sanitize_rendered_html(&rendered, &placeholders);
+    let safe_html = local_images.rewrite_sanitized_html_image_sources(safe_html, &mut placeholders);
+    placeholders.apply(&safe_html)
 }
 
-fn sanitize_rendered_html(
-    rendered: &str,
-    allowed_table_classes: &[String],
-    allowed_heading_ids: &[String],
-    allowed_mermaid_classes: &[String],
-    allowed_math_classes: &[String],
-    allowed_task_list_classes: &[String],
-) -> String {
-    let allowed_table_classes: Vec<&str> =
-        allowed_table_classes.iter().map(String::as_str).collect();
-    let allowed_heading_ids: Vec<&str> = allowed_heading_ids.iter().map(String::as_str).collect();
-    let allowed_mermaid_classes: Vec<&str> =
-        allowed_mermaid_classes.iter().map(String::as_str).collect();
-    let allowed_math_classes: Vec<&str> = allowed_math_classes.iter().map(String::as_str).collect();
-    let allowed_task_list_classes: Vec<&str> = allowed_task_list_classes
-        .iter()
-        .map(String::as_str)
-        .collect();
+fn sanitize_rendered_html(rendered: &str, placeholders: &Placeholders) -> String {
+    let table_cell_classes = placeholders.allowed_attribute_values(&[Slot::TableCellClass]);
+    let code_classes = placeholders.allowed_attribute_values(&[Slot::CodeLanguage]);
+    let span_classes =
+        placeholders.allowed_attribute_values(&[Slot::MathClass, Slot::TaskListMarker]);
+    let heading_ids = placeholders.allowed_attribute_values(&[Slot::HeadingId]);
     let mut builder = Builder::default();
 
-    builder.add_allowed_classes("th", &allowed_table_classes);
-    builder.add_allowed_classes("td", &allowed_table_classes);
-    builder.add_allowed_classes("code", &allowed_mermaid_classes);
-    builder.add_allowed_classes("span", &allowed_math_classes);
-    builder.add_allowed_classes("span", &allowed_task_list_classes);
+    builder.add_allowed_classes("th", &table_cell_classes);
+    builder.add_allowed_classes("td", &table_cell_classes);
+    builder.add_allowed_classes("code", &code_classes);
+    builder.add_allowed_classes("span", &span_classes);
 
     for tag in ["h1", "h2", "h3", "h4", "h5", "h6"] {
-        builder.add_tag_attribute_values(tag, "id", &allowed_heading_ids);
+        builder.add_tag_attribute_values(tag, "id", &heading_ids);
     }
 
     builder.clean(rendered).to_string()
@@ -335,20 +303,18 @@ fn slugify_heading(text: &str) -> String {
 
 struct HeadingIdRewriter {
     ids: VecDeque<String>,
-    placeholder_prefix: String,
-    replacements: Vec<(String, String)>,
 }
 
 impl HeadingIdRewriter {
     fn new(ids: Vec<String>) -> Self {
-        Self {
-            ids: ids.into(),
-            placeholder_prefix: heading_id_placeholder_prefix(),
-            replacements: Vec::new(),
-        }
+        Self { ids: ids.into() }
     }
 
-    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Event<'a> {
+    fn rewrite_event<'a>(
+        &mut self,
+        event: Event<'a>,
+        placeholders: &mut Placeholders,
+    ) -> Event<'a> {
         match event {
             Event::Start(Tag::Heading {
                 level,
@@ -356,12 +322,10 @@ impl HeadingIdRewriter {
                 classes,
                 attrs,
             }) => {
-                let id = self.ids.pop_front().map(|public_id| {
-                    let placeholder =
-                        format!("{}-{}", self.placeholder_prefix, self.replacements.len());
-                    self.replacements.push((placeholder.clone(), public_id));
-                    CowStr::from(placeholder)
-                });
+                let id = self
+                    .ids
+                    .pop_front()
+                    .map(|public_id| CowStr::from(placeholders.insert(Slot::HeadingId, public_id)));
 
                 Event::Start(Tag::Heading {
                     level,
@@ -373,38 +337,12 @@ impl HeadingIdRewriter {
             _ => event,
         }
     }
-
-    fn allowed_ids(&self) -> Vec<String> {
-        self.replacements
-            .iter()
-            .map(|(placeholder, _)| placeholder.clone())
-            .collect()
-    }
-
-    fn apply_replacements(&self, mut safe_html: String) -> String {
-        for (placeholder, public_id) in self.replacements.iter().rev() {
-            safe_html = safe_html.replace(placeholder, public_id);
-        }
-
-        safe_html
-    }
-}
-
-fn heading_id_placeholder_prefix() -> String {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
-
-    format!("hushmark-heading-token-{nanos}-{}", std::process::id())
 }
 
 struct TableAlignmentRewriter {
     alignments: Vec<Alignment>,
     table_part: TablePart,
     cell_index: usize,
-    placeholder_prefix: String,
-    replacements: Vec<(String, &'static str)>,
 }
 
 impl TableAlignmentRewriter {
@@ -413,12 +351,14 @@ impl TableAlignmentRewriter {
             alignments: Vec::new(),
             table_part: TablePart::Body,
             cell_index: 0,
-            placeholder_prefix: table_alignment_placeholder_prefix(),
-            replacements: Vec::new(),
         }
     }
 
-    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Event<'a> {
+    fn rewrite_event<'a>(
+        &mut self,
+        event: Event<'a>,
+        placeholders: &mut Placeholders,
+    ) -> Event<'a> {
         match event {
             Event::Start(Tag::Table(alignments)) => {
                 self.alignments = alignments;
@@ -440,7 +380,9 @@ impl TableAlignmentRewriter {
                 self.cell_index = 0;
                 Event::Start(Tag::TableRow)
             }
-            Event::Start(Tag::TableCell) => Event::Html(CowStr::from(self.table_cell_start_tag())),
+            Event::Start(Tag::TableCell) => {
+                Event::Html(CowStr::from(self.table_cell_start_tag(placeholders)))
+            }
             Event::End(TagEnd::TableCell) => {
                 let tag = self.table_part.cell_tag();
                 self.cell_index += 1;
@@ -456,7 +398,7 @@ impl TableAlignmentRewriter {
         }
     }
 
-    fn table_cell_start_tag(&mut self) -> String {
+    fn table_cell_start_tag(&self, placeholders: &mut Placeholders) -> String {
         let tag = self.table_part.cell_tag();
 
         match self
@@ -465,28 +407,11 @@ impl TableAlignmentRewriter {
             .and_then(markdown_alignment_class)
         {
             Some(public_class) => {
-                let placeholder =
-                    format!("{}-{}", self.placeholder_prefix, self.replacements.len());
-                self.replacements.push((placeholder.clone(), public_class));
+                let placeholder = placeholders.insert(Slot::TableCellClass, public_class);
                 format!("<{tag} class=\"{placeholder}\">")
             }
             None => format!("<{tag}>"),
         }
-    }
-
-    fn allowed_classes(&self) -> Vec<String> {
-        self.replacements
-            .iter()
-            .map(|(placeholder, _)| placeholder.clone())
-            .collect()
-    }
-
-    fn apply_replacements(&self, mut safe_html: String) -> String {
-        for (placeholder, public_class) in self.replacements.iter().rev() {
-            safe_html = safe_html.replace(placeholder, public_class);
-        }
-
-        safe_html
     }
 }
 
@@ -514,57 +439,15 @@ fn markdown_alignment_class(alignment: &Alignment) -> Option<&'static str> {
     }
 }
 
-fn table_alignment_placeholder_prefix() -> String {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
-
-    format!("hushmark-align-token-{nanos}-{}", std::process::id())
-}
-
-struct MermaidCodeBlockRewriter {
-    placeholder_prefix: String,
-    replacements: Vec<String>,
-}
-
-impl MermaidCodeBlockRewriter {
-    fn new() -> Self {
-        Self {
-            placeholder_prefix: mermaid_class_placeholder_prefix(),
-            replacements: Vec::new(),
+fn rewrite_mermaid_code_block<'a>(event: Event<'a>, placeholders: &mut Placeholders) -> Event<'a> {
+    match event {
+        Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info))) if is_mermaid_fence(&info) => {
+            let placeholder = placeholders.insert(Slot::CodeLanguage, "mermaid-source");
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(CowStr::from(
+                placeholder,
+            ))))
         }
-    }
-
-    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Event<'a> {
-        match event {
-            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info)))
-                if is_mermaid_fence(&info) =>
-            {
-                let placeholder =
-                    format!("{}-{}", self.placeholder_prefix, self.replacements.len());
-                self.replacements.push(placeholder.clone());
-                Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(CowStr::from(
-                    placeholder,
-                ))))
-            }
-            _ => event,
-        }
-    }
-
-    fn allowed_classes(&self) -> Vec<String> {
-        self.replacements
-            .iter()
-            .map(|placeholder| format!("language-{placeholder}"))
-            .collect()
-    }
-
-    fn apply_replacements(&self, mut safe_html: String) -> String {
-        for placeholder in self.replacements.iter().rev() {
-            safe_html = safe_html.replace(&format!("language-{placeholder}"), "mermaid-source");
-        }
-
-        safe_html
+        _ => event,
     }
 }
 
@@ -574,151 +457,50 @@ fn is_mermaid_fence(info: &str) -> bool {
         .is_some_and(|language| language.eq_ignore_ascii_case("mermaid"))
 }
 
-fn mermaid_class_placeholder_prefix() -> String {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
+fn rewrite_math<'a>(event: Event<'a>, placeholders: &mut Placeholders) -> Vec<Event<'a>> {
+    let (source, public_classes) = match event {
+        Event::InlineMath(source) => (source, "math math-inline"),
+        Event::DisplayMath(source) => (source, "math math-display"),
+        _ => return vec![event],
+    };
+    let placeholder = placeholders.insert(Slot::MathClass, public_classes);
 
-    format!("hushmark-mermaid-token-{nanos}-{}", std::process::id())
+    vec![
+        Event::Html(CowStr::from(format!("<span class=\"{placeholder}\">"))),
+        Event::Text(source),
+        Event::Html(CowStr::from("</span>")),
+    ]
 }
 
-struct MathClassRewriter {
-    placeholder_prefix: String,
-    replacements: Vec<(String, &'static str)>,
-}
-
-impl MathClassRewriter {
-    fn new() -> Self {
-        Self {
-            placeholder_prefix: math_class_placeholder_prefix(),
-            replacements: Vec::new(),
-        }
-    }
-
-    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Vec<Event<'a>> {
-        match event {
-            Event::InlineMath(source) => self.math_events(source, "math math-inline"),
-            Event::DisplayMath(source) => self.math_events(source, "math math-display"),
-            _ => vec![event],
-        }
-    }
-
-    fn math_events<'a>(
-        &mut self,
-        source: CowStr<'a>,
-        public_classes: &'static str,
-    ) -> Vec<Event<'a>> {
-        let placeholder = format!("{}-{}", self.placeholder_prefix, self.replacements.len());
-        self.replacements
-            .push((placeholder.clone(), public_classes));
-
-        vec![
-            Event::Html(CowStr::from(format!("<span class=\"{placeholder}\">"))),
-            Event::Text(source),
-            Event::Html(CowStr::from("</span>")),
-        ]
-    }
-
-    fn allowed_classes(&self) -> Vec<String> {
-        self.replacements
-            .iter()
-            .map(|(placeholder, _)| placeholder.clone())
-            .collect()
-    }
-
-    fn apply_replacements(&self, mut safe_html: String) -> String {
-        for (placeholder, public_classes) in self.replacements.iter().rev() {
-            safe_html = safe_html.replace(placeholder, public_classes);
-        }
-
-        safe_html
-    }
-}
-
-fn math_class_placeholder_prefix() -> String {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
-
-    format!("hushmark-math-token-{nanos}-{}", std::process::id())
-}
-
-struct TaskListMarkerRewriter {
-    placeholder_prefix: String,
-    replacements: Vec<(String, bool)>,
-}
-
-impl TaskListMarkerRewriter {
-    fn new() -> Self {
-        Self {
-            placeholder_prefix: task_list_marker_placeholder_prefix(),
-            replacements: Vec::new(),
-        }
-    }
-
-    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Event<'a> {
-        match event {
-            Event::TaskListMarker(checked) => {
-                let placeholder =
-                    format!("{}-{}", self.placeholder_prefix, self.replacements.len());
-                self.replacements.push((placeholder.clone(), checked));
-                Event::Html(CowStr::from(format!(
-                    "<span class=\"{placeholder}\"></span>"
-                )))
-            }
-            _ => event,
-        }
-    }
-
-    fn allowed_classes(&self) -> Vec<String> {
-        self.replacements
-            .iter()
-            .map(|(placeholder, _)| placeholder.clone())
-            .collect()
-    }
-
-    fn apply_replacements(&self, mut safe_html: String) -> String {
-        for (placeholder, checked) in self.replacements.iter().rev() {
-            let placeholder_html = format!("<span class=\"{placeholder}\"></span>");
-            let marker = if *checked {
+fn rewrite_task_list_marker<'a>(event: Event<'a>, placeholders: &mut Placeholders) -> Event<'a> {
+    match event {
+        Event::TaskListMarker(checked) => {
+            let marker = if checked {
                 r#"<input class="task-list-marker" type="checkbox" checked disabled aria-label="Completed task">"#
             } else {
                 r#"<input class="task-list-marker" type="checkbox" disabled aria-label="Incomplete task">"#
             };
-            safe_html = safe_html.replace(&placeholder_html, marker);
+            let placeholder = placeholders.insert(Slot::TaskListMarker, marker);
+            Event::Html(CowStr::from(format!(
+                "<span class=\"{placeholder}\"></span>"
+            )))
         }
-
-        safe_html
+        _ => event,
     }
-}
-
-fn task_list_marker_placeholder_prefix() -> String {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
-
-    format!("hushmark-task-token-{nanos}-{}", std::process::id())
 }
 
 struct LocalImageResolver {
     base_dir: Option<PathBuf>,
-    placeholder_prefix: String,
-    replacements: Vec<(String, String)>,
 }
 
 impl LocalImageResolver {
     fn new(document_path: Option<&Path>) -> Self {
         Self {
             base_dir: document_path.and_then(canonical_document_dir),
-            placeholder_prefix: local_image_placeholder_prefix(),
-            replacements: Vec::new(),
         }
     }
 
-    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Event<'a> {
+    fn rewrite_event<'a>(&self, event: Event<'a>, placeholders: &mut Placeholders) -> Event<'a> {
         match event {
             Event::Start(Tag::Image {
                 link_type,
@@ -727,7 +509,7 @@ impl LocalImageResolver {
                 id,
             }) => {
                 let dest_url = self
-                    .rewrite_image_destination(&dest_url)
+                    .rewrite_image_destination(&dest_url, placeholders)
                     .map(CowStr::from)
                     .unwrap_or(dest_url);
 
@@ -742,31 +524,25 @@ impl LocalImageResolver {
         }
     }
 
-    fn rewrite_image_destination(&mut self, src: &str) -> Option<String> {
+    fn rewrite_image_destination(
+        &self,
+        src: &str,
+        placeholders: &mut Placeholders,
+    ) -> Option<String> {
         match local_image_data_uri(self.base_dir.as_deref(), src) {
             ImageResolution::Resolved(data_uri) => {
-                let placeholder =
-                    format!("{}/{}", self.placeholder_prefix, self.replacements.len());
-                self.replacements.push((placeholder.clone(), data_uri));
-                Some(placeholder)
+                Some(placeholders.insert(Slot::ImageSource, data_uri))
             }
             ImageResolution::RejectedLocal => Some(String::new()),
             ImageResolution::NotLocal => None,
         }
     }
 
-    fn apply_replacements(&self, mut safe_html: String) -> String {
-        for (placeholder, data_uri) in self.replacements.iter().rev() {
-            safe_html = safe_html.replace(
-                &format!("src=\"{placeholder}\""),
-                &format!("src=\"{data_uri}\""),
-            );
-        }
-
-        safe_html
-    }
-
-    fn rewrite_sanitized_html_image_sources(&mut self, safe_html: String) -> String {
+    fn rewrite_sanitized_html_image_sources(
+        &self,
+        safe_html: String,
+        placeholders: &mut Placeholders,
+    ) -> String {
         let mut rewritten = String::with_capacity(safe_html.len());
         let mut remaining = safe_html.as_str();
 
@@ -780,7 +556,7 @@ impl LocalImageResolver {
             };
 
             let (tag, after_tag) = after_start.split_at(img_end + 1);
-            rewritten.push_str(&self.rewrite_sanitized_img_tag(tag));
+            rewritten.push_str(&self.rewrite_sanitized_img_tag(tag, placeholders));
             remaining = after_tag;
         }
 
@@ -788,7 +564,7 @@ impl LocalImageResolver {
         rewritten
     }
 
-    fn rewrite_sanitized_img_tag(&mut self, tag: &str) -> String {
+    fn rewrite_sanitized_img_tag(&self, tag: &str, placeholders: &mut Placeholders) -> String {
         let Some(src_start) = tag.find("src=\"") else {
             return tag.to_string();
         };
@@ -800,7 +576,7 @@ impl LocalImageResolver {
         let value_end = value_start + value_end_offset;
         let src = &tag[value_start..value_end];
 
-        let Some(rewritten_src) = self.rewrite_image_destination(src) else {
+        let Some(rewritten_src) = self.rewrite_image_destination(src, placeholders) else {
             return tag.to_string();
         };
 
@@ -811,18 +587,6 @@ impl LocalImageResolver {
             &tag[value_end..]
         )
     }
-}
-
-fn local_image_placeholder_prefix() -> String {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or_default();
-
-    format!(
-        "https://hushmark.local/__local-image/{nanos}-{}",
-        std::process::id()
-    )
 }
 
 enum ImageResolution {
@@ -1153,7 +917,7 @@ mod tests {
         assert!(html.contains("<span class=\"math math-inline\">a &lt; b</span>"));
         assert!(html.contains("<span class=\"math math-display\">"));
         assert!(html.contains("E = mc^2 &lt; script"));
-        assert!(!html.contains("hushmark-math-token"));
+        assert!(!html.contains("hushmark-token"));
     }
 
     #[test]
@@ -1164,7 +928,7 @@ mod tests {
 
         assert!(html.contains("<pre><code class=\"mermaid-source\">"));
         assert!(html.contains("Start --&gt; \"&lt;Finish&gt;\""));
-        assert!(!html.contains("hushmark-mermaid-token"));
+        assert!(!html.contains("hushmark-token"));
     }
 
     #[test]
@@ -1197,7 +961,7 @@ mod tests {
         assert_eq!(html.matches("checked disabled").count(), 2);
         assert!(html.contains("aria-label=\"Incomplete task\""));
         assert!(html.contains("aria-label=\"Completed task\""));
-        assert!(!html.contains("hushmark-task-token"));
+        assert!(!html.contains("hushmark-token"));
     }
 
     #[test]
@@ -1249,7 +1013,7 @@ mod tests {
         assert!(html.contains("<h1 id=\"introduction\">Introduction</h1>"));
         assert!(!html.contains("<hr>"));
         assert!(!html.contains("title:"));
-        assert!(!html.contains("hushmark-front-matter-token"));
+        assert!(!html.contains("hushmark-token"));
     }
 
     #[test]
@@ -1265,7 +1029,7 @@ mod tests {
         assert!(html.contains("<td class=\"hushmark-align-center\">banana</td>"));
         assert!(html.contains("<td class=\"hushmark-align-right\">123</td>"));
         assert!(!html.contains("style="));
-        assert!(!html.contains("hushmark-align-token"));
+        assert!(!html.contains("hushmark-token"));
     }
 
     #[test]
@@ -1280,7 +1044,7 @@ mod tests {
         assert!(html.contains("<h4 id=\"four\">Four</h4>"));
         assert!(html.contains("<h5 id=\"five\">Five</h5>"));
         assert!(html.contains("<h6 id=\"six\">Six</h6>"));
-        assert!(!html.contains("hushmark-heading-token"));
+        assert!(!html.contains("hushmark-token"));
     }
 
     #[test]
@@ -1351,7 +1115,7 @@ mod tests {
         assert!(html.contains("<h2 id=\"install-update\">Install / Update</h2>"));
         assert!(!html.contains("alpha0"));
         assert!(!html.contains("alpha1"));
-        assert!(!html.contains("hushmark-heading-token"));
+        assert!(!html.contains("hushmark-token"));
     }
 
     #[test]
@@ -1380,7 +1144,7 @@ mod tests {
         assert_eq!(html.matches("class=\"hushmark-align-right\"").count(), 4);
         assert!(!html.contains("hushmark-align-center0"));
         assert!(!html.contains("hushmark-align-right1"));
-        assert!(!html.contains("hushmark-align-token"));
+        assert!(!html.contains("hushmark-token"));
     }
 
     #[test]
@@ -1414,7 +1178,7 @@ mod tests {
         assert!(html.contains("<td class=\"hushmark-align-center\">middle</td>"));
         assert!(html.contains("<td class=\"hushmark-align-right\">789</td>"));
         assert!(!html.contains("hushmark-align-center0"));
-        assert!(!html.contains("hushmark-heading-token"));
+        assert!(!html.contains("hushmark-token"));
     }
 
     #[test]
