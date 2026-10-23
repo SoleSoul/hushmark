@@ -12,6 +12,7 @@ This roadmap is not a contract. It is a short parking lot for likely next work a
 ## Near-Term Linux Support
 
 - Upgrade to a stable Tauri release containing Tao 0.36 or later, then validate native title-bar appearance and window controls on GNOME Wayland without adding a custom title bar. Checked 2026-10-23: stable Tauri 2.12.5 uses `tauri-runtime-wry` 2.12.3, which depends on Tao 0.37, so the upgrade is no longer blocked. It awaits an explicit decision because it changes window behavior on every platform.
+- After the Tauri upgrade, investigate server-side decorations on Linux/Wayland. Hushmark currently sets its own GTK header bar as the title bar, even with `GTK_CSD=0`. Under a compositor that draws title bars (owbox, KDE, labwc), it should let the compositor decorate the window, as a plain GTK window does. First determine whether this is the Tao bug the upgrade addresses; if not, track it as a separate Linux windowing issue.
 - Decide whether the WebKitGTK/NVIDIA DMABUF blank-window issue needs an app-level or package-level workaround before a public Linux release.
 - Keep the checked-in desktop entry and icon aligned with downstream Linux packaging, and verify Markdown MIME associations when packaging changes.
 - Validate file opening, Ctrl+O, drag/drop, document links, local images, external links, and navigation on Linux.
