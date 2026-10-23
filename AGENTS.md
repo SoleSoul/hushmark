@@ -31,6 +31,8 @@ The reader deliberately remains light on every platform. Do not infer or add a d
 
 Do not store project decisions in hidden agent/tool memory. Durable context belongs in tracked repository docs.
 
+Commit directly to `master` with a linear history: no merge commits and no pull requests unless explicitly requested. Commits are authored by the project owner; do not add `Co-Authored-By` or other agent attribution trailers to commit messages. Use a short imperative subject line, with a wrapped body when the reason is not obvious.
+
 Start here:
 
 - `docs/project-context.md`
