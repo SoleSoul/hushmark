@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet, VecDeque},
     ffi::OsString,
     fs,
@@ -156,14 +157,12 @@ fn render_document_with_document_path(source: &str, document_path: Option<&Path>
 
 fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path>) -> String {
     let mut placeholders = Placeholders::new();
-    let local_images = LocalImageResolver::new(document_path);
     let mut table_alignments = TableAlignmentRewriter::new();
     let mut heading_ids = HeadingIdRewriter::new(collect_heading_ids(markdown));
     let mut rendered = String::new();
 
     {
         let parser = Parser::new_ext(markdown, markdown_options()).flat_map(|event| {
-            let event = local_images.rewrite_event(event, &mut placeholders);
             let event = table_alignments.rewrite_event(event, &mut placeholders);
             let event = heading_ids.rewrite_event(event, &mut placeholders);
             let event = rewrite_task_list_marker(event, &mut placeholders);
@@ -173,17 +172,21 @@ fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path
         html::push_html(&mut rendered, parser);
     }
 
-    let safe_html = sanitize_rendered_html(&rendered, &placeholders);
-    let safe_html = local_images.rewrite_sanitized_html_image_sources(safe_html, &mut placeholders);
+    let safe_html = sanitize_rendered_html(&rendered, &placeholders, document_path);
     placeholders.apply(&safe_html)
 }
 
-fn sanitize_rendered_html(rendered: &str, placeholders: &Placeholders) -> String {
+fn sanitize_rendered_html(
+    rendered: &str,
+    placeholders: &Placeholders,
+    document_path: Option<&Path>,
+) -> String {
     let table_cell_classes = placeholders.allowed_attribute_values(&[Slot::TableCellClass]);
     let code_classes = placeholders.allowed_attribute_values(&[Slot::CodeLanguage]);
     let span_classes =
         placeholders.allowed_attribute_values(&[Slot::MathClass, Slot::TaskListMarker]);
     let heading_ids = placeholders.allowed_attribute_values(&[Slot::HeadingId]);
+    let image_base_dir = document_path.and_then(canonical_document_dir);
     let mut builder = Builder::default();
 
     builder.add_allowed_classes("th", &table_cell_classes);
@@ -194,6 +197,15 @@ fn sanitize_rendered_html(rendered: &str, placeholders: &Placeholders) -> String
     for tag in ["h1", "h2", "h3", "h4", "h5", "h6"] {
         builder.add_tag_attribute_values(tag, "id", &heading_ids);
     }
+
+    // Runs after the sanitizer's URL checks, so Markdown and raw HTML images
+    // both reach it only with a source that is already safe to keep.
+    builder.attribute_filter(
+        move |element, attribute, value| match (element, attribute) {
+            ("img", "src") => Some(image_source(image_base_dir.as_deref(), value)),
+            _ => Some(value.into()),
+        },
+    );
 
     builder.clean(rendered).to_string()
 }
@@ -489,103 +501,13 @@ fn rewrite_task_list_marker<'a>(event: Event<'a>, placeholders: &mut Placeholder
     }
 }
 
-struct LocalImageResolver {
-    base_dir: Option<PathBuf>,
-}
-
-impl LocalImageResolver {
-    fn new(document_path: Option<&Path>) -> Self {
-        Self {
-            base_dir: document_path.and_then(canonical_document_dir),
-        }
-    }
-
-    fn rewrite_event<'a>(&self, event: Event<'a>, placeholders: &mut Placeholders) -> Event<'a> {
-        match event {
-            Event::Start(Tag::Image {
-                link_type,
-                dest_url,
-                title,
-                id,
-            }) => {
-                let dest_url = self
-                    .rewrite_image_destination(&dest_url, placeholders)
-                    .map(CowStr::from)
-                    .unwrap_or(dest_url);
-
-                Event::Start(Tag::Image {
-                    link_type,
-                    dest_url,
-                    title,
-                    id,
-                })
-            }
-            _ => event,
-        }
-    }
-
-    fn rewrite_image_destination(
-        &self,
-        src: &str,
-        placeholders: &mut Placeholders,
-    ) -> Option<String> {
-        match local_image_data_uri(self.base_dir.as_deref(), src) {
-            ImageResolution::Resolved(data_uri) => {
-                Some(placeholders.insert(Slot::ImageSource, data_uri))
-            }
-            ImageResolution::RejectedLocal => Some(String::new()),
-            ImageResolution::NotLocal => None,
-        }
-    }
-
-    fn rewrite_sanitized_html_image_sources(
-        &self,
-        safe_html: String,
-        placeholders: &mut Placeholders,
-    ) -> String {
-        let mut rewritten = String::with_capacity(safe_html.len());
-        let mut remaining = safe_html.as_str();
-
-        while let Some(img_start) = remaining.find("<img") {
-            let (before, after_start) = remaining.split_at(img_start);
-            rewritten.push_str(before);
-
-            let Some(img_end) = after_start.find('>') else {
-                rewritten.push_str(after_start);
-                return rewritten;
-            };
-
-            let (tag, after_tag) = after_start.split_at(img_end + 1);
-            rewritten.push_str(&self.rewrite_sanitized_img_tag(tag, placeholders));
-            remaining = after_tag;
-        }
-
-        rewritten.push_str(remaining);
-        rewritten
-    }
-
-    fn rewrite_sanitized_img_tag(&self, tag: &str, placeholders: &mut Placeholders) -> String {
-        let Some(src_start) = tag.find("src=\"") else {
-            return tag.to_string();
-        };
-
-        let value_start = src_start + "src=\"".len();
-        let Some(value_end_offset) = tag[value_start..].find('"') else {
-            return tag.to_string();
-        };
-        let value_end = value_start + value_end_offset;
-        let src = &tag[value_start..value_end];
-
-        let Some(rewritten_src) = self.rewrite_image_destination(src, placeholders) else {
-            return tag.to_string();
-        };
-
-        format!(
-            "{}{}{}",
-            &tag[..value_start],
-            rewritten_src,
-            &tag[value_end..]
-        )
+/// Embeds safe local images as `data:` URLs, clears rejected local paths, and
+/// leaves remote images unchanged.
+fn image_source<'u>(base_dir: Option<&Path>, src: &'u str) -> Cow<'u, str> {
+    match local_image_data_uri(base_dir, src) {
+        ImageResolution::Resolved(data_uri) => Cow::Owned(data_uri),
+        ImageResolution::RejectedLocal => Cow::Borrowed(""),
+        ImageResolution::NotLocal => Cow::Borrowed(src),
     }
 }
 
@@ -1418,6 +1340,25 @@ mod tests {
         assert!(!html.contains("style="));
         assert!(!html.contains("<script>"));
         assert!(!html.contains("data:image/"));
+    }
+
+    #[test]
+    fn resolves_raw_html_image_paths_containing_escaped_characters() {
+        let fixture = TestFixture::new("raw-html-image-entities");
+        fs::write(fixture.path.join("a&b.png"), b"fake png").expect("write png");
+
+        let document_path = fixture.path.join("doc.md");
+        fs::write(
+            &document_path,
+            "<img src=\"a&amp;b.png\" alt=\"Raw\">\n\n![Markdown](a&b.png)",
+        )
+        .expect("write Markdown");
+
+        let document = load_markdown_file(document_path);
+        let html = document.html.expect("rendered HTML");
+
+        assert_eq!(html.matches("src=\"data:image/png;base64,").count(), 2);
+        assert!(!html.contains("a&amp;b.png"));
     }
 
     #[test]

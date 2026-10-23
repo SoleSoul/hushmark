@@ -2,9 +2,9 @@
 //!
 //! Hushmark sanitizes the complete rendered document, because raw author HTML
 //! can span many Markdown events. Markup that Hushmark itself adds (heading
-//! ids, table alignment classes, math spans, Mermaid fences, task markers, and
-//! embedded local images) would otherwise be removed by the sanitizer or could
-//! be forged by raw author HTML. Each such value is emitted as an unguessable
+//! ids, table alignment classes, math spans, Mermaid fences, and task markers)
+//! would otherwise be removed by the sanitizer or could be forged by raw author
+//! HTML. Each such value is emitted as an unguessable
 //! token that the sanitizer allows, and all tokens are swapped for their real
 //! markup in a single pass afterwards.
 
@@ -15,8 +15,6 @@ use std::{
 };
 
 pub(crate) const PLACEHOLDER_MARKER: &str = "hushmark-token-";
-
-const LOCAL_IMAGE_URL_PREFIX: &str = "https://hushmark.local/";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Slot {
@@ -30,8 +28,6 @@ pub(crate) enum Slot {
     MathClass,
     /// An empty `<span class="…"></span>` replaced by a task-list checkbox.
     TaskListMarker,
-    /// An image `src` URL replaced by an embedded `data:` URL.
-    ImageSource,
 }
 
 impl Slot {
@@ -42,7 +38,6 @@ impl Slot {
             Self::HeadingId | Self::TableCellClass | Self::MathClass => ("", ""),
             Self::CodeLanguage => ("language-", ""),
             Self::TaskListMarker => ("<span class=\"", "\"></span>"),
-            Self::ImageSource => (LOCAL_IMAGE_URL_PREFIX, ""),
         }
     }
 }
@@ -74,10 +69,7 @@ impl Placeholders {
             value: value.into(),
         });
 
-        match slot {
-            Slot::ImageSource => format!("{LOCAL_IMAGE_URL_PREFIX}{token}"),
-            _ => token,
-        }
+        token
     }
 
     /// Attribute values the sanitizer must allow for the given slots.
@@ -184,16 +176,15 @@ mod tests {
         let heading = placeholders.insert(Slot::HeadingId, "intro");
         let code = placeholders.insert(Slot::CodeLanguage, "mermaid-source");
         let marker = placeholders.insert(Slot::TaskListMarker, "<input disabled>");
-        let image = placeholders.insert(Slot::ImageSource, "data:image/png;base64,AA==");
         let html = format!(
             "<h1 id=\"{heading}\"></h1><code class=\"language-{code}\"></code>\
-             <span class=\"{marker}\"></span><img src=\"{image}\">"
+             <span class=\"{marker}\"></span>"
         );
 
         assert_eq!(
             placeholders.apply(&html),
             "<h1 id=\"intro\"></h1><code class=\"mermaid-source\"></code>\
-             <input disabled><img src=\"data:image/png;base64,AA==\">"
+             <input disabled>"
         );
     }
 
