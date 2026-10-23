@@ -485,8 +485,10 @@ fn query_version_translations(data: &[u8]) -> Vec<(u16, u16)> {
         )
     };
     words
-        .chunks_exact(2)
-        .map(|translation| (translation[0], translation[1]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|&[language, code_page]| (language, code_page))
         .collect()
 }
 
