@@ -45,6 +45,15 @@ struct StartupView {
     platform: &'static str,
     document: Option<LoadedDocument>,
     capabilities: PlatformCapabilities,
+    launch_check: bool,
+}
+
+/// Set by CI to launch the real app, report whether the first document
+/// rendered, and exit. It has no effect when unset.
+const LAUNCH_CHECK_ENV: &str = "HUSHMARK_LAUNCH_CHECK";
+
+fn launch_check_enabled() -> bool {
+    std::env::var_os(LAUNCH_CHECK_ENV).is_some()
 }
 
 #[tauri::command]
@@ -56,7 +65,20 @@ fn load_initial_view(window: tauri::Window) -> Result<StartupView, String> {
         platform: std::env::consts::OS,
         document: Some(document),
         capabilities: PlatformCapabilities::current(),
+        launch_check: launch_check_enabled(),
     })
+}
+
+#[tauri::command]
+fn finish_launch_check(passed: bool, report: String, app: tauri::AppHandle) -> Result<(), String> {
+    if !launch_check_enabled() {
+        return Err(format!("{LAUNCH_CHECK_ENV} is not set."));
+    }
+
+    let outcome = if passed { "passed" } else { "failed" };
+    println!("Hushmark launch check {outcome}: {report}");
+    app.exit(if passed { 0 } else { 1 });
+    Ok(())
 }
 
 #[tauri::command]
@@ -177,6 +199,7 @@ pub fn run() {
         load_initial_view,
         load_dropped_document,
         load_linked_document,
+        finish_launch_check,
         get_setup_status,
         toggle_install,
         toggle_open_with_support,
@@ -190,6 +213,7 @@ pub fn run() {
         load_initial_view,
         load_dropped_document,
         load_linked_document,
+        finish_launch_check,
         open_external_link
     ]);
 
@@ -198,6 +222,7 @@ pub fn run() {
         load_initial_view,
         load_dropped_document,
         load_linked_document,
+        finish_launch_check,
         open_external_link,
         macos::macos_frontend_ready,
         macos::print_macos_document,

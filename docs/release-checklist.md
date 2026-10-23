@@ -134,7 +134,7 @@ For an AUR update:
 
 ## Smoke Tests
 
-CI's browser tests cover the shared reader on every push: navigation and history, reading positions, zoom and layout shortcuts and Control+wheel, same-document and linked links, external and unsupported links, the file picker and drag and drop hand-off, printing hand-off, mathematics, Mermaid, local images, the disabled context menu, and the macOS frontend (Command shortcuts, menu commands and state, Finder open events). A release whose changes stay within that area needs no manual testing on each operating system.
+CI's browser tests cover the shared reader on every push: navigation and history, reading positions, zoom and layout shortcuts and Control+wheel, same-document and linked links, external and unsupported links, the file picker and drag and drop hand-off, printing hand-off, mathematics, Mermaid, local images, the disabled context menu, and the macOS frontend (Command shortcuts, menu commands and state, Finder open events). CI also launches the real app on Windows, macOS, and Linux and confirms it renders diagrams and mathematics from its bundled assets. A release whose changes stay within those areas needs no manual testing on each operating system.
 
 Smoke-test manually only where automation cannot reach:
 

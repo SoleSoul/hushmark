@@ -47,7 +47,7 @@ jobs:
         timeout-minutes: 10
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libxdo-dev libssl-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libxdo-dev libssl-dev xvfb
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -106,6 +106,31 @@ jobs:
       - name: Run browser tests
         timeout-minutes: 10
         run: npx playwright test ${{ matrix.browser_projects }}
+
+      # Launches the real app with real documents, catching startup, WebView,
+      # and asset-loading failures that the browser tests cannot see.
+      - name: Build the app
+        run: npm run tauri -- build --debug --no-bundle
+
+      - name: Launch the app
+        timeout-minutes: 3
+        shell: bash
+        env:
+          HUSHMARK_LAUNCH_CHECK: "1"
+        run: |
+          app=src-tauri/target/debug/hushmark
+          launcher=()
+          if [ "$RUNNER_OS" = Windows ]; then app="$app.exe"; fi
+          if [ "$RUNNER_OS" = Linux ]; then launcher=(xvfb-run -a); fi
+
+          check() {
+            "${launcher[@]}" "$app" "examples/$1" > launch.log 2>&1 || { cat launch.log; exit 1; }
+            cat launch.log
+            grep -Eq "launch check passed: .* [1-9][0-9]* $2" launch.log || { echo "Expected rendered $2 in $1."; exit 1; }
+          }
+
+          check mermaid-visual-inspection.md diagrams
+          check math-visual-inspection.md formulas
 
       - name: Upload browser test traces
         if: ${{ failure() }}

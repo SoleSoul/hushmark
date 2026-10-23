@@ -20,6 +20,7 @@ import {
 } from "./documentPresentation";
 import type { DocumentPositionRequest } from "./documentPresentation";
 import { createHomeView } from "./homeView";
+import { reportLaunchCheck } from "./launchCheck";
 import { classifyDocumentLink, findFragmentTarget } from "./links";
 import { NavigationHistory } from "./navigationHistory";
 import {
@@ -774,6 +775,10 @@ async function start(): Promise<void> {
       }
     } catch (error) {
       console.warn("failed to receive pending open-document events", error);
+    }
+
+    if (startupView.launchCheck) {
+      void reportLaunchCheck(app);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

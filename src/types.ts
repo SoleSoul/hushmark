@@ -53,6 +53,7 @@ export type StartupView = {
   platform: string;
   document: LoadedDocument | null;
   capabilities: PlatformCapabilities;
+  launchCheck: boolean;
 };
 
 export type NavigationView =
