@@ -1164,6 +1164,172 @@ mod tests {
         assert!(!html.contains("javascript:"));
     }
 
+    /// Known HTML injection and mutation-XSS vectors, including the shapes of
+    /// published ammonia advisories, so a dependency or configuration change
+    /// that reopens one fails here regardless of the sanitizer version.
+    const INJECTION_VECTORS: &[&str] = &[
+        "<svg><animate onbegin=alert(1) attributeName=x dur=1s>",
+        "<svg><a><animate attributeName=href values=javascript:alert(1) /><text x=20 y=20>Click</text></a></svg>",
+        "<svg><set attributeName=onmouseover to=alert(1) /></svg>",
+        "<svg><a xlink:href=\"javascript:alert(1)\"><text>x</text></a></svg>",
+        "<math><annotation-xml encoding=\"text/html\"><img src=x onerror=alert(1)></annotation-xml></math>",
+        "<math><mtext><table><mglyph><style><img src=x onerror=alert(1)>",
+        "<math><mi xlink:href=\"javascript:alert(1)\">x</mi></math>",
+        "<p style=\"background:url(javascript:alert(1))\">x</p>",
+        "<p style=\"background:URL('https://tracker.example/x')\">x</p>",
+        "<style>@import 'https://tracker.example/x.css';</style>",
+        "<iframe srcdoc=\"<script>alert(1)</script>\"></iframe>",
+        "<object data=\"data:text/html,<script>alert(1)</script>\"></object>",
+        "<embed src=\"javascript:alert(1)\">",
+        "<form action=\"https://example.com\"><button formaction=\"javascript:alert(1)\">x</button></form>",
+        "<a href=\"jav&#x61;script:alert(1)\">x</a>",
+        "<a href=\"  JaVaScRiPt:alert(1)\">x</a>",
+        "<a href=\"java\tscript:alert(1)\">x</a>",
+        "<a href=\"vbscript:msgbox(1)\">x</a>",
+        "<a href=\"data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==\">x</a>",
+        "<details open ontoggle=alert(1)>x</details>",
+        "<base href=\"https://evil.example/\">",
+        "<meta http-equiv=\"refresh\" content=\"0;url=javascript:alert(1)\">",
+        "<link rel=stylesheet href=\"https://tracker.example/x.css\">",
+        "<template><script>alert(1)</script></template>",
+        "<noscript><p title=\"</noscript><img src=x onerror=alert(1)>\"></noscript>",
+        "<table><td><style><img src=x onerror=alert(1)></style></td></table>",
+        "<img src=x onerror=alert(1)//",
+        "<div title=\"x\" onmouseover=\"alert(1)\">x</div>",
+        "<input autofocus onfocus=alert(1)>",
+        "[x](javascript:alert(1) \"title\")",
+        "[x][ref]\n\n[ref]: javascript:alert(1)",
+        "<javascript:alert(1)>",
+        "![x](javascript:alert(1))",
+    ];
+
+    const FORBIDDEN_TAGS: &[&str] = &[
+        "script",
+        "svg",
+        "math",
+        "animate",
+        "set",
+        "annotation-xml",
+        "style",
+        "iframe",
+        "object",
+        "embed",
+        "form",
+        "button",
+        "input",
+        "base",
+        "meta",
+        "link",
+        "template",
+        "noscript",
+        "mglyph",
+    ];
+
+    const FORBIDDEN_ATTRIBUTES: &[&str] = &[
+        "style",
+        "srcdoc",
+        "formaction",
+        "action",
+        "xlink:href",
+        "http-equiv",
+    ];
+
+    const URL_ATTRIBUTES: &[&str] = &["href", "src", "data", "cite", "poster", "background"];
+
+    /// Splits sanitized, serialized HTML into (tag name, attributes) pairs,
+    /// keeping quoted attribute values intact so text inside them is not
+    /// mistaken for markup.
+    fn parse_tags(html: &str) -> Vec<(String, Vec<(String, String)>)> {
+        let mut tags = Vec::new();
+        let mut rest = html;
+
+        while let Some(start) = rest.find('<') {
+            rest = &rest[start + 1..];
+            if rest.starts_with('/') || rest.starts_with('!') {
+                continue;
+            }
+
+            let name_end = rest
+                .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
+                .unwrap_or(rest.len());
+            let name = rest[..name_end].to_ascii_lowercase();
+            rest = &rest[name_end..];
+
+            let mut attributes = Vec::new();
+            loop {
+                rest = rest.trim_start_matches(|c: char| c.is_whitespace() || c == '/');
+                if rest.is_empty() || rest.starts_with('>') {
+                    break;
+                }
+
+                let attribute_end = rest
+                    .find(|c: char| c == '=' || c == '>' || c.is_whitespace())
+                    .unwrap_or(rest.len());
+                let attribute = rest[..attribute_end].to_ascii_lowercase();
+                rest = &rest[attribute_end..];
+
+                let mut value = String::new();
+                if let Some(after_equals) = rest.strip_prefix("=\"") {
+                    let value_end = after_equals.find('"').unwrap_or(after_equals.len());
+                    value = after_equals[..value_end].to_string();
+                    rest = &after_equals[(value_end + 1).min(after_equals.len())..];
+                }
+                attributes.push((attribute, value));
+            }
+
+            tags.push((name, attributes));
+        }
+
+        tags
+    }
+
+    #[test]
+    fn known_injection_vectors_are_neutralized() {
+        for vector in INJECTION_VECTORS {
+            let html = render_markdown_to_safe_html(vector);
+
+            for (tag, attributes) in parse_tags(&html) {
+                assert!(
+                    !FORBIDDEN_TAGS.contains(&tag.as_str()),
+                    "{vector:?} kept <{tag}> in {html:?}"
+                );
+
+                for (attribute, value) in attributes {
+                    assert!(
+                        !attribute.starts_with("on"),
+                        "{vector:?} kept event handler {attribute} in {html:?}"
+                    );
+                    assert!(
+                        !FORBIDDEN_ATTRIBUTES.contains(&attribute.as_str()),
+                        "{vector:?} kept {attribute} in {html:?}"
+                    );
+
+                    if URL_ATTRIBUTES.contains(&attribute.as_str()) {
+                        let url: String = value
+                            .to_ascii_lowercase()
+                            .chars()
+                            .filter(|c| !c.is_whitespace())
+                            .collect();
+                        assert!(
+                            !url.starts_with("javascript:")
+                                && !url.starts_with("vbscript:")
+                                && !url.starts_with("data:text"),
+                            "{vector:?} kept unsafe {attribute}={value:?} in {html:?}"
+                        );
+                    }
+                }
+            }
+
+            // Mutation XSS shows up as output that changes when parsed and
+            // sanitized again; sanitized output must be stable.
+            assert_eq!(
+                ammonia::clean(&html),
+                html,
+                "{vector:?} produced unstable output"
+            );
+        }
+    }
+
     #[test]
     fn resolves_relative_markdown_image_paths_against_document_directory() {
         let fixture = TestFixture::new("relative-image");
