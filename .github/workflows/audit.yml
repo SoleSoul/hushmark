@@ -24,6 +24,7 @@ jobs:
   npm:
     name: npm advisories
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Check out repository
@@ -41,6 +42,7 @@ jobs:
   cargo:
     name: Rust advisories
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Check out repository
