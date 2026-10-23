@@ -1,0 +1,56 @@
+name: Dependency audit
+
+# Hushmark renders untrusted documents, so newly published advisories in its
+# sanitizer, renderers, or WebView stack matter even when no code changes.
+on:
+  schedule:
+    - cron: "23 5 * * 1"
+  push:
+    paths:
+      - package-lock.json
+      - src-tauri/Cargo.lock
+      - .github/workflows/audit.yml
+  pull_request:
+    paths:
+      - package-lock.json
+      - src-tauri/Cargo.lock
+      - .github/workflows/audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    name: npm advisories
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      # Low and moderate advisories are reported in the log without failing.
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=high
+
+  cargo:
+    name: Rust advisories
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      # Vulnerabilities fail the job; unmaintained-crate warnings are reported only.
+      - name: Audit Rust dependencies
+        run: cargo audit --file src-tauri/Cargo.lock
