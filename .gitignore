@@ -7,3 +7,6 @@ local-artifacts/
 release-history/
 *.log
 .DS_Store
+e2e/fixtures/
+test-results/
+playwright-report/

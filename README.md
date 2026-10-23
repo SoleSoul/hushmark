@@ -79,6 +79,7 @@ Useful commands:
 ```sh
 npm run build
 npm test
+npm run test:e2e
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run tauri -- build

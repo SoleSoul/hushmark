@@ -23,8 +23,19 @@ jobs:
       fail-fast: false
       matrix:
         # Each platform compiles its own gated shell code (setup.rs on
-        # Windows, macos.rs on macOS), so lint and test all three.
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Windows, macos.rs on macOS), so lint and test all three. Browser
+        # tests use the engine closest to each platform's WebView: Edge for
+        # WebView2, WebKit for WKWebView, and both on Linux.
+        include:
+          - os: ubuntu-latest
+            browsers: chromium webkit
+            browser_projects: --project chromium --project webkit
+          - os: windows-latest
+            browsers: ""
+            browser_projects: --project edge
+          - os: macos-latest
+            browsers: webkit
+            browser_projects: --project webkit
 
     steps:
       - name: Check out repository
@@ -67,6 +78,10 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         run: npm test
 
+      - name: Type-check browser tests
+        if: ${{ runner.os == 'Linux' }}
+        run: npx tsc --noEmit -p e2e/tsconfig.json
+
       - name: Check Rust formatting
         if: ${{ runner.os == 'Linux' }}
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
@@ -76,3 +91,22 @@ jobs:
 
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --quiet
+
+      - name: Export rendered examples for browser tests
+        run: npm run test:e2e:fixtures
+
+      # Edge is preinstalled on Windows runners.
+      - name: Install browser engines
+        if: ${{ matrix.browsers != '' }}
+        run: npx playwright install --with-deps ${{ matrix.browsers }}
+
+      - name: Run browser tests
+        run: npx playwright test ${{ matrix.browser_projects }}
+
+      - name: Upload browser test traces
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: browser-test-results-${{ matrix.os }}
+          path: test-results/
+          if-no-files-found: ignore

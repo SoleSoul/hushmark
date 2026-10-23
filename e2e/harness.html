@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Hushmark browser test harness</title>
+    <script>
+      // Test-only stand-in for the Tauri IPC bridge. It serves documents that
+      // the Rust renderer exported to e2e/fixtures, records every command, and
+      // lets tests emit backend events such as macOS menu commands.
+      //
+      // Query parameters: doc (example path), platform (linux, windows, macos).
+      (() => {
+        const params = new URLSearchParams(location.search);
+        const platform = params.get("platform") ?? "linux";
+        const root = "/examples";
+        const callbacks = new Map();
+        const listeners = new Map();
+        let nextCallbackId = 1;
+        let fixtureNames = null;
+
+        const harness = {
+          calls: [],
+          dialogResult: null,
+          pendingOpenDocuments: window.__initialPendingOpenDocuments ?? [],
+          emit(event, payload) {
+            for (const handlerId of listeners.get(event) ?? []) {
+              callbacks.get(handlerId)?.({ event, id: handlerId, payload });
+            }
+          },
+          commands(name) {
+            return this.calls.filter(([command]) => command === name).map(([, args]) => args);
+          },
+        };
+        window.__hushmark = harness;
+
+        async function loadDocument(path) {
+          fixtureNames ??= await (await fetch("/e2e/fixtures/index.json")).json();
+          const name = path.slice(root.length + 1);
+          const fileName = path.split("/").pop();
+          if (!fixtureNames.includes(name)) {
+            return { path, navigationRoot: root, fileName, html: null, error: `Hushmark could not find ${path}.` };
+          }
+          const html = await (await fetch(`/e2e/fixtures/${name}.html`)).text();
+          return { path, navigationRoot: root, fileName, html, error: null };
+        }
+
+        const commands = {
+          async load_initial_view() {
+            const doc = params.get("doc");
+            return {
+              platform,
+              capabilities: { setup: false },
+              document: doc
+                ? await loadDocument(`${root}/${doc}`)
+                : { path: null, navigationRoot: null, fileName: null, html: null, error: null },
+            };
+          },
+          load_dropped_document: ({ path }) => loadDocument(path),
+          async load_linked_document({ currentPath, href }) {
+            const [target, fragment] = href.split("#");
+            const resolved = new URL(decodeURIComponent(target), `file://${currentPath}`).pathname;
+            return { document: await loadDocument(resolved), fragment: fragment ? `#${fragment}` : null };
+          },
+          "plugin:dialog|open": () => harness.dialogResult,
+          "plugin:event|listen": ({ event, handler }) => {
+            listeners.set(event, [...(listeners.get(event) ?? []), handler]);
+            return handler;
+          },
+          macos_frontend_ready: () => harness.pendingOpenDocuments.splice(0),
+        };
+
+        window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
+        window.__TAURI_INTERNALS__ = {
+          metadata: {
+            currentWindow: { label: "main" },
+            currentWebview: { windowLabel: "main", label: "main" },
+          },
+          transformCallback(callback) {
+            const id = nextCallbackId++;
+            callbacks.set(id, callback);
+            return id;
+          },
+          unregisterCallback(id) {
+            callbacks.delete(id);
+          },
+          async invoke(command, args) {
+            harness.calls.push([command, args]);
+            const handler = commands[command];
+            return handler ? handler(args ?? {}) : null;
+          },
+        };
+      })();
+    </script>
+  </head>
+  <body>
+    <main id="app"></main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

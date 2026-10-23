@@ -30,6 +30,7 @@ PowerShell:
 ```powershell
 npm run build
 npm test
+npm run test:e2e
 Push-Location .\src-tauri; cargo fmt; cargo test --quiet; Pop-Location
 npm run tauri -- build
 git diff --check
@@ -40,6 +41,7 @@ Bash:
 ```bash
 npm run build
 npm test
+npm run test:e2e
 (cd src-tauri && cargo fmt && cargo test --quiet)
 npm run tauri -- build
 git diff --check
@@ -131,6 +133,17 @@ For an AUR update:
 9. Check `https://aur.archlinux.org/packages/hushmark` shows the new version.
 
 ## Smoke Tests
+
+CI's browser tests cover the shared reader on every push: navigation and history, reading positions, zoom and layout shortcuts and Control+wheel, same-document and linked links, external and unsupported links, the file picker and drag and drop hand-off, printing hand-off, mathematics, Mermaid, local images, the disabled context menu, and the macOS frontend (Command shortcuts, menu commands and state, Finder open events). A release whose changes stay within that area needs no manual testing on each operating system.
+
+Smoke-test manually only where automation cannot reach:
+
+- Windows setup, Open With, right-click, and uninstall: when `src-tauri/src/setup.rs` or Windows identity changes.
+- macOS menus, Finder, Dock, lifecycle, and Gatekeeper: when `src-tauri/src/macos.rs`, `src-tauri/tauri.macos.conf.json`, or `src-tauri/Info.macos.plist` changes, using `docs/macos-support.md`.
+- Native dialogs, print preview, window chrome, and startup on each platform: when Tauri, its plugins, or window configuration change. Linux can be checked locally; the release workflow's builds must at least succeed on Windows and macOS.
+- Visual typography and layout: when `src/styles.css` or rendering markup changes, by viewing the visual-inspection examples.
+
+The full manual list below remains the reference when those areas change:
 
 - Run `src-tauri\target\release\hushmark.exe examples\markdown-visual-inspection.md`.
 - Open with no arguments and confirm the Home/Help contents page.

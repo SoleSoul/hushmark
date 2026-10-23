@@ -797,14 +797,14 @@ fn is_markdown_path(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, fs};
+    use std::{env, fs, path::Path};
 
     use pulldown_cmark::Options;
 
     use super::{
-        load_dropped_markdown_file, load_initial_document_from_arg, load_linked_markdown_file,
-        load_markdown_file, markdown_options, render_document_to_safe_html,
-        render_markdown_to_safe_html,
+        is_markdown_path, load_dropped_markdown_file, load_initial_document_from_arg,
+        load_linked_markdown_file, load_markdown_file, markdown_options,
+        render_document_to_safe_html, render_markdown_to_safe_html,
     };
 
     #[test]
@@ -1787,6 +1787,50 @@ mod tests {
             assert!(linked.document.html.is_none(), "{href}");
             assert!(linked.document.error.is_some(), "{href}");
         }
+    }
+
+    /// Writes every example document as rendered and sanitized by Rust into
+    /// `e2e/fixtures`, so the browser tests exercise real reader output.
+    #[test]
+    #[ignore = "run by `npm run test:e2e`"]
+    fn export_rendered_examples_for_browser_tests() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let examples = root.join("examples");
+        let output = root.join("e2e").join("fixtures");
+        let _ = fs::remove_dir_all(&output);
+
+        let mut pending = vec![examples.clone()];
+        let mut names = Vec::new();
+        while let Some(dir) = pending.pop() {
+            for entry in fs::read_dir(dir).expect("read examples directory") {
+                let path = entry.expect("read examples entry").path();
+                if path.is_dir() {
+                    pending.push(path);
+                } else if is_markdown_path(&path) {
+                    let name = path
+                        .strip_prefix(&examples)
+                        .expect("example path")
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    let html = load_markdown_file(path.clone())
+                        .html
+                        .unwrap_or_else(|| panic!("render {name}"));
+                    let target = output.join(format!("{name}.html"));
+                    fs::create_dir_all(target.parent().expect("fixture directory"))
+                        .expect("create fixture directory");
+                    fs::write(target, html).expect("write fixture");
+                    names.push(name);
+                }
+            }
+        }
+
+        names.sort();
+        let index = names
+            .iter()
+            .map(|name| format!("{name:?}"))
+            .collect::<Vec<_>>()
+            .join(",");
+        fs::write(output.join("index.json"), format!("[{index}]")).expect("write index");
     }
 
     struct TestFixture {

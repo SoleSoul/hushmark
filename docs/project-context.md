@@ -84,7 +84,8 @@ See `docs/reader-design.md` for the focused design note.
 
 ## Known Limitations
 
-- Frontend unit tests (Vitest, `npm test`) cover pure logic such as navigation history, link classification, shortcuts, and view preferences. DOM rendering, reading-position restoration, and platform integration still rely on manual smoke testing.
+- Frontend unit tests (Vitest, `npm test`) cover pure logic such as navigation history, link classification, shortcuts, and view preferences.
+- Browser tests (Playwright, `npm run test:e2e`, in `e2e/`) run the real frontend against a fake Tauri backend that serves example documents exported by the Rust renderer. They cover navigation, reading-position restoration, zoom and layout, links, the file picker, drag and drop, printing, mathematics, Mermaid, images, and the macOS frontend shell (shortcuts, menu commands, Finder open events, menu state). CI runs them in Edge on Windows, WebKit on macOS, and Chromium and WebKit on Linux. They do not exercise the Rust shell, native dialogs, menus, window chrome, or OS integration, which still need manual smoke tests when touched; see `docs/release-checklist.md`.
 - Markdown support is intentionally limited; Hushmark is not full GitHub-Flavored Markdown. See `docs/markdown-support.md`.
 - Windows default-app assignment remains user-controlled. Hushmark registers itself as a candidate for Open With, but the setup page does not try to guide or automate default-app selection.
 - Linux packages should own installation, updates, desktop integration, icons, and MIME registration. See `docs/linux-support.md`.
