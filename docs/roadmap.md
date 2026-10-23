@@ -62,6 +62,10 @@ These came out of the October 2026 quality review. Each needs an explicit produc
 - **Mermaid 12.** Two low-severity advisories remain in the KaTeX copy bundled by Mermaid 11. Mermaid 12 resolves them but is a major upgrade; verify every diagram in `examples/mermaid-visual-inspection.md` at several zoom levels and in print before accepting it.
 - **Tauri 2.12.** See Near-Term Linux Support. Smoke-test Windows setup, macOS menus and Finder events, and Linux windowing after upgrading.
 
+### Robustness
+
+- **Deeply nested documents.** Sanitizing is quadratic in HTML nesting depth (measured 2026-10-23: 10,000 nested blockquotes take 0.3 seconds, 100,000 take 31 seconds; nested raw `<div>` elements behave the same). The cost is in the sanitizer's HTML parser, not in Hushmark code. Options: cap nesting depth before sanitizing, as browsers cap DOM depth; make the document-loading commands asynchronous so rendering runs off the main thread and the window stays responsive; or both. Either changes behavior for pathological files only.
+
 ### Presentation and distribution
 
 - **README.** The screenshot predates current features and shows the README itself; the README also leads with packaging details rather than what Hushmark is for. Consider a current screenshot of a document with mathematics, a diagram, and a table.

@@ -89,6 +89,7 @@ See `docs/reader-design.md` for the focused design note.
 - Windows default-app assignment remains user-controlled. Hushmark registers itself as a candidate for Open With, but the setup page does not try to guide or automate default-app selection.
 - Linux packages should own installation, updates, desktop integration, icons, and MIME registration. See `docs/linux-support.md`.
 - The macOS release DMG is unsigned, so Gatekeeper may require users to approve its first launch manually. Developer ID signing and notarization remain a possible future improvement.
+- Sanitizing extremely deep HTML nesting is quadratic inside the sanitizer's HTML parser: about 100,000 nested blockquotes or raw `<div>` elements (a crafted file near 100 KB) take roughly 30 seconds to render. Realistic documents are unaffected, and rendering does not crash at any tested depth. Possible mitigations are tracked in `docs/roadmap.md`.
 - Same-document fragment history currently re-renders during popstate restoration. This is acceptable while the reader has little transient DOM-only state.
 - Document zoom and layout intentionally reset to Page at 100% on every launch so Hushmark always opens with its paper-like reading baseline.
 - The reader deliberately remains light when the operating system uses a dark appearance; dark mode is not accepted until it has a shared reader design.

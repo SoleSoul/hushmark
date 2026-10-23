@@ -1330,6 +1330,52 @@ mod tests {
         }
     }
 
+    /// Release builds abort on panic, so a document that makes rendering panic
+    /// would close Hushmark. Depths stay moderate because sanitizing deeply
+    /// nested HTML is quadratic (see the roadmap); this guards crashes, not speed.
+    #[test]
+    fn pathological_documents_render_without_panicking() {
+        const DEPTH: usize = 2_000;
+        let documents = [
+            ">".repeat(DEPTH) + " deep quote",
+            (0..200)
+                .map(|level| format!("{}- item\n", "  ".repeat(level)))
+                .collect(),
+            "<div>".repeat(DEPTH) + "unclosed",
+            "</div>".repeat(DEPTH) + "unopened",
+            "*a ".repeat(DEPTH) + &"*".repeat(DEPTH),
+            "[".repeat(DEPTH) + "x" + &"](u)".repeat(DEPTH),
+            "$".repeat(DEPTH),
+            "`".repeat(DEPTH),
+            format!(
+                "|{}\n|{}\n|{}\n",
+                "a|".repeat(DEPTH),
+                "-|".repeat(DEPTH),
+                "b|".repeat(DEPTH)
+            ),
+            format!(
+                "---\na: {}{}\n---\nbody",
+                "[".repeat(DEPTH),
+                "]".repeat(DEPTH)
+            ),
+            format!(
+                "---\n{}leaf: 1\n---\nbody",
+                (0..200)
+                    .map(|level| format!("{}k{level}:\n", "  ".repeat(level)))
+                    .collect::<String>()
+            ),
+            "---\n: : :\n\t- [\n---\nbody".to_string(),
+            "# ".repeat(DEPTH),
+            "```mermaid\n".to_string() + &"graph TD;".repeat(DEPTH),
+            "\0\u{feff}\r\n\u{202e}# heading\r\n- [x] \u{1F600}".to_string(),
+        ];
+
+        for document in documents {
+            render_markdown_to_safe_html(&document);
+            render_document_to_safe_html(&document);
+        }
+    }
+
     #[test]
     fn resolves_relative_markdown_image_paths_against_document_directory() {
         let fixture = TestFixture::new("relative-image");
