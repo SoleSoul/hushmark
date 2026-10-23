@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Open large Markdown documents much faster. Rendering time no longer grows sharply with the number of headings, formulas, table cells, and task-list items.
+
 ## 0.3.0
 
 Native macOS support milestone.
