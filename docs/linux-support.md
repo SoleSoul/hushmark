@@ -10,9 +10,9 @@ Installation, updates, desktop integration, icons, and MIME registration belong 
 
 ## Wayland Window Decorations
 
-Hushmark's current Tauri dependency line uses Tao 0.34 on Linux. Its custom Wayland client-side decorations can look inconsistent with the GNOME color scheme, and title-bar controls may not receive pointer input. Hushmark's initially hidden window may make the input problem more visible, but changing Linux startup behavior would be a temporary workaround rather than the correct fix.
+Before Tauri 2.12, Hushmark used Tao 0.34 on Linux, whose custom Wayland client-side decorations replaced the compositor's title bar with a GTK header bar, even with `GTK_CSD=0`. They could look inconsistent with the GNOME color scheme, title-bar controls might not receive pointer input, and the header bar showed only the application name.
 
-Tao 0.36 restores GTK's normal decoration handling and fixes the related Wayland title-bar input bugs. Upgrade Hushmark when a stable Tauri release consumes Tao 0.36 or later, then validate GNOME Wayland title appearance, minimize/maximize/close input, startup visibility, and Windows window behavior. Do not replace the native title bar with an HTML implementation for this issue.
+Hushmark now uses Tauri 2.12 with Tao 0.37, which restores GTK's normal decoration handling. Verified 2026-10-23 on owbox (Wayland, server-side decorations): the compositor draws the title bar, and it shows the open document's name. Still to validate: GNOME Wayland, where GTK draws client-side decorations, for title appearance, minimize/maximize/close input, and startup visibility. Do not replace the native title bar with an HTML implementation.
 
 ## WebKitGTK Renderer Workaround
 

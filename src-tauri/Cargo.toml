@@ -20,8 +20,8 @@ pulldown-cmark = "0.13"
 serde = { version = "1", features = ["derive"] }
 serde_yaml_ng = "0.10"
 tauri = { version = "2", features = [] }
-tauri-plugin-dialog = "=2.6.0"
-tauri-plugin-opener = "2.5.4"
+tauri-plugin-dialog = "=2.8.3"
+tauri-plugin-opener = "2.7.2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_UI_Shell"] }
