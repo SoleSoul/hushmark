@@ -10,7 +10,7 @@ The product identity is centralized in:
 
 - Rust: `src-tauri/src/identity.rs`
 - Frontend: `src/product.ts`
-- Version metadata: `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`
+- Version metadata: `package.json` (read directly by `src-tauri/tauri.conf.json`) and `src-tauri/Cargo.toml`, set together with `node scripts/version.mjs <version>`
 
 Current values:
 

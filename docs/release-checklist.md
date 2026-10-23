@@ -60,7 +60,7 @@ GitHub Actions uses the same Universal build command without signing credentials
 
 Use this sequence for a public release:
 
-1. Update version metadata and move `CHANGELOG.md` notes from `Unreleased` to the new version.
+1. Set the version with `node scripts/version.mjs <version>` and move `CHANGELOG.md` notes from `Unreleased` to the new version.
 2. Run the relevant checks.
 3. Commit the release change.
 4. Push the release commit to `master` and confirm `origin/master` points to it.
