@@ -70,12 +70,27 @@ function isScrolledTo(page: Page, selector: string): Promise<boolean> {
   });
 }
 
-/** Scrolls so the element sits at a fixed offset from the top of the viewport. */
-async function scrollElementTo(page: Page, selector: string, offset: number): Promise<void> {
+// Reading positions are restored proportionally within the text, so engines
+// that lay text out at fractional pixels land within a few pixels of the
+// original position. A lost position moves by hundreds of pixels.
+const POSITION_TOLERANCE = 4;
+
+/**
+ * Scrolls so the element sits near a fixed offset from the top of the
+ * viewport, and returns its actual offset.
+ */
+async function scrollElementTo(page: Page, selector: string, offset: number): Promise<number> {
   await page.locator(selector).first().evaluate((element, top) => {
     window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY - top);
   }, offset);
-  await expect.poll(() => topOf(page, selector)).toBe(offset);
+  await expect.poll(async () => Math.abs((await topOf(page, selector)) - offset)).toBeLessThanOrEqual(1);
+  return topOf(page, selector);
+}
+
+async function expectElementNear(page: Page, selector: string, top: number): Promise<void> {
+  await expect
+    .poll(async () => Math.abs((await topOf(page, selector)) - top))
+    .toBeLessThanOrEqual(POSITION_TOLERANCE);
 }
 
 test.describe("reader", () => {
@@ -126,7 +141,9 @@ test.describe("reader", () => {
     await expect.poll(() => isScrolledTo(page, "#tables")).toBe(true);
 
     await page.keyboard.press("Alt+ArrowLeft");
-    await expect.poll(() => page.evaluate(() => Math.round(window.scrollY))).toBe(scrollBefore);
+    await expect
+      .poll(async () => Math.abs((await page.evaluate(() => window.scrollY)) - scrollBefore))
+      .toBeLessThanOrEqual(POSITION_TOLERANCE);
   });
 
   test("shows a quiet message for a missing linked document", async ({ page }) => {
@@ -146,7 +163,7 @@ test.describe("reader", () => {
 
   test("Home keeps the reading position for Back", async ({ page }) => {
     await open(page, { doc: "math-visual-inspection.md" });
-    await scrollElementTo(page, "#display-mathematics", 120);
+    const start = await scrollElementTo(page, "#display-mathematics", 120);
 
     await page.keyboard.press("Control+h");
     await expect(home(page)).toBeVisible();
@@ -154,12 +171,12 @@ test.describe("reader", () => {
 
     await page.keyboard.press("Alt+ArrowLeft");
     await expect(article(page)).toBeVisible();
-    await expect.poll(() => topOf(page, "#display-mathematics")).toBe(120);
+    await expectElementNear(page, "#display-mathematics", start);
   });
 
   test("zoom and layout commands keep the reading position", async ({ page }) => {
     await open(page, { doc: "math-visual-inspection.md" });
-    await scrollElementTo(page, "#display-mathematics", 120);
+    const start = await scrollElementTo(page, "#display-mathematics", 120);
 
     await page.keyboard.press("Control+=");
     await page.keyboard.press("Control+=");
@@ -177,7 +194,7 @@ test.describe("reader", () => {
 
     await page.keyboard.press("Control+l");
     await expect.poll(() => layout(page)).toBe("page");
-    await expect.poll(() => topOf(page, "#display-mathematics")).toBe(120);
+    await expectElementNear(page, "#display-mathematics", start);
   });
 
   test("Control and the mouse wheel zoom in steps", async ({ page }) => {
