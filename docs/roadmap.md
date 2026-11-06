@@ -45,8 +45,10 @@ These came out of the October 2026 quality review. Each needs an explicit produc
 
 ### Reading behavior
 
-- **Reload.** F5 is WebView behavior, not a Hushmark command: it restarts the frontend, which reloads the document Hushmark was launched with, losing Back/Forward history and returning linked or Ctrl+O documents to the launch file or Home. Decide whether to add a deliberate Reload that re-reads the current file while keeping its reading position and history, and whether to list it on the Help page. Automatic reload when the file changes on disk is a separate, optional idea.
-- **Find in page.** Ctrl+F comes from the WebView rather than Hushmark. It is expected to work in WebView2 on Windows but not in WebKitGTK or WKWebView; verify each platform, then decide whether to list it on Help only where it works or to provide a minimal find overlay everywhere.
+A November 2026 comparison with zathura-markdown (a Markdown plugin for the zathura document viewer) found nothing to adopt from its rendering, which is weaker than Hushmark's, but showed that even a deliberately minimal reader ships reload, find, and a heading outline, and presents them without persistent chrome. That supports deciding Reload and Find in page below, and the table-of-contents view under Later Ideas, rather than leaving reload and find to the WebView.
+
+- **Reload.** F5 is WebView behavior, not a Hushmark command: it restarts the frontend, which reloads the document Hushmark was launched with, losing Back/Forward history and returning linked or Ctrl+O documents to the launch file or Home. Decide whether to add a deliberate Reload that re-reads the current file while keeping its reading position and history, and whether to list it on the Help page. Automatic reload when the file changes on disk is a separate, optional idea; zathura does it by default and keeps the reader's place, which suits documents being written or generated alongside the reader. Either form can restore the existing semantic reading position (`docs/document-view.md`) after the re-render, as already happens across zoom and layout reflow, though edits above the reading line may shift the structural bookmark and need a fallback.
+- **Find in page.** Ctrl+F comes from the WebView rather than Hushmark. It is expected to work in WebView2 on Windows but not in WebKitGTK or WKWebView; verify each platform, then decide whether to list it on Help only where it works or to provide a minimal find overlay everywhere. A Hushmark-owned find would behave the same on every platform. zathura's shape fits Hushmark's restraint: a one-line prompt that appears only while typing, highlighted matches, and keys to step to the next and previous match, with nothing left on screen afterwards.
 - **Remembered zoom and layout.** Zoom and layout deliberately reset to Page at 100% on every launch. Reconsider remembering the last zoom level for readers who always need larger text; this would be persisted state, not a settings surface.
 - **Dark appearance.** The reader stays light on every platform until a shared dark reader design exists. Decide whether to design one, for example a warm dark paper that follows the operating-system appearance.
 - **Help shortcut.** Ctrl+H usually means History or Replace elsewhere. Consider adding F1 as a conventional alternative.
@@ -76,7 +78,7 @@ These came out of the October 2026 quality review. Each needs an explicit produc
 These are speculative unless a future request explicitly accepts them:
 
 - Overlay controls that appear only when needed and do not become a persistent toolbar.
-- Table-of-contents overlay generated from document headings.
+- Table-of-contents view generated from document headings. To avoid a sidebar, it could replace the document while open, like Home, toggled by a key, and jump to the chosen heading on activation, which is how zathura presents its outline. Hushmark already generates heading anchors and same-document fragment history for it to build on.
 - Source/render toggle for inspection only, with no editing workflow.
 - More Markdown fixtures or focused tests for parser, sanitization, image, link, and navigation edge cases.
 - Frontend tests for setup affordance behavior and DOM-level rendering, if a DOM test environment proves worthwhile.
