@@ -60,6 +60,8 @@ GitHub Actions uses the same Universal build command without signing credentials
 
 ## Release Flow
 
+When the owner asks an agent for a release, the agent runs the whole flow below without handing steps back: version and changelog, checks, push and tag, release notes, the smoke-test decision (using the Smoke Tests section; on a machine that can't run a required manual test, say so rather than claim it), publishing, and the AUR update. Report what was done and what was verified at the end.
+
 Use this sequence for a public release:
 
 1. Set the version with `node scripts/version.mjs <version>` and move `CHANGELOG.md` notes from `Unreleased` to the new version.
