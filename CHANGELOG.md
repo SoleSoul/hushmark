@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## 0.3.2
+
+Security update.
+
+- Update the Markdown parser to fix published advisories (RUSTSEC-2026-0414 and RUSTSEC-2026-0433).
+
 ## 0.3.1
 
 Performance, security, and platform update.
