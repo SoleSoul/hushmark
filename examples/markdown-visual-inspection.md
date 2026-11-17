@@ -598,6 +598,61 @@ This sentence mixes English with עברית in the same line so bidirectional re
 
 ---
 
+## Feature: Right-to-left text direction
+
+**Expect:** Each top-level paragraph, heading, blockquote, list, and table takes its direction from its first strong letter, and content nested in quotes, lists, and tables follows its container. Hebrew blocks read right to left with right alignment, a right-side quote rule, right-side list markers and indentation, and right-to-left table columns placed against the right edge of the measure. English blocks remain left to right. Inline code, code blocks, and mathematics stay left to right inside Hebrew text, and their punctuation stays in place. Authored `dir` attributes are respected, and Markdown inside an authored `<div dir="rtl">` wrapper stays right to left even when a block starts with an English word.
+
+**Usage:**
+
+### כותרת בעברית
+
+זוהי פסקה בעברית עם מילה באנגלית (Hushmark) ופיסוק בסוף משפט!
+
+פסקה עם קוד: הריצו את `npm run build` ואחר כך את `cargo test --quiet`. נוסחה: $a^2 + b^2 = c^2$.
+
+> ציטוט בעברית: הקו צריך להופיע בצד ימין.
+>
+> פסקה שנייה בציטוט, עם English inside.
+
+- פריט ראשון
+- פריט שני עם English words
+  - פריט מקונן
+- [x] משימה שהושלמה
+
+1. צעד ראשון
+2. צעד שני
+
+| שם | ערך | הערה |
+| --- | ---: | :---: |
+| אלף | 1 | ראשון |
+| בית | 22 | <bdi>C++</bdi> |
+
+```text
+// Code blocks stay left to right: שלום
+let greeting = "שלום";
+```
+
+English paragraph after Hebrew content stays left to right.
+
+123 — a paragraph starting with digits takes its direction from the first letter.
+
+<p dir="rtl">Authored dir="rtl" keeps this English paragraph right to left.</p>
+
+<div dir="rtl">
+
+**Wrapped:** רשימה בתוך עטיפה מפורשת נשארת מימין לשמאל.
+
+- **Greedy decoding** הוא דטרמיניסטי.
+- **Random sampling** מגוון יותר.
+
+| n | ערך |
+| --- | ---: |
+| 2 | 508 |
+
+</div>
+
+---
+
 ## Feature: Very long paragraph token
 
 **Expect:** The document should not become unusably wide. Long text should wrap or be contained reasonably.

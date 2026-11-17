@@ -41,6 +41,7 @@ The reader is expected to handle ordinary CommonMark-style documents with:
 - inline `$...$` and display `$$...$$` TeX mathematics
 - fenced Mermaid diagrams
 - Unicode text, including Hebrew
+- per-block right-to-left and left-to-right text direction
 
 ## Known limitations
 
@@ -61,6 +62,22 @@ Tables use the browser's automatic, content-sensitive column sizing. Ordinary sh
 Do not impose equal-width or position-based column rules on general Markdown tables. Markdown does not identify columns as labels, numbers, or prose, so fixed widths and first-column assumptions create surprising results across real documents.
 
 Possible future minimum-height optimization approaches are recorded in `docs/table-layout-optimization.md`. Current Hushmark behavior intentionally remains browser-driven.
+
+## Text direction
+
+Hushmark follows the per-block direction model used by common rendered-Markdown hosts such as GitHub and GitLab, built on the HTML `dir="auto"` attribute. `dir="auto"` resolves a block's base direction from its first strong character, as in Unicode Bidirectional Algorithm rules P2 and P3. This suits Markdown, which has no direction syntax of its own.
+
+- Top-level paragraphs, headings, blockquotes, lists, and tables, plus the front matter block and each front matter value, receive `dir="auto"` from the Rust renderer.
+- Blockquotes, lists, and tables resolve one direction for their whole contents, and everything nested inside them inherits it. List markers, quote rules, and column order therefore stay consistent when items or cells mix scripts, and tight and loose lists behave alike. Nested blocks deliberately do not receive their own `dir="auto"`: HTML skips descendants with their own `dir` when resolving `dir="auto"`, which would leave a quote or loose list resolving left to right regardless of its text.
+- Inside an inherited right-to-left context, a left-to-right fragment ending in punctuation, such as `C++` alone in a table cell, follows ordinary bidi ordering. Authors can wrap such a fragment in `<bdi>` to isolate it.
+- A block with no strong characters, such as one containing only digits or punctuation, follows the WebView's `dir="auto"` fallback.
+- Inline code, code blocks, invalid Mermaid source, and mathematics always read left to right and are bidi-isolated from surrounding text, so a Hebrew sentence cannot reorder their punctuation.
+- Reader styles use logical properties, so the blockquote rule, list indentation, task-list markers, front matter rule, and default table-header alignment follow each block's direction on screen and in print. Right-to-left tables and front matter sit against the right edge of the measure.
+- Explicit Markdown table alignment (`:---`, `---:`) stays physical left or right, as specified by GitHub-Flavored Markdown.
+- Authored raw HTML may set `dir="ltr"`, `dir="rtl"`, or `dir="auto"` on any allowed element, and `<bdi>` / `<bdo>` are kept. Other `dir` values are removed.
+- An explicit authored direction wins over detection. Markdown blocks inside raw HTML whose nearest `dir` is `ltr` or `rtl`, such as the common `<div dir="rtl">` wrapper separated from its Markdown by blank lines, inherit that direction instead of receiving `dir="auto"`. A Hebrew list whose first item starts with an English term therefore stays right to left inside such a wrapper. A nearer `dir="auto"` wrapper restores detection. This deliberately differs from GitHub, where wrapped blocks still resolve their own direction.
+- The renderer follows authored wrappers by reading opening and closing tags in raw HTML, skipping comments, void elements, and self-closing tags. This only decides where `dir="auto"` is added; the sanitizer still checks all authored HTML.
+- There is no document-wide direction setting or detection, and Home, Setup, and error states remain left to right.
 
 ## Mathematics
 
@@ -139,7 +156,7 @@ Manual visual checklist:
 - Relative Markdown images render when the referenced file is under the document folder.
 - Relative raw HTML `<img>` images render when the referenced file is under the document folder and uses a supported image extension.
 - Images do not overflow the reading column.
-- Hebrew and mixed English/Hebrew text display correctly.
+- Hebrew and mixed English/Hebrew text display correctly; Hebrew blocks read right to left with right-side quote rules, list markers, and table columns, while code and math stay left to right.
 - Raw unsafe HTML does not execute or display unsafe script/link behavior.
 - Valid YAML front matter appears as quiet metadata without raw delimiters, while malformed or unterminated front matter remains visible as Markdown.
 - Inline mathematics follows the prose baseline, display mathematics is centered, and long expressions overflow locally without widening the document.

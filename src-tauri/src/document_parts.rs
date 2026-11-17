@@ -41,12 +41,12 @@ pub(crate) fn render_front_matter_to_safe_html(front_matter: Option<&FrontMatter
         return String::new();
     };
 
-    let mut rendered = String::from("<dl class=\"hushmark-front-matter\">");
+    let mut rendered = String::from("<dl class=\"hushmark-front-matter\" dir=\"auto\">");
 
     for (key, value) in &front_matter.fields {
         rendered.push_str("<dt>");
         rendered.push_str(&escape_html_text(key));
-        rendered.push_str("</dt><dd>");
+        rendered.push_str("</dt><dd dir=\"auto\">");
         render_yaml_value(value, &mut rendered);
         rendered.push_str("</dd>");
     }
@@ -65,6 +65,10 @@ pub(crate) fn render_front_matter_to_safe_html(front_matter: Option<&FrontMatter
     builder.tags(allowed_tags);
     builder.add_allowed_classes("dl", &allowed_classes);
     builder.add_allowed_classes("span", &allowed_span_classes);
+    // Metadata follows the reader's per-block direction policy: the block takes
+    // its direction from the first key and each value resolves its own.
+    builder.add_tag_attribute_values("dl", "dir", &["auto"]);
+    builder.add_tag_attribute_values("dd", "dir", &["auto"]);
     builder.clean(&rendered).to_string()
 }
 
@@ -196,8 +200,8 @@ mod tests {
         assert_eq!(parts.markdown_start, source.find("# Introduction").unwrap());
 
         let html = render_front_matter_to_safe_html(parts.front_matter.as_ref());
-        assert!(html.contains("<dt>title</dt><dd>Guide</dd>"));
-        assert!(html.contains("<dt>draft</dt><dd>false</dd>"));
+        assert!(html.contains("<dt>title</dt><dd dir=\"auto\">Guide</dd>"));
+        assert!(html.contains("<dt>draft</dt><dd dir=\"auto\">false</dd>"));
     }
 
     #[test]
@@ -253,10 +257,11 @@ mod tests {
         let parts = parse_document_parts(source);
         let html = render_front_matter_to_safe_html(parts.front_matter.as_ref());
 
-        assert!(html.contains("<dt>title</dt><dd>A quoted value</dd>"));
-        assert!(html.contains("<dt>description</dt><dd>**plain**, not Markdown</dd>"));
-        assert!(html.contains("<dt>tags</dt><dd>ai, markdown</dd>"));
-        assert!(html.contains("<dt>owner</dt><dd><span class=\"hushmark-front-matter-map\">"));
+        assert!(html.contains("<dt>title</dt><dd dir=\"auto\">A quoted value</dd>"));
+        assert!(html.contains("<dt>description</dt><dd dir=\"auto\">**plain**, not Markdown</dd>"));
+        assert!(html.contains("<dt>tags</dt><dd dir=\"auto\">ai, markdown</dd>"));
+        assert!(html
+            .contains("<dt>owner</dt><dd dir=\"auto\"><span class=\"hushmark-front-matter-map\">"));
         assert!(html.contains(
             "<span class=\"hushmark-front-matter-key\">name</span>: Reader &lt;script&gt;alert(1)&lt;/script&gt;"
         ));
@@ -273,8 +278,8 @@ mod tests {
         let parts = parse_document_parts(source);
         let html = render_front_matter_to_safe_html(parts.front_matter.as_ref());
 
-        assert!(html.contains("<dt>description</dt><dd>First line\nSecond line</dd>"));
-        assert!(html.contains("<dt>spacing</dt><dd>First  second</dd>"));
+        assert!(html.contains("<dt>description</dt><dd dir=\"auto\">First line\nSecond line</dd>"));
+        assert!(html.contains("<dt>spacing</dt><dd dir=\"auto\">First  second</dd>"));
     }
 
     #[test]

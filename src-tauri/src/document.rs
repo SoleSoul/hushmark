@@ -159,6 +159,7 @@ fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path
     let mut placeholders = Placeholders::new();
     let mut table_alignments = TableAlignmentRewriter::new();
     let mut heading_ids = HeadingIdRewriter::new(collect_heading_ids(markdown));
+    let mut text_direction = TextDirectionRewriter::new();
     let mut rendered = String::new();
 
     {
@@ -167,6 +168,7 @@ fn render_markdown_body_to_safe_html(markdown: &str, document_path: Option<&Path
             let event = heading_ids.rewrite_event(event, &mut placeholders);
             let event = rewrite_task_list_marker(event, &mut placeholders);
             let event = rewrite_mermaid_code_block(event, &mut placeholders);
+            let event = text_direction.rewrite_event(event);
             rewrite_math(event, &mut placeholders)
         });
         html::push_html(&mut rendered, parser);
@@ -198,16 +200,321 @@ fn sanitize_rendered_html(
         builder.add_tag_attribute_values(tag, "id", &heading_ids);
     }
 
+    builder.add_generic_attributes(["dir"]);
+
     // Runs after the sanitizer's URL checks, so Markdown and raw HTML images
     // both reach it only with a source that is already safe to keep.
     builder.attribute_filter(
         move |element, attribute, value| match (element, attribute) {
             ("img", "src") => Some(image_source(image_base_dir.as_deref(), value)),
+            (_, "dir") => text_direction_attribute(value),
             _ => Some(value.into()),
         },
     );
 
     builder.clean(rendered).to_string()
+}
+
+/// Gives top-level Markdown blocks HTML `dir="auto"`, so each block takes its
+/// base direction from its first strong character (Unicode bidi rules P2-P3),
+/// following common rendered-Markdown practice.
+///
+/// Blockquotes, lists, and tables resolve one direction for their whole
+/// contents, and nested blocks inherit it. HTML `dir="auto"` skips descendants
+/// that carry their own `dir`, so giving nested paragraphs `dir="auto"` would
+/// leave their container without text to resolve from. Code, math, and diagrams
+/// are kept left-to-right by CSS.
+///
+/// An explicit `dir="ltr"` or `dir="rtl"` on authored raw HTML around Markdown,
+/// such as a `<div dir="rtl">` wrapper, wins over detection: blocks inside it
+/// inherit the authored direction instead of resolving their own.
+struct TextDirectionRewriter {
+    container_depth: usize,
+    authored_scope: AuthoredDirectionScope,
+}
+
+impl TextDirectionRewriter {
+    fn new() -> Self {
+        Self {
+            container_depth: 0,
+            authored_scope: AuthoredDirectionScope::default(),
+        }
+    }
+
+    fn rewrite_event<'a>(&mut self, event: Event<'a>) -> Event<'a> {
+        let resolves_own_direction =
+            self.container_depth == 0 && !self.authored_scope.is_explicit();
+
+        match &event {
+            Event::Html(html) | Event::InlineHtml(html) => {
+                self.authored_scope.scan(html);
+                return event;
+            }
+            Event::End(TagEnd::HtmlBlock) => {
+                self.authored_scope.end_html_block();
+                return event;
+            }
+            Event::Start(Tag::BlockQuote(_) | Tag::List(_) | Tag::Table(_)) => {
+                self.container_depth += 1;
+            }
+            Event::End(TagEnd::BlockQuote(_) | TagEnd::List(_) | TagEnd::Table) => {
+                self.container_depth = self.container_depth.saturating_sub(1);
+            }
+            _ => {}
+        }
+
+        if !resolves_own_direction {
+            return event;
+        }
+
+        match event {
+            Event::Start(Tag::Paragraph) => Event::Html(CowStr::from("<p dir=\"auto\">")),
+            Event::Start(Tag::Heading {
+                level,
+                id,
+                classes,
+                mut attrs,
+            }) => {
+                attrs.push((CowStr::from("dir"), Some(CowStr::from("auto"))));
+                Event::Start(Tag::Heading {
+                    level,
+                    id,
+                    classes,
+                    attrs,
+                })
+            }
+            Event::Start(Tag::BlockQuote(None)) => {
+                Event::Html(CowStr::from("\n<blockquote dir=\"auto\">\n"))
+            }
+            Event::Start(Tag::List(None)) => Event::Html(CowStr::from("\n<ul dir=\"auto\">\n")),
+            Event::Start(Tag::List(Some(1))) => Event::Html(CowStr::from("\n<ol dir=\"auto\">\n")),
+            Event::Start(Tag::List(Some(start))) => Event::Html(CowStr::from(format!(
+                "\n<ol dir=\"auto\" start=\"{start}\">\n"
+            ))),
+            Event::Start(Tag::Table(_)) => Event::Html(CowStr::from("<table dir=\"auto\">")),
+            _ => event,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AuthoredDirection {
+    Explicit,
+    Auto,
+}
+
+/// Follows the raw HTML elements left open around Markdown blocks and the
+/// direction the nearest of them sets. This only decides whether generated
+/// blocks receive `dir="auto"`; the sanitizer still checks all authored HTML.
+#[derive(Default)]
+struct AuthoredDirectionScope {
+    open_elements: Vec<(String, Option<AuthoredDirection>)>,
+    /// An opening or closing tag that continues on the next line of an HTML block.
+    pending: String,
+    in_comment: bool,
+}
+
+/// Longer unfinished tags are abandoned, so rescanning them stays cheap.
+const MAX_PENDING_TAG_LEN: usize = 4096;
+
+impl AuthoredDirectionScope {
+    fn is_explicit(&self) -> bool {
+        self.open_elements
+            .iter()
+            .rev()
+            .find_map(|(_, direction)| *direction)
+            == Some(AuthoredDirection::Explicit)
+    }
+
+    fn end_html_block(&mut self) {
+        self.pending.clear();
+        self.in_comment = false;
+    }
+
+    fn scan(&mut self, html: &str) {
+        let mut input = std::mem::take(&mut self.pending);
+        input.push_str(html);
+        let mut rest = input.as_str();
+
+        if self.in_comment {
+            let Some(end) = rest.find("-->") else {
+                return;
+            };
+            self.in_comment = false;
+            rest = &rest[end + 3..];
+        }
+
+        while let Some(start) = rest.find('<') {
+            let markup = &rest[start..];
+            let Some(end) = markup_end(markup) else {
+                if markup.starts_with("<!--") {
+                    self.in_comment = true;
+                } else if markup.len() <= MAX_PENDING_TAG_LEN {
+                    self.pending = markup.to_string();
+                }
+                return;
+            };
+
+            self.apply_markup(&markup[..end]);
+            rest = &markup[end..];
+        }
+    }
+
+    fn apply_markup(&mut self, markup: &str) {
+        if let Some(closing) = markup.strip_prefix("</") {
+            let name = element_name(closing);
+            if let Some(index) = self
+                .open_elements
+                .iter()
+                .rposition(|(open_name, _)| *open_name == name)
+            {
+                self.open_elements.truncate(index);
+            }
+            return;
+        }
+
+        let Some(opening) = markup.strip_prefix('<') else {
+            return;
+        };
+        let name = element_name(opening);
+        let self_closing = markup.trim_end_matches('>').trim_end().ends_with('/');
+
+        if name.is_empty() || self_closing || is_void_element(&name) {
+            return;
+        }
+
+        let direction = tag_attribute(opening, "dir").and_then(|value| {
+            match value.trim().to_ascii_lowercase().as_str() {
+                "ltr" | "rtl" => Some(AuthoredDirection::Explicit),
+                "auto" => Some(AuthoredDirection::Auto),
+                _ => None,
+            }
+        });
+        self.open_elements.push((name, direction));
+    }
+}
+
+/// Returns the length of the tag or comment starting at `markup`, `Some(1)`
+/// when the `<` is ordinary text, or `None` when it continues past the input.
+fn markup_end(markup: &str) -> Option<usize> {
+    if markup.starts_with("<!--") {
+        return markup.find("-->").map(|end| end + 3);
+    }
+
+    let starts_markup = markup[1..]
+        .chars()
+        .next()
+        .is_some_and(|next| next.is_ascii_alphabetic() || matches!(next, '/' | '!' | '?'));
+    if !starts_markup {
+        return Some(1);
+    }
+
+    let mut quote = None;
+    for (index, character) in markup.char_indices().skip(1) {
+        match (quote, character) {
+            (Some(open), _) if character == open => quote = None,
+            (Some(_), _) => {}
+            (None, '"' | '\'') => quote = Some(character),
+            (None, '>') => return Some(index + 1),
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn element_name(tag: &str) -> String {
+    tag.chars()
+        .take_while(|character| character.is_ascii_alphanumeric() || *character == '-')
+        .collect::<String>()
+        .to_ascii_lowercase()
+}
+
+fn is_void_element(name: &str) -> bool {
+    matches!(
+        name,
+        "area"
+            | "base"
+            | "br"
+            | "col"
+            | "embed"
+            | "hr"
+            | "img"
+            | "input"
+            | "link"
+            | "meta"
+            | "source"
+            | "track"
+            | "wbr"
+    )
+}
+
+/// Reads one attribute value from the inside of an opening tag, after `<`.
+fn tag_attribute<'t>(tag: &'t str, wanted: &str) -> Option<&'t str> {
+    let bytes = tag.as_bytes();
+    let is_space = |byte: u8| byte.is_ascii_whitespace();
+    let mut index = bytes
+        .iter()
+        .position(|&byte| is_space(byte) || byte == b'/' || byte == b'>')?;
+
+    loop {
+        while index < bytes.len() && (is_space(bytes[index]) || bytes[index] == b'/') {
+            index += 1;
+        }
+        if index >= bytes.len() || bytes[index] == b'>' {
+            return None;
+        }
+
+        let name_start = index;
+        while index < bytes.len()
+            && !matches!(bytes[index], b'=' | b'>' | b'/')
+            && !is_space(bytes[index])
+        {
+            index += 1;
+        }
+        let name = &tag[name_start..index];
+
+        while index < bytes.len() && is_space(bytes[index]) {
+            index += 1;
+        }
+        let value = if index < bytes.len() && bytes[index] == b'=' {
+            index += 1;
+            while index < bytes.len() && is_space(bytes[index]) {
+                index += 1;
+            }
+            let (value_start, value_end) = match bytes.get(index) {
+                Some(&quote @ (b'"' | b'\'')) => {
+                    let start = index + 1;
+                    let end = tag[start..]
+                        .find(quote as char)
+                        .map_or(bytes.len(), |end| start + end);
+                    index = (end + 1).min(bytes.len());
+                    (start, end)
+                }
+                _ => {
+                    let start = index;
+                    while index < bytes.len() && !is_space(bytes[index]) && bytes[index] != b'>' {
+                        index += 1;
+                    }
+                    (start, index)
+                }
+            };
+            &tag[value_start..value_end]
+        } else {
+            ""
+        };
+
+        if name.eq_ignore_ascii_case(wanted) {
+            return Some(value);
+        }
+    }
+}
+
+/// Keeps a `dir` attribute only when it names a valid HTML direction,
+/// normalized to lowercase.
+fn text_direction_attribute(value: &str) -> Option<Cow<'_, str>> {
+    let direction = value.trim().to_ascii_lowercase();
+    matches!(direction.as_str(), "ltr" | "rtl" | "auto").then(|| Cow::Owned(direction))
 }
 
 fn markdown_options() -> Options {
@@ -803,8 +1110,8 @@ mod tests {
 
     use super::{
         is_markdown_path, load_dropped_markdown_file, load_initial_document_from_arg,
-        load_linked_markdown_file, load_markdown_file, markdown_options,
-        render_document_to_safe_html, render_markdown_to_safe_html,
+        load_linked_markdown_file, load_markdown_file, markdown_options, markup_end,
+        render_document_to_safe_html, render_markdown_to_safe_html, tag_attribute,
     };
 
     #[test]
@@ -826,10 +1133,123 @@ mod tests {
             "| Feature | State |\n| --- | --- |\n| Tables | Enabled |\n\n~~removed~~",
         );
 
-        assert!(html.contains("<table>"));
+        assert!(html.contains("<table dir=\"auto\">"));
         assert!(html.contains("<th>Feature</th>"));
         assert!(html.contains("<td>Enabled</td>"));
         assert!(html.contains("<del>removed</del>"));
+    }
+
+    #[test]
+    fn generated_text_blocks_resolve_their_own_direction() {
+        let html = render_markdown_to_safe_html(
+            "# שלום\n\nפסקה\n\n> ציטוט\n\n- one\n- two\n\n1. first\n\npause\n\n3. third\n\n| א | ב |\n| --- | --- |\n| 1 | 2 |",
+        );
+
+        assert!(html.contains("<h1 id=\"שלום\" dir=\"auto\">שלום</h1>"));
+        assert!(html.contains("<p dir=\"auto\">פסקה</p>"));
+        assert!(html.contains("<blockquote dir=\"auto\">\n<p>ציטוט</p>"));
+        assert!(html.contains("<ul dir=\"auto\">\n<li>one</li>"));
+        assert!(html.contains("<ol dir=\"auto\">\n<li>first</li>"));
+        assert!(html.contains("<ol dir=\"auto\" start=\"3\">"));
+        assert!(html.contains("<table dir=\"auto\"><thead><tr><th>א</th>"));
+        assert_eq!(html.matches("<p dir=\"auto\">").count(), 2);
+    }
+
+    #[test]
+    fn nested_blocks_inherit_their_container_direction() {
+        let html = render_markdown_to_safe_html(
+            "> # ציטוט\n>\n> פסקה\n>\n> - פריט\n\n- loose\n\n  > quoted\n\n  | a |\n  | --- |\n  | b |\n\n  - nested",
+        );
+
+        assert!(html.contains("<blockquote dir=\"auto\">\n<h1 id=\"ציטוט\">ציטוט</h1>"));
+        assert!(html.contains("<p>פסקה</p>"));
+        assert!(html.contains("<ul>\n<li>פריט</li>"));
+        assert!(html.contains("<ul dir=\"auto\">\n<li>\n<p>loose</p>"));
+        assert!(html.contains("<blockquote>\n<p>quoted</p>"));
+        assert!(html.contains("<table><thead>"));
+        assert!(html.contains("<ul>\n<li>nested</li>"));
+        assert_eq!(html.matches("dir=").count(), 2);
+    }
+
+    #[test]
+    fn code_blocks_and_list_items_do_not_receive_their_own_direction() {
+        let html =
+            render_markdown_to_safe_html("```rust\nlet x = 1;\n```\n\n    indented\n\n- item");
+
+        assert!(html.contains("<pre><code class=\"\">let x = 1;"));
+        assert!(html.contains("<pre><code>indented"));
+        assert!(html.contains("<li>item</li>"));
+    }
+
+    #[test]
+    fn authored_direction_wrappers_win_over_detection() {
+        let html = render_markdown_to_safe_html(
+            "<div dir=\"rtl\">\n\n# כותרת\n\n* **Greedy** הוא\n\n| n | ערך |\n| --- | --- |\n| 2 | 3 |\n\n</div>\n\nafter\n\n| strategy |\n| --- |\n| greedy |",
+        );
+
+        assert!(html.contains("<div dir=\"rtl\">"));
+        assert!(html.contains("<h1 id=\"כותרת\">כותרת</h1>"));
+        assert!(html.contains("<ul>\n<li><strong>Greedy</strong> הוא</li>"));
+        assert!(html.contains("<table><thead><tr><th>n</th>"));
+        assert!(html.contains("<p dir=\"auto\">after</p>"));
+        assert!(html.contains("<table dir=\"auto\"><thead><tr><th>strategy</th>"));
+    }
+
+    #[test]
+    fn nearest_authored_direction_decides_detection() {
+        let html = render_markdown_to_safe_html(
+            "<section dir=\"RTL\"><div dir=\"auto\">\n\nauto inside\n\n</div>\n\nrtl again\n\n</section>\n\n<div lang=\"he\">\n\nno direction\n\n</div>",
+        );
+
+        assert!(html.contains("<p dir=\"auto\">auto inside</p>"));
+        assert!(html.contains("<p>rtl again</p>"));
+        assert!(html.contains("<p dir=\"auto\">no direction</p>"));
+    }
+
+    #[test]
+    fn authored_direction_scope_reads_tags_across_lines_and_ignores_comments() {
+        let html = render_markdown_to_safe_html(
+            "<!-- <div dir=\"rtl\"> -->\n<!--\n<div dir=\"rtl\">\n-->\n\nfirst\n\n<div\n  class=\"x\"\n  dir='ltr'>\n\nsecond\n\n</div>\n\nthird\n\n<div dir=\"rtl\"/><br dir=\"rtl\">\n\nfourth",
+        );
+
+        assert!(html.contains("<p dir=\"auto\">first</p>"));
+        assert!(html.contains("<p>second</p>"));
+        assert!(html.contains("<p dir=\"auto\">third</p>"));
+        assert!(html.contains("<p dir=\"auto\">fourth</p>"));
+    }
+
+    #[test]
+    fn tag_attribute_reads_quoted_unquoted_and_bare_attributes() {
+        assert_eq!(tag_attribute("div hidden dir=rtl>", "dir"), Some("rtl"));
+        assert_eq!(
+            tag_attribute("div title='a > b' DIR = \"ltr\">", "dir"),
+            Some("ltr")
+        );
+        assert_eq!(tag_attribute("div data-dir=\"rtl\">", "dir"), None);
+        assert_eq!(tag_attribute("div>", "dir"), None);
+        assert_eq!(markup_end("<div title='a > b'>x"), Some(19));
+        assert_eq!(markup_end("< 3"), Some(1));
+        assert_eq!(markup_end("<div"), None);
+    }
+
+    #[test]
+    fn author_direction_attributes_are_kept_only_when_valid() {
+        let html = render_markdown_to_safe_html(
+            r#"<div dir="RTL">rtl</div>
+<p dir=" ltr ">ltr</p>
+<span dir="auto">auto</span>
+<bdo dir="rtl">bdo</bdo>
+<bdi>bdi</bdi>
+<div dir="sideways" title="kept">bad</div>"#,
+        );
+
+        assert!(html.contains("<div dir=\"rtl\">rtl</div>"));
+        assert!(html.contains("<p dir=\"ltr\">ltr</p>"));
+        assert!(html.contains("<span dir=\"auto\">auto</span>"));
+        assert!(html.contains("<bdo dir=\"rtl\">bdo</bdo>"));
+        assert!(html.contains("<bdi>bdi</bdi>"));
+        assert!(html.contains("<div title=\"kept\">bad</div>"));
+        assert!(!html.contains("sideways"));
     }
 
     #[test]
@@ -928,11 +1348,11 @@ mod tests {
             "---\ntitle: \"AI <Guide>\"\ndraft: false\ncount: 3\n---\n# Introduction",
         );
 
-        assert!(html.contains("<dl class=\"hushmark-front-matter\">"));
-        assert!(html.contains("<dt>title</dt><dd>AI &lt;Guide&gt;</dd>"));
-        assert!(html.contains("<dt>draft</dt><dd>false</dd>"));
-        assert!(html.contains("<dt>count</dt><dd>3</dd>"));
-        assert!(html.contains("<h1 id=\"introduction\">Introduction</h1>"));
+        assert!(html.contains("<dl class=\"hushmark-front-matter\" dir=\"auto\">"));
+        assert!(html.contains("<dt>title</dt><dd dir=\"auto\">AI &lt;Guide&gt;</dd>"));
+        assert!(html.contains("<dt>draft</dt><dd dir=\"auto\">false</dd>"));
+        assert!(html.contains("<dt>count</dt><dd dir=\"auto\">3</dd>"));
+        assert!(html.contains("<h1 id=\"introduction\" dir=\"auto\">Introduction</h1>"));
         assert!(!html.contains("<hr>"));
         assert!(!html.contains("title:"));
         assert!(!html.contains("hushmark-token"));
@@ -960,12 +1380,12 @@ mod tests {
             "# Introduction\n\n## My Section\n\n### Install / Update\n\n#### Four\n\n##### Five\n\n###### Six",
         );
 
-        assert!(html.contains("<h1 id=\"introduction\">Introduction</h1>"));
-        assert!(html.contains("<h2 id=\"my-section\">My Section</h2>"));
-        assert!(html.contains("<h3 id=\"install-update\">Install / Update</h3>"));
-        assert!(html.contains("<h4 id=\"four\">Four</h4>"));
-        assert!(html.contains("<h5 id=\"five\">Five</h5>"));
-        assert!(html.contains("<h6 id=\"six\">Six</h6>"));
+        assert!(html.contains("<h1 id=\"introduction\" dir=\"auto\">Introduction</h1>"));
+        assert!(html.contains("<h2 id=\"my-section\" dir=\"auto\">My Section</h2>"));
+        assert!(html.contains("<h3 id=\"install-update\" dir=\"auto\">Install / Update</h3>"));
+        assert!(html.contains("<h4 id=\"four\" dir=\"auto\">Four</h4>"));
+        assert!(html.contains("<h5 id=\"five\" dir=\"auto\">Five</h5>"));
+        assert!(html.contains("<h6 id=\"six\" dir=\"auto\">Six</h6>"));
         assert!(!html.contains("hushmark-token"));
     }
 
@@ -973,25 +1393,25 @@ mod tests {
     fn duplicate_heading_ids_get_stable_suffixes() {
         let html = render_markdown_to_safe_html("# Intro\n\n## Intro\n\n### Intro");
 
-        assert!(html.contains("<h1 id=\"intro\">Intro</h1>"));
-        assert!(html.contains("<h2 id=\"intro-1\">Intro</h2>"));
-        assert!(html.contains("<h3 id=\"intro-2\">Intro</h3>"));
+        assert!(html.contains("<h1 id=\"intro\" dir=\"auto\">Intro</h1>"));
+        assert!(html.contains("<h2 id=\"intro-1\" dir=\"auto\">Intro</h2>"));
+        assert!(html.contains("<h3 id=\"intro-2\" dir=\"auto\">Intro</h3>"));
     }
 
     #[test]
     fn punctuation_and_empty_heading_slugs_are_predictable() {
         let html = render_markdown_to_safe_html("# !!!\n\n## Install / Update\n\n### ...");
 
-        assert!(html.contains("<h1 id=\"heading\">!!!</h1>"));
-        assert!(html.contains("<h2 id=\"install-update\">Install / Update</h2>"));
-        assert!(html.contains("<h3 id=\"heading-1\">...</h3>"));
+        assert!(html.contains("<h1 id=\"heading\" dir=\"auto\">!!!</h1>"));
+        assert!(html.contains("<h2 id=\"install-update\" dir=\"auto\">Install / Update</h2>"));
+        assert!(html.contains("<h3 id=\"heading-1\" dir=\"auto\">...</h3>"));
     }
 
     #[test]
     fn unicode_heading_ids_are_preserved() {
         let html = render_markdown_to_safe_html("# שלום עולם");
 
-        assert!(html.contains("<h1 id=\"שלום-עולם\">שלום עולם</h1>"));
+        assert!(html.contains("<h1 id=\"שלום-עולם\" dir=\"auto\">שלום עולם</h1>"));
     }
 
     #[test]
@@ -999,7 +1419,7 @@ mod tests {
         let html = render_markdown_to_safe_html("[Jump](#my-section)\n\n## My Section");
 
         assert!(html.contains("<a href=\"#my-section\""));
-        assert!(html.contains("<h2 id=\"my-section\">My Section</h2>"));
+        assert!(html.contains("<h2 id=\"my-section\" dir=\"auto\">My Section</h2>"));
     }
 
     #[test]
@@ -1032,9 +1452,9 @@ mod tests {
 ## Install / Update",
         );
 
-        assert!(html.contains("<h2 id=\"duplicate-heading\">Duplicate heading</h2>"));
-        assert!(html.contains("<h2 id=\"duplicate-heading-1\">Duplicate heading</h2>"));
-        assert!(html.contains("<h2 id=\"install-update\">Install / Update</h2>"));
+        assert!(html.contains("<h2 id=\"duplicate-heading\" dir=\"auto\">Duplicate heading</h2>"));
+        assert!(html.contains("<h2 id=\"duplicate-heading-1\" dir=\"auto\">Duplicate heading</h2>"));
+        assert!(html.contains("<h2 id=\"install-update\" dir=\"auto\">Install / Update</h2>"));
         assert!(!html.contains("alpha0"));
         assert!(!html.contains("alpha1"));
         assert!(!html.contains("hushmark-token"));
@@ -1050,7 +1470,7 @@ mod tests {
 
         assert_eq!(html.matches("id=\"my-section\"").count(), 1);
         assert!(html.contains("<h2>Raw</h2>"));
-        assert!(html.contains("<h2 id=\"my-section\">My Section</h2>"));
+        assert!(html.contains("<h2 id=\"my-section\" dir=\"auto\">My Section</h2>"));
         assert!(!html.contains("onclick"));
         assert!(!html.contains("class=\"evil\""));
     }
@@ -1139,7 +1559,7 @@ mod tests {
         let html =
             render_markdown_to_safe_html("# Hello\n\n<script>alert('xss')</script>\n\n**world**");
 
-        assert!(html.contains("<h1 id=\"hello\">Hello</h1>"));
+        assert!(html.contains("<h1 id=\"hello\" dir=\"auto\">Hello</h1>"));
         assert!(html.contains("<strong>world</strong>"));
         assert!(!html.contains("<script>"));
         assert!(!html.contains("alert('xss')"));
@@ -1321,9 +1741,12 @@ mod tests {
             }
 
             // Mutation XSS shows up as output that changes when parsed and
-            // sanitized again; sanitized output must be stable.
+            // sanitized again; sanitized output must be stable. The reference
+            // sanitizer also keeps the generic `dir` attribute Hushmark allows.
+            let mut reference = ammonia::Builder::default();
+            reference.add_generic_attributes(["dir"]);
             assert_eq!(
-                ammonia::clean(&html),
+                reference.clean(&html).to_string(),
                 html,
                 "{vector:?} produced unstable output"
             );

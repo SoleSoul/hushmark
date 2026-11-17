@@ -540,7 +540,8 @@ body {
   width: fit-content;
   max-width: 100%;
   margin: 0 0 2.25rem;
-  padding: 0.15rem 0 0.15rem 0.9rem;
+  padding-block: 0.15rem;
+  padding-inline: 0.9rem 0;
   border-inline-start: 2px solid #cdbf9f;
   color: #4f555c;
   font-family: var(--font-reader);
@@ -682,7 +683,7 @@ body {
 
 .document ul,
 .document ol {
-  padding-left: 1.6rem;
+  padding-inline-start: 1.6rem;
 }
 
 .document li + li {
@@ -696,7 +697,8 @@ body {
 .document .task-list-marker {
   width: 0.9em;
   height: 0.9em;
-  margin: 0 0.45em 0 -1.35em;
+  margin-block: 0;
+  margin-inline: -1.35em 0.45em;
   accent-color: #786445;
   opacity: 0.8;
   pointer-events: none;
@@ -717,14 +719,33 @@ body {
 }
 
 .document blockquote {
-  padding: 0.15rem 0 0.15rem 1rem;
-  border-left: 4px solid #c8c0ad;
+  padding-block: 0.15rem;
+  padding-inline: 1rem 0;
+  border-inline-start: 4px solid #c8c0ad;
   color: #57606a;
 }
 
 .document code,
 .document pre {
   font-family: var(--font-code);
+}
+
+/*
+ * Code and mathematics read left to right inside any surrounding direction,
+ * isolated so neighboring right-to-left text cannot reorder their punctuation.
+ * An explicit author dir attribute still wins.
+ */
+.document pre:not([dir]),
+.document :not(pre) > code:not([dir]),
+.document .math {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Right-to-left shrink-wrapped blocks sit on the right edge of the measure. */
+.document table:dir(rtl),
+.document .hushmark-front-matter:dir(rtl) {
+  margin-inline-end: auto;
 }
 
 .document code {
@@ -821,7 +842,7 @@ body {
 .document th {
   background: #eee9dc;
   font-family: var(--font-ui);
-  text-align: left;
+  text-align: start;
 }
 
 .document th.hushmark-align-left,
