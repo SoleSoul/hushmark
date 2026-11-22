@@ -6,8 +6,7 @@ This roadmap is not a contract. It is a short parking lot for likely next work a
 
 - Keep `CHANGELOG.md` current under `Unreleased` for user-visible changes.
 - Run the release checklist before publishing any GitHub release or explicitly shared prerelease binary.
-- Smoke-test `examples/markdown-visual-inspection.md`, `examples/math-visual-inspection.md`, `examples/mermaid-visual-inspection.md`, same-document fragments, relative Markdown links, Home/Back/Forward, document zoom/layout, Ctrl+O, Ctrl+P, Ctrl+H, local images, table alignment, external links, and Windows setup mode.
-- Smoke-test the quiet Windows setup entry point and install-version action labels.
+- Rely on CI's browser tests in each platform's engine for shared reader changes, and smoke-test by hand only what the release checklist's Smoke Tests section names: platform-specific changes and areas automation cannot reach.
 
 ## Near-Term Linux Support
 
@@ -60,8 +59,9 @@ A November 2026 comparison with zathura-markdown (a Markdown plugin for the zath
 
 ### Dependencies
 
-- **Tauri 2.12 follow-up.** Upgraded 2026-10-23 and validated on Linux; smoke-test Windows setup and macOS menus and Finder events before the next release.
+- **Tauri 2.12 follow-up.** Upgraded 2026-10-23 and shipped in 0.3.1 through 0.4.0 (Tauri 2.12.7), validated by CI and by hand on Linux. No manual check of Windows setup or of macOS menus and Finder events is recorded since the upgrade; do one the next time a Windows machine or a Mac is at hand, or when those areas change.
 - **Mermaid 12.** Two low-severity advisories remain in the KaTeX copy bundled by Mermaid 11. Mermaid 12 resolves them but is a major upgrade; verify every diagram in `examples/mermaid-visual-inspection.md` at several zoom levels and in print before accepting it.
+- **Other major updates.** Dependencies were updated within their compatible ranges for 0.4.0. Still on older majors: KaTeX 0.18 (0.19 available; check `examples/math-visual-inspection.md` on screen and in print), vite 7 (8), TypeScript 5 (7), and `@types/node` 24 (26). Take each separately, with its own checks.
 
 ### Robustness
 
