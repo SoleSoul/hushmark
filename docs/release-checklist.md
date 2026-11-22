@@ -138,12 +138,12 @@ For an AUR update:
 
 CI's browser tests cover the shared reader on every push: navigation and history, reading positions, zoom and layout shortcuts and Control+wheel, same-document and linked links, external and unsupported links, the file picker and drag and drop hand-off, printing hand-off, mathematics, Mermaid, local images, right-to-left layout, the disabled context menu, and the macOS frontend (Command shortcuts, menu commands and state, Finder open events). CI also launches the real app on Windows, macOS, and Linux and confirms it renders diagrams and mathematics from its bundled assets. A release whose changes stay within those areas needs no manual testing on each operating system.
 
-Smoke-test manually only where automation cannot reach:
+Smoke-test manually only where automation cannot reach, and on Windows or macOS only when a change is made for that platform or gives it a specific reason to break. A shared change that CI exercises in each platform's engine needs no manual check on the other operating systems:
 
 - Windows setup, Open With, right-click, and uninstall: when `src-tauri/src/setup.rs` or Windows identity changes.
 - macOS menus, Finder, Dock, lifecycle, and Gatekeeper: when `src-tauri/src/macos.rs`, `src-tauri/tauri.macos.conf.json`, or `src-tauri/Info.macos.plist` changes, using `docs/macos-support.md`.
 - Native dialogs, print preview, window chrome, and startup on each platform: when Tauri, its plugins, or window configuration change. Linux can be checked locally; the release workflow's builds must at least succeed on Windows and macOS.
-- Visual typography and layout: when `src/styles.css` or rendering markup changes, by viewing the visual-inspection examples.
+- Visual typography and layout: when `src/styles.css` or rendering markup changes, by viewing the visual-inspection examples on the development machine. Repeat the check on Windows or macOS only when the change is specific to that platform's engine, such as a WebView2- or WebKit-only rule or workaround.
 
 The full manual list below remains the reference when those areas change:
 
