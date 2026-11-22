@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Support right-to-left documents: paragraphs, headings, blockquotes, lists, tables, and front matter take their direction from their first strong letter, while code and mathematics stay left to right. Authored `dir` attributes are now kept, and Markdown inside an authored `<div dir="rtl">` wrapper follows the wrapper's direction.
+- Update the HTML sanitizer to fix a published mutation cross-site scripting advisory (RUSTSEC-2026-0533).
 
 ## 0.3.2
 
