@@ -136,7 +136,7 @@ For an AUR update:
 
 ## Smoke Tests
 
-CI's browser tests cover the shared reader on every push: navigation and history, reading positions, zoom and layout shortcuts and Control+wheel, same-document and linked links, external and unsupported links, the file picker and drag and drop hand-off, printing hand-off, mathematics, Mermaid, local images, the disabled context menu, and the macOS frontend (Command shortcuts, menu commands and state, Finder open events). CI also launches the real app on Windows, macOS, and Linux and confirms it renders diagrams and mathematics from its bundled assets. A release whose changes stay within those areas needs no manual testing on each operating system.
+CI's browser tests cover the shared reader on every push: navigation and history, reading positions, zoom and layout shortcuts and Control+wheel, same-document and linked links, external and unsupported links, the file picker and drag and drop hand-off, printing hand-off, mathematics, Mermaid, local images, right-to-left layout, the disabled context menu, and the macOS frontend (Command shortcuts, menu commands and state, Finder open events). CI also launches the real app on Windows, macOS, and Linux and confirms it renders diagrams and mathematics from its bundled assets. A release whose changes stay within those areas needs no manual testing on each operating system.
 
 Smoke-test manually only where automation cannot reach:
 
@@ -163,7 +163,7 @@ The full manual list below remains the reference when those areas change:
 - Open `examples/print-visual-inspection.md`, check Ctrl+P print preview and Print to PDF, and confirm Ctrl+P does nothing in empty, error, and setup views.
 - Check same-document fragments, missing fragments, Alt+Left, and Alt+Right.
 - Check relative `.md` / `.markdown` links, linked fragments, Back/Forward, and blocked unsafe links.
-- Check local images, table alignment, code overflow, Hebrew text, and unsafe HTML examples.
+- Check local images, table alignment, code overflow, Hebrew and right-to-left text, and unsafe HTML examples.
 - Check external `https:` and `mailto:` links open outside Hushmark.
 - Confirm the internal WebView context menu remains disabled.
 - If setup changed, smoke install/update/downgrade labels, Open With, right-click entry, and complete uninstall behavior on Windows.

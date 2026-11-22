@@ -304,6 +304,35 @@ test.describe("rendering", () => {
     await expect(article(page).locator("pre code").filter({ hasText: "Start -->" })).toHaveCount(1);
   });
 
+  test("lays out right-to-left blocks and keeps code left to right", async ({ page }) => {
+    await open(page, { doc: "markdown-visual-inspection.md" });
+
+    const content = article(page).locator(".document__content");
+    const direction = (locator: ReturnType<Page["locator"]>) =>
+      locator.evaluate((element) => getComputedStyle(element).direction);
+    const rightEdge = (locator: ReturnType<Page["locator"]>) =>
+      locator.evaluate((element) => Math.round(element.getBoundingClientRect().right));
+
+    expect(await direction(content.locator("h3", { hasText: "כותרת בעברית" }))).toBe("rtl");
+    expect(await direction(content.locator("p", { hasText: "English paragraph after Hebrew" }))).toBe("ltr");
+    expect(await direction(content.locator('p[dir="rtl"]', { hasText: "Authored" }))).toBe("rtl");
+
+    const paragraphWithCode = content.locator("p", { hasText: "npm run build" });
+    expect(await direction(paragraphWithCode)).toBe("rtl");
+    expect(await direction(paragraphWithCode.locator("code").first())).toBe("ltr");
+
+    const quote = content.locator("blockquote", { hasText: "ציטוט בעברית" });
+    expect(await quote.evaluate((element) => getComputedStyle(element).borderRightWidth)).toBe("4px");
+    expect(await quote.evaluate((element) => getComputedStyle(element).borderLeftWidth)).toBe("0px");
+
+    const table = content.locator("table", { hasText: "אלף" });
+    expect(await direction(table)).toBe("rtl");
+    expect(Math.abs((await rightEdge(table)) - (await rightEdge(content)))).toBeLessThanOrEqual(1);
+
+    // An authored dir="rtl" wrapper wins over a list that starts with English.
+    expect(await direction(content.locator("ul", { hasText: "Greedy decoding" }))).toBe("rtl");
+  });
+
   test("embeds and decodes local images", async ({ page }) => {
     await open(page, { doc: "markdown-visual-inspection.md" });
 
